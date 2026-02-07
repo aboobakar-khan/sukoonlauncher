@@ -9,6 +9,7 @@ import '../widgets/deen_mode_widget.dart';
 import '../widgets/event_tracker_widget.dart';
 import '../widgets/tasbih_counter_widget.dart';
 import '../widgets/prayer_tracker_widget.dart';
+import '../widgets/screen_time_widget.dart';
 import 'todo_list_screen.dart';
 import 'prayer_tracker_screen.dart';
 import 'premium_paywall_screen.dart';
