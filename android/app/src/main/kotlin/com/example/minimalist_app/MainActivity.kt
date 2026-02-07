@@ -198,8 +198,11 @@ class MainActivity : FlutterActivity() {
     
     private fun getUsageStats(startTime: Long, endTime: Long): List<Map<String, Any>> {
         val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        
+        // Use INTERVAL_BEST for more accurate daily data
+        // INTERVAL_DAILY can aggregate incorrectly across midnight
         val stats = usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_DAILY,
+            UsageStatsManager.INTERVAL_BEST,
             startTime,
             endTime
         )

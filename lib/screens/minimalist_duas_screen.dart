@@ -169,13 +169,13 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFF40C463).withValues(alpha: 0.15),
+              color: const Color(0xFFC2A366).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               '${_duas.length}',
               style: TextStyle(
-                color: const Color(0xFF40C463).withValues(alpha: 0.9),
+                color: const Color(0xFFC2A366).withValues(alpha: 0.9),
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -209,7 +209,7 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isExpanded 
-                ? const Color(0xFF40C463).withValues(alpha: 0.15)
+                ? const Color(0xFFC2A366).withValues(alpha: 0.15)
                 : Colors.white.withValues(alpha: 0.04),
           ),
         ),
@@ -276,7 +276,7 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
               Text(
                 dua['transliteration']!,
                 style: TextStyle(
-                  color: const Color(0xFF40C463).withValues(alpha: 0.7),
+                  color: const Color(0xFFC2A366).withValues(alpha: 0.7),
                   fontSize: 14,
                   fontStyle: FontStyle.italic,
                   height: 1.5,
@@ -309,7 +309,7 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: const Text('Dua copied'),
-                        backgroundColor: const Color(0xFF40C463).withValues(alpha: 0.9),
+                        backgroundColor: const Color(0xFFC2A366).withValues(alpha: 0.9),
                         duration: const Duration(seconds: 1),
                       ),
                     );

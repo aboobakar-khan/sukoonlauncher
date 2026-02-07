@@ -5,13 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/installed_app.dart';
 import '../providers/favorite_apps_provider.dart';
 import '../providers/installed_apps_provider.dart';
-import '../providers/app_interrupt_provider.dart';
-import '../providers/focus_mode_provider.dart';
 import '../providers/theme_provider.dart';
-import '../providers/hidden_apps_provider.dart';
 import '../providers/recent_apps_provider.dart';
+import '../providers/productivity_provider.dart';
 import '../services/app_settings_service.dart';
-import '../widgets/app_interrupt_dialog.dart';
 import 'settings_screen.dart';
 
 /// App List Screen - Minimalist launcher
@@ -28,8 +25,10 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
     with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
   String _searchQuery = '';
   bool _hasAutoLaunched = false; // Prevent multiple auto-launches
+  String? _activeAlpha; // Currently highlighted letter
 
   @override
   void initState() {
@@ -82,10 +81,9 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
   }
 
   Future<void> _refreshAppList() async {
-    final hiddenApps = ref.read(hiddenAppsProvider);
     await ref
         .read(installedAppsProvider.notifier)
-        .refreshApps(hiddenApps: hiddenApps);
+        .refreshApps();
   }
 
   @override
@@ -94,38 +92,28 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   Future<void> _launchApp(String packageName) async {
     // Unfocus search when launching
     _searchFocusNode.unfocus();
-    
-    // Check if focus mode is blocking this app
-    final focusModeNotifier = ref.read(focusModeProvider.notifier);
-    if (focusModeNotifier.isAppBlocked(packageName)) {
-      final focusMode = ref.read(focusModeProvider);
-      _showFocusModeBlockDialog(
-        focusMode.blockMessage ?? 'Focus mode is active. This app is blocked.',
-      );
-      return;
-    }
 
-    // Check if app has an interrupt configured
-    final interruptNotifier = ref.read(appInterruptProvider.notifier);
-    final interrupt = interruptNotifier.getInterrupt(packageName);
-
-    if (interrupt != null && interrupt.isEnabled) {
-      final shouldProceed = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) =>
-            AppInterruptDialog(interrupt: interrupt, onSuccess: () {}),
-      );
-
-      if (shouldProceed != true) {
-        return;
+    // Check app blocker
+    final blocker = ref.read(appBlockRuleProvider.notifier);
+    if (blocker.isAppBlocked(packageName)) {
+      final msg = blocker.getBlockMessage(packageName) ?? 'Stay focused! 🐪';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: const Color(0xFFE8915A).withValues(alpha: 0.9),
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
+      return;
     }
 
     // Track as recent app
@@ -152,8 +140,123 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
     }
   }
 
+  void _scrollToLetter(String letter, List<InstalledApp> apps) {
+    final itemHeight = 48.0; // Approximate height of each app item (padding 12*2 + text)
+    final index = apps.indexWhere(
+        (app) => app.appName.toUpperCase().startsWith(letter));
+    if (index != -1) {
+      final offset = index * itemHeight;
+      _scrollController.animateTo(
+        offset.clamp(0.0, _scrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+      HapticFeedback.selectionClick();
+      setState(() => _activeAlpha = letter);
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) setState(() => _activeAlpha = null);
+      });
+    }
+  }
+
+  Widget _buildAlphabetSidebar(List<InstalledApp> apps, AppThemeColor themeColor) {
+    // Get available first letters from app list
+    final availableLetters = <String>{};
+    for (final app in apps) {
+      if (app.appName.isNotEmpty) {
+        final first = app.appName[0].toUpperCase();
+        if (RegExp(r'[A-Z]').hasMatch(first)) {
+          availableLetters.add(first);
+        }
+      }
+    }
+
+    const allLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+    return Positioned(
+      right: 0,
+      top: 0,
+      bottom: 0,
+      child: Center(
+        child: GestureDetector(
+          onVerticalDragStart: (details) {
+            _handleAlphabetDrag(details.localPosition.dy, allLetters, availableLetters, apps, context);
+          },
+          onVerticalDragUpdate: (details) {
+            _handleAlphabetDrag(details.localPosition.dy, allLetters, availableLetters, apps, context);
+          },
+          onVerticalDragEnd: (_) {
+            Future.delayed(const Duration(milliseconds: 400), () {
+              if (mounted) setState(() => _activeAlpha = null);
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: allLetters.split('').map((letter) {
+                final isAvailable = availableLetters.contains(letter);
+                final isActive = _activeAlpha == letter;
+                return GestureDetector(
+                  onTap: isAvailable ? () => _scrollToLetter(letter, apps) : null,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
+                    width: isActive ? 24 : 20,
+                    height: isActive ? 24 : 18,
+                    alignment: Alignment.center,
+                    margin: const EdgeInsets.symmetric(vertical: 0.5),
+                    decoration: isActive
+                        ? BoxDecoration(
+                            color: themeColor.color.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(8),
+                          )
+                        : null,
+                    child: Text(
+                      letter,
+                      style: TextStyle(
+                        color: isActive
+                            ? themeColor.color
+                            : isAvailable
+                                ? Colors.white.withValues(alpha: 0.55)
+                                : Colors.white.withValues(alpha: 0.1),
+                        fontSize: isActive ? 12 : 10,
+                        fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                        height: 1.0,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _handleAlphabetDrag(double localY, String allLetters, Set<String> availableLetters, List<InstalledApp> apps, BuildContext context) {
+    // Calculate based on the sidebar's actual rendered height
+    final totalLetters = allLetters.length;
+    // Each letter: 18px height + 1px margin = ~19px, active = 25px. Avg ~19px
+    final sidebarHeight = totalLetters * 19.0 + 12; // 6px padding top+bottom
+    final adjustedY = localY - 6; // offset for top padding
+    final index = (adjustedY / (sidebarHeight - 12) * totalLetters).floor().clamp(0, totalLetters - 1);
+    final letter = allLetters[index];
+    if (availableLetters.contains(letter) && _activeAlpha != letter) {
+      _scrollToLetter(letter, apps);
+    } else if (_activeAlpha != letter) {
+      setState(() => _activeAlpha = letter);
+    }
+  }
+
   void _showAppOptions(BuildContext context, InstalledApp app, WidgetRef ref) {
     final themeColor = ref.read(themeColorProvider);
+    final isFav = ref.read(favoriteAppsProvider.notifier).isFavorite(app.packageName);
 
     showModalBottomSheet(
       context: context,
@@ -177,41 +280,44 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
             ),
             const Divider(color: Colors.white12),
 
-            // Hide app option
+            // Add/Remove from favorites
             ListTile(
               leading: Icon(
-                Icons.visibility_off,
-                color: themeColor.color.withValues(alpha: 0.7),
+                isFav ? Icons.star : Icons.star_outline,
+                color: isFav
+                    ? const Color(0xFFC2A366)
+                    : const Color(0xFFC2A366).withValues(alpha: 0.6),
               ),
               title: Text(
-                'Hide this app',
+                isFav ? 'Remove from Favorites' : 'Add to Favorites',
                 style: TextStyle(
-                  color: themeColor.color.withValues(alpha: 0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                 ),
               ),
-              onTap: () async {
-                Navigator.pop(context);
-                final color = themeColor.color;
-
-                await ref
-                    .read(hiddenAppsProvider.notifier)
-                    .hideApp(app.packageName, app.appName);
-
-                ref
-                    .read(installedAppsProvider.notifier)
-                    .removeApp(app.packageName);
-
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '${app.appName} hidden. Go to Settings > Hidden Apps to unhide.',
-                        style: TextStyle(color: color.withValues(alpha: 0.9)),
+              subtitle: !isFav
+                  ? Text(
+                      'Max 7 apps',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.3),
+                        fontSize: 11,
                       ),
-                      backgroundColor: Colors.black.withValues(alpha: 0.9),
-                      duration: const Duration(seconds: 3),
+                    )
+                  : null,
+              onTap: () async {
+                final success = await ref
+                    .read(favoriteAppsProvider.notifier)
+                    .toggleFavorite(app.packageName, app.appName);
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                if (!success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Max 7 favorites reached'),
+                      backgroundColor: Color(0xFFE8915A),
                     ),
                   );
+                } else {
+                  HapticFeedback.lightImpact();
                 }
               },
             ),
@@ -288,37 +394,10 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
     );
   }
 
-  void _showFocusModeBlockDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: Row(
-          children: [
-            Icon(Icons.lock_clock, color: Colors.orange.shade400),
-            const SizedBox(width: 12),
-            const Text(
-              'Focus Mode Active',
-              style: TextStyle(color: Colors.white),
-            ),
-          ],
-        ),
-        content: Text(message, style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final allApps = ref.watch(installedAppsProvider);
     final installedAppsNotifier = ref.watch(installedAppsProvider.notifier);
-    ref.watch(hiddenAppsProvider);
 
     final filteredApps = installedAppsNotifier.filterApps(_searchQuery);
     final isRefreshing = installedAppsNotifier.isRefreshing;
@@ -380,7 +459,7 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
                 ),
               ),
 
-              // App list
+              // App list with A-Z sidebar
               Expanded(
                 child: allApps.isEmpty
                     ? Center(
@@ -413,16 +492,24 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
                           ),
                         ),
                       )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        itemCount: filteredApps.length,
-                        cacheExtent: 500,
-                        addAutomaticKeepAlives: false,
-                        addRepaintBoundaries: true,
-                        itemBuilder: (context, index) {
-                          final app = filteredApps[index];
-                          return _buildAppItem(app, themeColor);
-                        },
+                    : Stack(
+                        children: [
+                          ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.only(left: 24, right: 28),
+                            itemCount: filteredApps.length,
+                            cacheExtent: 500,
+                            addAutomaticKeepAlives: false,
+                            addRepaintBoundaries: true,
+                            itemBuilder: (context, index) {
+                              final app = filteredApps[index];
+                              return _buildAppItem(app, themeColor);
+                            },
+                          ),
+                          // A-Z alphabet sidebar (only when not searching)
+                          if (_searchQuery.isEmpty)
+                            _buildAlphabetSidebar(filteredApps, themeColor),
+                        ],
                       ),
               ),
 
@@ -437,12 +524,12 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
 
   Widget _buildBottomSearchBar(AppThemeColor themeColor) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.3),
+        color: Colors.black.withValues(alpha: 0.5),
         border: Border(
           top: BorderSide(
-            color: Colors.white.withValues(alpha: 0.05),
+            color: themeColor.color.withValues(alpha: 0.08),
           ),
         ),
       ),
@@ -451,47 +538,47 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
         focusNode: _searchFocusNode,
         style: TextStyle(
           color: themeColor.color.withValues(alpha: 0.9),
-          fontSize: 16,
-          letterSpacing: 1.0,
+          fontSize: 17,
+          letterSpacing: 0.8,
         ),
         textInputAction: TextInputAction.search,
         decoration: InputDecoration(
-          hintText: 'Type to search apps...',
+          hintText: 'Search apps...',
           hintStyle: TextStyle(
-            color: Colors.white.withValues(alpha: 0.25),
-            fontSize: 16,
+            color: Colors.white.withValues(alpha: 0.3),
+            fontSize: 17,
             letterSpacing: 0.5,
           ),
           filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.05),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          fillColor: Colors.white.withValues(alpha: 0.07),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(24),
-            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: themeColor.color.withValues(alpha: 0.1)),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(24),
-            borderSide: BorderSide(color: themeColor.color.withValues(alpha: 0.3)),
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: themeColor.color.withValues(alpha: 0.35), width: 1.5),
           ),
           prefixIcon: Padding(
-            padding: const EdgeInsets.only(left: 16, right: 8),
+            padding: const EdgeInsets.only(left: 16, right: 10),
             child: Icon(
-              Icons.search,
-              color: Colors.white.withValues(alpha: 0.3),
-              size: 20,
+              Icons.search_rounded,
+              color: themeColor.color.withValues(alpha: 0.4),
+              size: 22,
             ),
           ),
-          prefixIconConstraints: const BoxConstraints(minWidth: 40),
+          prefixIconConstraints: const BoxConstraints(minWidth: 44),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   icon: Icon(
-                    Icons.clear,
-                    color: Colors.white.withValues(alpha: 0.4),
-                    size: 18,
+                    Icons.close_rounded,
+                    color: Colors.white.withValues(alpha: 0.5),
+                    size: 20,
                   ),
                   onPressed: () {
                     _searchController.clear();

@@ -89,10 +89,10 @@ class ThemeColorPickerScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF40C463).withValues(alpha: 0.15),
+                color: const Color(0xFFC2A366).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: const Color(0xFF40C463).withValues(alpha: 0.4),
+                  color: const Color(0xFFC2A366).withValues(alpha: 0.4),
                 ),
               ),
               child: Row(
@@ -100,14 +100,14 @@ class ThemeColorPickerScreen extends ConsumerWidget {
                 children: [
                   Icon(
                     Icons.lock_open,
-                    color: const Color(0xFF40C463),
+                    color: const Color(0xFFC2A366),
                     size: 14,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     '${ThemeColors.all.length - freeThemeCount} PRO',
                     style: const TextStyle(
-                      color: Color(0xFF40C463),
+                      color: Color(0xFFC2A366),
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -245,7 +245,7 @@ class ThemeColorPickerScreen extends ConsumerWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF40C463).withValues(alpha: 0.9),
+                  color: const Color(0xFFC2A366).withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text(

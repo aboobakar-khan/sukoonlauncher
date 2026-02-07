@@ -103,7 +103,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.shopping_cart, color: Color(0xFF40C463)),
+            const Icon(Icons.shopping_cart, color: Color(0xFFC2A366)),
             const SizedBox(width: 12),
             const Text('Purchase', style: TextStyle(color: Colors.white)),
           ],
@@ -140,7 +140,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF40C463),
+              backgroundColor: const Color(0xFFC2A366),
             ),
             child: const Text('Simulate Purchase', style: TextStyle(color: Colors.white)),
           ),
@@ -150,53 +150,12 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
   }
 
   void _showSuccessAnimation() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Center(
-        child: Container(
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.check_circle,
-                color: Color(0xFF40C463),
-                size: 64,
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Welcome to Premium!',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'All features are now unlocked',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const _PremiumCelebrationPage(),
       ),
     );
-    
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        Navigator.pop(context); // Close success dialog
-        Navigator.pop(context); // Close paywall
-      }
-    });
   }
 
   void _dismiss() {
@@ -313,8 +272,8 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                const Color(0xFF40C463),
-                const Color(0xFF30A14E),
+                const Color(0xFFC2A366),
+                const Color(0xFFA67B5B),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -322,7 +281,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF40C463).withValues(alpha: 0.3),
+                color: const Color(0xFFC2A366).withValues(alpha: 0.3),
                 blurRadius: 20,
                 spreadRadius: 5,
               ),
@@ -371,13 +330,13 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF40C463).withValues(alpha: 0.2),
-            const Color(0xFF40C463).withValues(alpha: 0.1),
+            const Color(0xFFC2A366).withValues(alpha: 0.2),
+            const Color(0xFFC2A366).withValues(alpha: 0.1),
           ],
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF40C463).withValues(alpha: 0.3),
+          color: const Color(0xFFC2A366).withValues(alpha: 0.3),
         ),
       ),
       child: Row(
@@ -391,7 +350,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
                 const Text(
                   'Congratulations!',
                   style: TextStyle(
-                    color: Color(0xFF40C463),
+                    color: Color(0xFFC2A366),
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
@@ -463,6 +422,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
       ('🎨', 'All Theme Colors', '12 beautiful themes to personalize'),
       ('📊', 'Advanced Statistics', 'Detailed insights & progress tracking'),
       ('🌙', 'Deen Mode', 'Block distractions during prayer times'),
+      ('🛡️', 'Hard Block Mode', 'Lock blocks permanently — no escape'),
       ('☁️', 'Cloud Backup', 'Never lose your streaks & data'),
       ('📖', 'Full Content Library', 'Complete Hadith & Dua collection'),
     ];
@@ -481,7 +441,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFF40C463).withValues(alpha: 0.1),
+              color: const Color(0xFFC2A366).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Center(
@@ -514,7 +474,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
           ),
           const Icon(
             Icons.check_circle,
-            color: Color(0xFF40C463),
+            color: Color(0xFFC2A366),
             size: 20,
           ),
         ],
@@ -538,12 +498,12 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: isSelected 
-                  ? const Color(0xFF40C463).withValues(alpha: 0.15)
+                  ? const Color(0xFFC2A366).withValues(alpha: 0.15)
                   : const Color(0xFF1A1A1A),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: isSelected 
-                    ? const Color(0xFF40C463)
+                    ? const Color(0xFFC2A366)
                     : Colors.white.withValues(alpha: 0.1),
                 width: isSelected ? 2 : 1,
               ),
@@ -558,7 +518,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: isSelected 
-                          ? const Color(0xFF40C463)
+                          ? const Color(0xFFC2A366)
                           : Colors.white.withValues(alpha: 0.3),
                       width: 2,
                     ),
@@ -569,7 +529,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
                             width: 10,
                             height: 10,
                             decoration: const BoxDecoration(
-                              color: Color(0xFF40C463),
+                              color: Color(0xFFC2A366),
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -602,7 +562,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
                               decoration: BoxDecoration(
                                 color: badge == 'BEST VALUE'
                                     ? Colors.amber.withValues(alpha: 0.2)
-                                    : const Color(0xFF40C463).withValues(alpha: 0.2),
+                                    : const Color(0xFFC2A366).withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
@@ -610,7 +570,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
                                 style: TextStyle(
                                   color: badge == 'BEST VALUE'
                                       ? Colors.amber
-                                      : const Color(0xFF40C463),
+                                      : const Color(0xFFC2A366),
                                   fontSize: 9,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.5,
@@ -624,7 +584,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
                         Text(
                           'Just ₹${plan['monthlyEquivalent']}/month',
                           style: TextStyle(
-                            color: const Color(0xFF40C463).withValues(alpha: 0.8),
+                            color: const Color(0xFFC2A366).withValues(alpha: 0.8),
                             fontSize: 12,
                           ),
                         ),
@@ -659,7 +619,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
                       Text(
                         'Save ${plan['savings']}',
                         style: const TextStyle(
-                          color: Color(0xFF40C463),
+                          color: Color(0xFFC2A366),
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
@@ -682,12 +642,12 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
         padding: const EdgeInsets.symmetric(vertical: 18),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF40C463), Color(0xFF30A14E)],
+            colors: [Color(0xFFC2A366), Color(0xFFA67B5B)],
           ),
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF40C463).withValues(alpha: 0.3),
+              color: const Color(0xFFC2A366).withValues(alpha: 0.3),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -840,17 +800,262 @@ class PremiumGate extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFF40C463).withValues(alpha: 0.2),
+              color: const Color(0xFFC2A366).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(4),
             ),
             child: const Text(
               'UNLOCK',
               style: TextStyle(
-                color: Color(0xFF40C463),
+                color: Color(0xFFC2A366),
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🎉 PREMIUM CELEBRATION PAGE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _PremiumCelebrationPage extends StatefulWidget {
+  const _PremiumCelebrationPage();
+
+  @override
+  State<_PremiumCelebrationPage> createState() =>
+      _PremiumCelebrationPageState();
+}
+
+class _PremiumCelebrationPageState extends State<_PremiumCelebrationPage>
+    with TickerProviderStateMixin {
+  static const _sandGold = Color(0xFFC2A366);
+  static const _camelBrown = Color(0xFFA67B5B);
+  static const _desertSunset = Color(0xFFE8915A);
+
+  late AnimationController _scaleCtrl;
+  late AnimationController _fadeCtrl;
+  late AnimationController _sparkleCtrl;
+  late Animation<double> _scaleAnim;
+  late Animation<double> _fadeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _sparkleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _scaleAnim = CurvedAnimation(parent: _scaleCtrl, curve: Curves.elasticOut);
+    _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
+
+    _scaleCtrl.forward();
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) _fadeCtrl.forward();
+    });
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _sparkleCtrl.repeat(reverse: true);
+    });
+    HapticFeedback.heavyImpact();
+  }
+
+  @override
+  void dispose() {
+    _scaleCtrl.dispose();
+    _fadeCtrl.dispose();
+    _sparkleCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            children: [
+              const Spacer(flex: 2),
+              // Animated badge
+              ScaleTransition(
+                scale: _scaleAnim,
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        _sandGold.withValues(alpha: 0.3),
+                        _sandGold.withValues(alpha: 0.05),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: Center(
+                    child: AnimatedBuilder(
+                      animation: _sparkleCtrl,
+                      builder: (_, child) => Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.black,
+                          border: Border.all(
+                            color: _sandGold.withValues(
+                                alpha: 0.4 + _sparkleCtrl.value * 0.4),
+                            width: 2.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _sandGold.withValues(
+                                  alpha: 0.15 + _sparkleCtrl.value * 0.15),
+                              blurRadius: 30,
+                              spreadRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: const Center(
+                          child: Text(
+                            '🐪',
+                            style: TextStyle(fontSize: 42),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              // Title
+              FadeTransition(
+                opacity: _fadeAnim,
+                child: const Column(
+                  children: [
+                    Text(
+                      'You\'re a Pro Member!',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Jazak Allahu Khayran 🤲',
+                      style: TextStyle(
+                        color: _sandGold,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'All premium features are now unlocked',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 40),
+              // Unlocked features
+              FadeTransition(
+                opacity: _fadeAnim,
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _sandGold.withValues(alpha: 0.12),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      _celebrationFeature('📿', 'Unlimited Dhikr Presets'),
+                      _celebrationFeature('🎨', 'All Theme Colors'),
+                      _celebrationFeature('📊', 'Advanced Statistics'),
+                      _celebrationFeature('🛡️', 'Hard Block Mode'),
+                      _celebrationFeature('☁️', 'Cloud Backup'),
+                      _celebrationFeature('📖', 'Full Content Library'),
+                    ],
+                  ),
+                ),
+              ),
+              const Spacer(flex: 2),
+              // CTA button
+              FadeTransition(
+                opacity: _fadeAnim,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _sandGold.withValues(alpha: 0.2),
+                      foregroundColor: _sandGold,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Start Exploring  ✨',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _celebrationFeature(String emoji, String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 18)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Icon(
+            Icons.check_circle_rounded,
+            color: _sandGold.withValues(alpha: 0.6),
+            size: 18,
           ),
         ],
       ),

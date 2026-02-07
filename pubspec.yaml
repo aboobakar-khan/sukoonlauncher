@@ -80,6 +80,9 @@ dependencies:
   
   # Connectivity detection for offline content
   connectivity_plus: ^6.0.5
+  
+  # Audio player for Pomodoro completion sound
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -112,6 +115,7 @@ flutter:
     - assets/
     - assets/lottie/
     - assets/quran/quran_en.json
+    - assets/sounds/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

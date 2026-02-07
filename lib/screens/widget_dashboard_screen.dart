@@ -1,25 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../widgets/todo_widget.dart';
-import '../widgets/notes_widget.dart';
 import '../widgets/calendar_widget.dart';
-import '../widgets/pomodoro_widget.dart';
-import '../widgets/focus_mode_widget.dart';
-import '../widgets/deen_mode_widget.dart';
-import '../widgets/event_tracker_widget.dart';
-import '../widgets/tasbih_counter_widget.dart';
+import '../widgets/daily_challenge_card.dart';
 import '../widgets/prayer_tracker_widget.dart';
-import '../widgets/screen_time_widget.dart';
-import 'todo_list_screen.dart';
-import 'prayer_tracker_screen.dart';
+import '../widgets/dhikr_counter_widget.dart';
 import 'premium_paywall_screen.dart';
 import '../features/quran/providers/quran_provider.dart';
 import '../features/quran/widgets/tafseer_bottom_sheet.dart';
 import '../providers/arabic_font_provider.dart';
 import '../providers/premium_provider.dart';
 import '../providers/theme_provider.dart';
+import '../widgets/ambient_sound_widget.dart';
 
-/// Widget Dashboard - Oasis-style productivity screen
+/// Widget Dashboard - 🐪 Camel Oasis productivity screen
 /// Contains cards for To-Do, Notes, Calendar, etc.
 class WidgetDashboardScreen extends ConsumerWidget {
   const WidgetDashboardScreen({super.key});
@@ -65,12 +58,7 @@ class WidgetDashboardScreen extends ConsumerWidget {
                                 color: Colors.grey[900],
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: const Color.fromARGB(
-                                    255,
-                                    133,
-                                    252,
-                                    137,
-                                  ).withValues(alpha: 0.3),
+                                  color: const Color(0xFFC2A366).withValues(alpha: 0.3),
                                   width: 1,
                                 ),
                               ),
@@ -81,12 +69,7 @@ class WidgetDashboardScreen extends ConsumerWidget {
                                     children: [
                                       Icon(
                                         Icons.auto_awesome,
-                                        color: const Color.fromARGB(
-                                          255,
-                                          133,
-                                          252,
-                                          137,
-                                        ),
+                                        color: const Color(0xFFC2A366),
                                         size: 20,
                                       ),
                                       const SizedBox(width: 8),
@@ -132,12 +115,7 @@ class WidgetDashboardScreen extends ConsumerWidget {
                                       Text(
                                         '${verse['surahTransliteration']} ${verse['verseNumber']}',
                                         style: TextStyle(
-                                          color: const Color.fromARGB(
-                                            255,
-                                            133,
-                                            252,
-                                            137,
-                                          ),
+                                          color: const Color(0xFFC2A366),
                                           fontSize: 12,
                                           fontWeight: FontWeight.w500,
                                         ),
@@ -154,10 +132,10 @@ class WidgetDashboardScreen extends ConsumerWidget {
                                         child: Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFF30A14E).withValues(alpha: 0.2),
+                                            color: const Color(0xFFA67B5B).withValues(alpha: 0.2),
                                             borderRadius: BorderRadius.circular(8),
                                             border: Border.all(
-                                              color: const Color(0xFF40C463).withValues(alpha: 0.4),
+                                              color: const Color(0xFFC2A366).withValues(alpha: 0.4),
                                               width: 1,
                                             ),
                                           ),
@@ -167,13 +145,13 @@ class WidgetDashboardScreen extends ConsumerWidget {
                                               Icon(
                                                 Icons.menu_book_outlined,
                                                 size: 14,
-                                                color: const Color(0xFF40C463),
+                                                color: const Color(0xFFC2A366),
                                               ),
                                               const SizedBox(width: 4),
                                               Text(
                                                 'Tafseer',
                                                 style: TextStyle(
-                                                  color: const Color(0xFF40C463),
+                                                  color: const Color(0xFFC2A366),
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.w500,
                                                 ),
@@ -195,72 +173,25 @@ class WidgetDashboardScreen extends ConsumerWidget {
                     },
                   ),
 
-                  // Prayer Tracker Widget - 5 times daily prayer tracking
-                  PrayerTrackerWidget(
-                    onExpand: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const PrayerTrackerScreen(),
-                        ),
-                      );
-                    },
-                  ),
+                  // Prayer Tracker Widget - Track daily prayers (TOP PRIORITY)
+                  const PrayerTrackerWidget(),
+                  
+                  // Dhikr Counter Widget - Digital tasbih (TOP PRIORITY)
+                  const DhikrCounterWidget(),
+                  
+                  // Daily Islamic Challenges - Gamified habit building (placed after dhikr)
+                  const DailyIslamicChallengeCard(),
 
                   const SizedBox(height: 16),
 
-                  // Tasbih Counter Widget - Dhikr counting
-                  const TasbihCounterWidget(),
-
-                  // Todo Widget
-                  TodoWidget(
-                    onExpand: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const TodoListScreen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Notes Widget
-                  NotesWidget(
-                    onExpand: () {
-                      // TODO: Navigate to full notes screen
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Pomodoro Timer Widget
-                  PomodoroWidget(
-                    onExpand: () {
-                      // TODO: Navigate to full pomodoro screen
-                    },
-                  ),
-
-                  // Focus Mode Widget (near Pomodoro for productivity)
-                  const FocusModeWidget(),
-
-                  // Deen Mode Widget (spiritual focus)
-                  const DeenModeWidget(),
-
-                  const SizedBox(height: 16),
-
-                  // Event Tracker Widget
-                  EventTrackerWidget(
-                    onExpand: () {
-                      // TODO: Navigate to full events screen
-                    },
-                  ),
+                  // Ambient Sound - soothing Islamic background audio
+                  const AmbientSoundWidget(),
 
                   const SizedBox(height: 16),
 
                   // Calendar (full width)
                   CalendarWidget(
                     onExpand: () {
-                      // TODO: Navigate to full calendar screen
                     },
                   ),
 
@@ -283,7 +214,9 @@ class WidgetDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildPremiumCard(BuildContext context, AppThemeColor currentTheme) {
-    const greenAccent = Color(0xFF40C463);
+    const camelGold = Color(0xFFC2A366);
+    const camelWarm = Color(0xFFD4A96A);
+    const camelBrown = Color(0xFFA67B5B);
     
     return GestureDetector(
       onTap: () {
@@ -291,7 +224,7 @@ class WidgetDashboardScreen extends ConsumerWidget {
         Navigator.of(context).push(
           PageRouteBuilder(
             opaque: false,
-            pageBuilder: (context, _, __) => const PremiumPaywallScreen(),
+            pageBuilder: (context, _, __) => PremiumPaywallScreen(),
             transitionsBuilder: (context, anim, _, child) {
               return FadeTransition(opacity: anim, child: child);
             },
@@ -304,41 +237,39 @@ class WidgetDashboardScreen extends ConsumerWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              greenAccent.withValues(alpha: 0.15),
-              greenAccent.withValues(alpha: 0.05),
+              camelGold.withValues(alpha: 0.15),
+              camelBrown.withValues(alpha: 0.05),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: greenAccent.withValues(alpha: 0.4),
+            color: camelGold.withValues(alpha: 0.4),
             width: 1.5,
           ),
         ),
         child: Column(
           children: [
-            // Premium icon with glow
+            // Premium icon with camel glow
             Container(
               width: 56,
               height: 56,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF40C463), Color(0xFF30A14E)],
+                  colors: [Color(0xFFC2A366), Color(0xFFA67B5B)],
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: greenAccent.withValues(alpha: 0.4),
+                    color: camelGold.withValues(alpha: 0.4),
                     blurRadius: 16,
                     spreadRadius: 2,
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.workspace_premium,
-                color: Colors.white,
-                size: 28,
+              child: const Center(
+                child: Text('🐪', style: TextStyle(fontSize: 26)),
               ),
             ),
             const SizedBox(height: 16),
@@ -359,13 +290,13 @@ class WidgetDashboardScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withValues(alpha: 0.2),
+                    color: camelGold.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: const Text(
                     '75% OFF',
                     style: TextStyle(
-                      color: Colors.amber,
+                      color: Color(0xFFE8D5B7),
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                     ),
@@ -387,25 +318,25 @@ class WidgetDashboardScreen extends ConsumerWidget {
             
             // Social proof
             Text(
-              '⭐ 10K+ Muslims already upgraded',
+              '🐪 10K+ Muslims already upgraded',
               style: TextStyle(
-                color: greenAccent.withValues(alpha: 0.7),
+                color: camelGold.withValues(alpha: 0.7),
                 fontSize: 12,
               ),
             ),
             const SizedBox(height: 16),
             
-            // CTA Button
+            // CTA Button with camel gradient
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF40C463), Color(0xFF30A14E)],
+                  colors: [Color(0xFFC2A366), Color(0xFFA67B5B)],
                 ),
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: greenAccent.withValues(alpha: 0.3),
+                    color: camelGold.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),

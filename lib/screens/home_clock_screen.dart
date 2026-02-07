@@ -8,16 +8,15 @@ import '../providers/clock_style_provider.dart';
 import '../providers/time_format_provider.dart';
 import '../providers/clock_opacity_provider.dart';
 import '../providers/favorite_apps_provider.dart';
-import '../providers/app_interrupt_provider.dart';
-import '../providers/focus_mode_provider.dart';
 import '../providers/installed_apps_provider.dart';
 import '../providers/quick_action_provider.dart';
+import '../providers/productivity_provider.dart';
 import '../services/app_settings_service.dart';
-import '../widgets/app_interrupt_dialog.dart';
 import '../widgets/clock_variants.dart';
 import '../widgets/quick_search_overlay.dart';
 import '../widgets/offline_download_indicator.dart';
 import 'app_list_screen.dart';
+import 'favorite_picker_screen.dart';
 
 /// Home Clock Screen - Minimalist clock and date display
 class HomeClockScreen extends ConsumerStatefulWidget {
@@ -86,32 +85,20 @@ class _HomeClockScreenState extends ConsumerState<HomeClockScreen> {
   }
 
   Future<void> _launchApp(String packageName) async {
-    // Check if focus mode is blocking this app
-    final focusModeNotifier = ref.read(focusModeProvider.notifier);
-    if (focusModeNotifier.isAppBlocked(packageName)) {
-      final focusMode = ref.read(focusModeProvider);
-      _showFocusModeBlockDialog(
-        focusMode.blockMessage ?? 'Focus mode is active. This app is blocked.',
-      );
-      return;
-    }
-
-    // Check if app has an interrupt configured
-    final interruptNotifier = ref.read(appInterruptProvider.notifier);
-    final interrupt = interruptNotifier.getInterrupt(packageName);
-
-    if (interrupt != null && interrupt.isEnabled) {
-      // Show interrupt dialog
-      final shouldProceed = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) =>
-            AppInterruptDialog(interrupt: interrupt, onSuccess: () {}),
-      );
-
-      if (shouldProceed != true) {
-        return; // User cancelled
+    // Check app blocker
+    final blocker = ref.read(appBlockRuleProvider.notifier);
+    if (blocker.isAppBlocked(packageName)) {
+      final msg = blocker.getBlockMessage(packageName) ?? 'Stay focused! 🐪';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: const Color(0xFFE8915A).withValues(alpha: 0.9),
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
+      return;
     }
 
     // Launch the app
@@ -129,32 +116,6 @@ class _HomeClockScreenState extends ConsumerState<HomeClockScreen> {
         ).showSnackBar(SnackBar(content: Text('Cannot open app: $e')));
       }
     }
-  }
-
-  void _showFocusModeBlockDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: Row(
-          children: [
-            Icon(Icons.lock_clock, color: Colors.orange.shade400),
-            const SizedBox(width: 12),
-            const Text(
-              'Focus Mode Active',
-              style: TextStyle(color: Colors.white),
-            ),
-          ],
-        ),
-        content: Text(message, style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -459,89 +420,9 @@ class _HomeClockScreenState extends ConsumerState<HomeClockScreen> {
   }
 
   void _showAddFavoritesDialog(AppThemeColor themeColor) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.star_outline, color: themeColor.color, size: 24),
-            const SizedBox(width: 12),
-            const Text(
-              'Add Favorites',
-              style: TextStyle(color: Colors.white, fontSize: 18),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'To add favorite apps for quick access:',
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildStep('1', 'Swipe right to open App List', themeColor),
-            const SizedBox(height: 10),
-            _buildStep('2', 'Long-press any app', themeColor),
-            const SizedBox(height: 10),
-            _buildStep('3', 'Tap "Add to Favorites"', themeColor),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Got it',
-              style: TextStyle(
-                color: themeColor.color,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStep(String number, String text, AppThemeColor themeColor) {
-    return Row(
-      children: [
-        Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            color: themeColor.color.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            number,
-            style: TextStyle(
-              color: themeColor.color,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              color: Colors.grey[300],
-              fontSize: 13,
-            ),
-          ),
-        ),
-      ],
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FavoritePickerScreen()),
     );
   }
 

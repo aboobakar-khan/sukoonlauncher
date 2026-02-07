@@ -67,7 +67,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           title: '1. Information We Collect',
           content:
               '• We do not collect, store, or sell any personal data.\n\n'
-              '• All user preferences such as wallpaper selection, favorites, hidden apps, and settings are stored locally on your device only.\n\n'
+              '• All user preferences such as wallpaper selection, favorites, and settings are stored locally on your device only.\n\n'
               '• We do not require you to create an account.',
         ),
         const SizedBox(height: 24),

@@ -430,9 +430,9 @@ Future<List<Hadith>> _getOfflineHadiths(String? collectionId) async {
           grade: map['grade'] != null 
               ? HadithGrade.values.firstWhere(
                   (g) => g.name == map['grade'],
-                  orElse: () => HadithGrade.sahih,
+                  orElse: () => HadithGrade.unknown,
                 )
-              : HadithGrade.sahih,
+              : HadithGrade.unknown,
         );
       }).toList();
       

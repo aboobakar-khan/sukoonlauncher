@@ -61,12 +61,12 @@ class _MinimalistDuaScreenState extends ConsumerState<MinimalistDuaScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF40C463).withValues(alpha: 0.15),
+              color: const Color(0xFFC2A366).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
               Icons.favorite_outline,
-              color: Color(0xFF40C463),
+              color: Color(0xFFC2A366),
               size: 20,
             ),
           ),
@@ -118,12 +118,12 @@ class _MinimalistDuaScreenState extends ConsumerState<MinimalistDuaScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 color: isSelected 
-                    ? const Color(0xFF40C463).withValues(alpha: 0.15)
+                    ? const Color(0xFFC2A366).withValues(alpha: 0.15)
                     : Colors.white.withValues(alpha: 0.04),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSelected 
-                      ? const Color(0xFF40C463).withValues(alpha: 0.4)
+                      ? const Color(0xFFC2A366).withValues(alpha: 0.4)
                       : Colors.white.withValues(alpha: 0.08),
                 ),
               ),
@@ -131,7 +131,7 @@ class _MinimalistDuaScreenState extends ConsumerState<MinimalistDuaScreen> {
                 category['name']!,
                 style: TextStyle(
                   color: isSelected 
-                      ? const Color(0xFF40C463)
+                      ? const Color(0xFFC2A366)
                       : Colors.white.withValues(alpha: 0.6),
                   fontSize: 12,
                   fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
@@ -183,13 +183,13 @@ class _MinimalistDuaScreenState extends ConsumerState<MinimalistDuaScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF40C463).withValues(alpha: 0.1),
+                      color: const Color(0xFFC2A366).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       dua.category!.toUpperCase().replaceAll('_', ' '),
                       style: TextStyle(
-                        color: const Color(0xFF40C463).withValues(alpha: 0.8),
+                        color: const Color(0xFFC2A366).withValues(alpha: 0.8),
                         fontSize: 9,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.5,
@@ -327,13 +327,13 @@ class _DuaReaderScreen extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF40C463).withValues(alpha: 0.1),
+                            color: const Color(0xFFC2A366).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             dua.category!.toUpperCase().replaceAll('_', ' '),
                             style: TextStyle(
-                              color: const Color(0xFF40C463).withValues(alpha: 0.8),
+                              color: const Color(0xFFC2A366).withValues(alpha: 0.8),
                               fontSize: 10,
                               fontWeight: FontWeight.w500,
                               letterSpacing: 0.5,
@@ -389,7 +389,7 @@ class _DuaReaderScreen extends StatelessWidget {
                             Text(
                               dua.transliteration,
                               style: TextStyle(
-                                color: const Color(0xFF40C463).withValues(alpha: 0.8),
+                                color: const Color(0xFFC2A366).withValues(alpha: 0.8),
                                 fontSize: 14,
                                 fontStyle: FontStyle.italic,
                                 height: 1.6,
@@ -501,12 +501,12 @@ class _DuaReaderScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF40C463).withValues(alpha: 0.1),
+              color: const Color(0xFFC2A366).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
               Icons.favorite_outline,
-              color: Color(0xFF40C463),
+              color: Color(0xFFC2A366),
               size: 18,
             ),
           ),
@@ -526,7 +526,7 @@ class _DuaReaderScreen extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('Dua copied'),
-              backgroundColor: const Color(0xFF40C463).withValues(alpha: 0.9),
+              backgroundColor: const Color(0xFFC2A366).withValues(alpha: 0.9),
               duration: const Duration(seconds: 1),
             ),
           );

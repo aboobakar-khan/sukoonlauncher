@@ -154,7 +154,7 @@ class _MinimalistHadithsScreenState extends State<MinimalistHadithsScreen> {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: const Color(0xFF40C463).withValues(alpha: 0.15),
+              color: const Color(0xFFC2A366).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Text(
@@ -214,12 +214,12 @@ class _MinimalistHadithsScreenState extends State<MinimalistHadithsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: isSelected 
-                    ? const Color(0xFF40C463).withValues(alpha: 0.2)
+                    ? const Color(0xFFC2A366).withValues(alpha: 0.2)
                     : Colors.white.withValues(alpha: 0.04),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSelected 
-                      ? const Color(0xFF40C463).withValues(alpha: 0.4)
+                      ? const Color(0xFFC2A366).withValues(alpha: 0.4)
                       : Colors.transparent,
                 ),
               ),
@@ -227,7 +227,7 @@ class _MinimalistHadithsScreenState extends State<MinimalistHadithsScreen> {
                 category == 'all' ? 'All' : category[0].toUpperCase() + category.substring(1),
                 style: TextStyle(
                   color: isSelected 
-                      ? const Color(0xFF40C463)
+                      ? const Color(0xFFC2A366)
                       : Colors.white.withValues(alpha: 0.5),
                   fontSize: 12,
                   fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
@@ -262,7 +262,7 @@ class _MinimalistHadithsScreenState extends State<MinimalistHadithsScreen> {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isExpanded 
-                ? const Color(0xFF40C463).withValues(alpha: 0.15)
+                ? const Color(0xFFC2A366).withValues(alpha: 0.15)
                 : Colors.white.withValues(alpha: 0.04),
           ),
         ),
@@ -276,13 +276,13 @@ class _MinimalistHadithsScreenState extends State<MinimalistHadithsScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF40C463).withValues(alpha: 0.1),
+                    color: const Color(0xFFC2A366).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     hadith['source']!,
                     style: TextStyle(
-                      color: const Color(0xFF40C463).withValues(alpha: 0.8),
+                      color: const Color(0xFFC2A366).withValues(alpha: 0.8),
                       fontSize: 9,
                       fontWeight: FontWeight.w500,
                     ),
@@ -370,7 +370,7 @@ class _MinimalistHadithsScreenState extends State<MinimalistHadithsScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: const Text('Hadith copied'),
-                        backgroundColor: const Color(0xFF40C463).withValues(alpha: 0.9),
+                        backgroundColor: const Color(0xFFC2A366).withValues(alpha: 0.9),
                         duration: const Duration(seconds: 1),
                       ),
                     );

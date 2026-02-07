@@ -21,7 +21,7 @@ enum HadithGrade {
   int get colorValue {
     switch (this) {
       case HadithGrade.sahih:
-        return 0xFF40C463; // Green
+        return 0xFFC2A366; // Green
       case HadithGrade.hasan:
         return 0xFFE3B341; // Yellow/Amber
       case HadithGrade.daif:

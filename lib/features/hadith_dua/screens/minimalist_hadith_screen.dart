@@ -104,12 +104,12 @@ class MinimalistHadithScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF40C463).withValues(alpha: 0.15),
+              color: const Color(0xFFC2A366).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
               Icons.menu_book,
-              color: Color(0xFF40C463),
+              color: Color(0xFFC2A366),
               size: 20,
             ),
           ),
@@ -140,7 +140,7 @@ class MinimalistHadithScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF40C463).withValues(alpha: 0.15),
+                color: const Color(0xFFC2A366).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -148,14 +148,14 @@ class MinimalistHadithScreen extends ConsumerWidget {
                 children: [
                   Icon(
                     Icons.check_circle,
-                    color: const Color(0xFF40C463),
+                    color: const Color(0xFFC2A366),
                     size: 14,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     '$readCount read',
                     style: const TextStyle(
-                      color: Color(0xFF40C463),
+                      color: Color(0xFFC2A366),
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
                     ),
@@ -201,12 +201,12 @@ class _CollectionFilter extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 color: isSelected 
-                    ? const Color(0xFF40C463).withValues(alpha: 0.15)
+                    ? const Color(0xFFC2A366).withValues(alpha: 0.15)
                     : Colors.white.withValues(alpha: 0.04),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSelected 
-                      ? const Color(0xFF40C463).withValues(alpha: 0.4)
+                      ? const Color(0xFFC2A366).withValues(alpha: 0.4)
                       : Colors.white.withValues(alpha: 0.08),
                 ),
               ),
@@ -214,7 +214,7 @@ class _CollectionFilter extends StatelessWidget {
                 collection.shortName,
                 style: TextStyle(
                   color: isSelected 
-                      ? const Color(0xFF40C463)
+                      ? const Color(0xFFC2A366)
                       : Colors.white.withValues(alpha: 0.6),
                   fontSize: 12,
                   fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
@@ -254,7 +254,10 @@ class _HadithsList extends ConsumerWidget {
             if (index == displayedHadiths.length) {
               return _buildLoadMoreButton(ref, remaining, hadiths.length);
             }
-            return _HadithCard(hadith: displayedHadiths[index]);
+            return _HadithCard(
+              hadith: displayedHadiths[index],
+              allHadiths: hadiths, // Pass all hadiths for navigation
+            );
           },
         );
       },
@@ -274,10 +277,10 @@ class _HadithsList extends ConsumerWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
-            color: const Color(0xFF40C463).withValues(alpha: 0.1),
+            color: const Color(0xFFC2A366).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: const Color(0xFF40C463).withValues(alpha: 0.3),
+              color: const Color(0xFFC2A366).withValues(alpha: 0.3),
             ),
           ),
           child: Row(
@@ -285,14 +288,14 @@ class _HadithsList extends ConsumerWidget {
             children: [
               Icon(
                 Icons.expand_more,
-                color: const Color(0xFF40C463),
+                color: const Color(0xFFC2A366),
                 size: 20,
               ),
               const SizedBox(width: 8),
               Text(
                 'Load More ($remaining remaining)',
                 style: const TextStyle(
-                  color: Color(0xFF40C463),
+                  color: Color(0xFFC2A366),
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -314,7 +317,7 @@ class _HadithsList extends ConsumerWidget {
             height: 24,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: const Color(0xFF40C463).withValues(alpha: 0.5),
+              color: const Color(0xFFC2A366).withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: 12),
@@ -385,13 +388,13 @@ class _HadithsList extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF40C463).withValues(alpha: 0.15),
+                color: const Color(0xFFC2A366).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(
                 'Try Again',
                 style: TextStyle(
-                  color: Color(0xFF40C463),
+                  color: Color(0xFFC2A366),
                   fontSize: 12,
                 ),
               ),
@@ -405,8 +408,9 @@ class _HadithsList extends ConsumerWidget {
 
 class _HadithCard extends ConsumerWidget {
   final Hadith hadith;
+  final List<Hadith> allHadiths;
   
-  const _HadithCard({required this.hadith});
+  const _HadithCard({required this.hadith, required this.allHadiths});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -419,12 +423,12 @@ class _HadithCard extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isRead 
-              ? const Color(0xFF40C463).withValues(alpha: 0.05)
+              ? const Color(0xFFC2A366).withValues(alpha: 0.05)
               : Colors.white.withValues(alpha: 0.03),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isRead 
-                ? const Color(0xFF40C463).withValues(alpha: 0.2)
+                ? const Color(0xFFC2A366).withValues(alpha: 0.2)
                 : Colors.white.withValues(alpha: 0.06),
           ),
         ),
@@ -437,13 +441,13 @@ class _HadithCard extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF40C463).withValues(alpha: 0.1),
+                    color: const Color(0xFFC2A366).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     '${hadith.collection.toUpperCase()} ${hadith.hadithNumber}',
                     style: TextStyle(
-                      color: const Color(0xFF40C463).withValues(alpha: 0.8),
+                      color: const Color(0xFFC2A366).withValues(alpha: 0.8),
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.5,
@@ -465,14 +469,14 @@ class _HadithCard extends ConsumerWidget {
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: isRead 
-                          ? const Color(0xFF40C463).withValues(alpha: 0.2)
+                          ? const Color(0xFFC2A366).withValues(alpha: 0.2)
                           : Colors.white.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
                       isRead ? Icons.check_circle : Icons.circle_outlined,
                       color: isRead 
-                          ? const Color(0xFF40C463)
+                          ? const Color(0xFFC2A366)
                           : Colors.white.withValues(alpha: 0.3),
                       size: 18,
                     ),
@@ -579,7 +583,10 @@ class _HadithCard extends ConsumerWidget {
     Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (context) => HadithReaderScreen(hadith: hadith),
+        builder: (context) => HadithReaderScreen(
+          hadith: hadith,
+          allHadiths: allHadiths,
+        ),
       ),
     );
   }
@@ -588,12 +595,23 @@ class _HadithCard extends ConsumerWidget {
 /// Full-screen Hadith Reader - sunnah.com style
 class HadithReaderScreen extends ConsumerWidget {
   final Hadith hadith;
+  final List<Hadith>? allHadiths;  // Optional: for navigation
   
-  const HadithReaderScreen({super.key, required this.hadith});
+  const HadithReaderScreen({
+    super.key, 
+    required this.hadith,
+    this.allHadiths,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isRead = ref.watch(readHadithsProvider.select((s) => s.contains('${hadith.collection}_${hadith.hadithNumber}')));
+    
+    // Find current index for navigation
+    final currentIndex = allHadiths?.indexWhere((h) => 
+      h.hadithNumber == hadith.hadithNumber && h.collection == hadith.collection
+    );
+    final hasNext = allHadiths != null && currentIndex != null && currentIndex >= 0 && currentIndex < allHadiths!.length - 1;
     
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
@@ -615,13 +633,13 @@ class HadithReaderScreen extends ConsumerWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF40C463).withValues(alpha: 0.1),
+                          color: const Color(0xFFC2A366).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
                           '${hadith.collection.toUpperCase()} • Hadith ${hadith.hadithNumber}',
                           style: const TextStyle(
-                            color: Color(0xFF40C463),
+                            color: Color(0xFFC2A366),
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
@@ -695,6 +713,12 @@ class HadithReaderScreen extends ConsumerWidget {
                     
                     // Actions
                     _buildActions(context, ref, isRead),
+                    
+                    // Next Hadith Button
+                    if (hasNext) ...[
+                      const SizedBox(height: 16),
+                      _buildNextHadithButton(context, ref, currentIndex!),
+                    ],
                   ],
                 ),
               ),
@@ -736,7 +760,7 @@ class HadithReaderScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: isRead 
-                    ? const Color(0xFF40C463).withValues(alpha: 0.15)
+                    ? const Color(0xFFC2A366).withValues(alpha: 0.15)
                     : Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -745,14 +769,14 @@ class HadithReaderScreen extends ConsumerWidget {
                 children: [
                   Icon(
                     isRead ? Icons.check_circle : Icons.circle_outlined,
-                    color: isRead ? const Color(0xFF40C463) : Colors.white.withValues(alpha: 0.4),
+                    color: isRead ? const Color(0xFFC2A366) : Colors.white.withValues(alpha: 0.4),
                     size: 16,
                   ),
                   const SizedBox(width: 6),
                   Text(
                     isRead ? 'Read' : 'Mark as Read',
                     style: TextStyle(
-                      color: isRead ? const Color(0xFF40C463) : Colors.white.withValues(alpha: 0.4),
+                      color: isRead ? const Color(0xFFC2A366) : Colors.white.withValues(alpha: 0.4),
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
                     ),
@@ -799,14 +823,104 @@ class HadithReaderScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Main reference info
           _buildMetadataRow('Collection', hadith.collection.toUpperCase()),
           if (hadith.book > 0)
             _buildMetadataRow('Book', hadith.book.toString()),
-          _buildMetadataRow('Hadith', hadith.hadithNumber.toString()),
+          _buildMetadataRow('Hadith Number', hadith.hadithNumber.toString()),
+          
+          // Narrator information
+          if (hadith.narrator != null || hadith.extractedNarrator != null) ...[
+            const SizedBox(height: 12),
+            Divider(color: Colors.white.withValues(alpha: 0.1)),
+            const SizedBox(height: 12),
+            _buildMetadataRow('Narrator', hadith.narrator ?? hadith.extractedNarrator ?? 'Unknown'),
+          ],
+          
+          // Chapter/Section name
+          if (hadith.chapterName != null && hadith.chapterName!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _buildMetadataRow('Chapter', hadith.chapterName!),
+          ],
+          
+          // Hadith grading information
+          if (hadith.grade != HadithGrade.unknown) ...[
+            const SizedBox(height: 12),
+            Divider(color: Colors.white.withValues(alpha: 0.1)),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Authenticity',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontSize: 12,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _getGradeColor(hadith.grade).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    hadith.grade.displayName,
+                    style: TextStyle(
+                      color: _getGradeColor(hadith.grade),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          
+          // Scholar grades if available
+          if (hadith.scholarGrades.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...hadith.scholarGrades.map((sg) => Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.school,
+                    size: 14,
+                    color: Colors.white.withValues(alpha: 0.4),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      sg.displayText,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )),
+          ],
         ],
       ),
     );
+  }
+  
+  Color _getGradeColor(HadithGrade grade) {
+    switch (grade) {
+      case HadithGrade.sahih:
+        return Colors.green;
+      case HadithGrade.hasan:
+        return Colors.teal;
+      case HadithGrade.daif:
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
   }
 
   Widget _buildMetadataRow(String label, String value) {
@@ -845,7 +959,7 @@ class HadithReaderScreen extends ConsumerWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('Hadith copied'),
-              backgroundColor: const Color(0xFF40C463).withValues(alpha: 0.9),
+              backgroundColor: const Color(0xFFC2A366).withValues(alpha: 0.9),
               duration: const Duration(seconds: 1),
             ),
           );
@@ -883,4 +997,54 @@ class HadithReaderScreen extends ConsumerWidget {
       ),
     );
   }
+  
+  Widget _buildNextHadithButton(BuildContext context, WidgetRef ref, int currentIndex) {
+    final nextHadith = allHadiths![currentIndex + 1];
+    
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        // Replace current screen with next hadith
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (context) => HadithReaderScreen(
+              hadith: nextHadith,
+              allHadiths: allHadiths,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFC2A366).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFFC2A366).withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Next Hadith',
+              style: TextStyle(
+                color: Color(0xFFC2A366),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.arrow_forward,
+              color: const Color(0xFFC2A366),
+              size: 18,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+

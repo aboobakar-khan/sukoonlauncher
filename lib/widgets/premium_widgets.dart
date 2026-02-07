@@ -35,14 +35,14 @@ class PremiumBadge extends ConsumerWidget {
         decoration: BoxDecoration(
           gradient: premiumState.isPremium
               ? const LinearGradient(
-                  colors: [Color(0xFF40C463), Color(0xFF30A14E)],
+                  colors: [Color(0xFFC2A366), Color(0xFFA67B5B)],
                 )
               : null,
           color: premiumState.isPremium ? null : Colors.white.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(20),
           border: premiumState.isPremium
               ? null
-              : Border.all(color: const Color(0xFF40C463).withValues(alpha: 0.5)),
+              : Border.all(color: const Color(0xFFC2A366).withValues(alpha: 0.5)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -53,7 +53,7 @@ class PremiumBadge extends ConsumerWidget {
                   : Icons.lock_open,
               color: premiumState.isPremium
                   ? Colors.white
-                  : const Color(0xFF40C463),
+                  : const Color(0xFFC2A366),
               size: size * 0.5,
             ),
             if (showLabel) ...[
@@ -63,7 +63,7 @@ class PremiumBadge extends ConsumerWidget {
                 style: TextStyle(
                   color: premiumState.isPremium
                       ? Colors.white
-                      : const Color(0xFF40C463),
+                      : const Color(0xFFC2A366),
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
@@ -105,12 +105,12 @@ class PremiumBadge extends ConsumerWidget {
               height: 64,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF40C463), Color(0xFF30A14E)],
+                  colors: [Color(0xFFC2A366), Color(0xFFA67B5B)],
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF40C463).withValues(alpha: 0.3),
+                    color: const Color(0xFFC2A366).withValues(alpha: 0.3),
                     blurRadius: 16,
                   ),
                 ],
@@ -174,7 +174,7 @@ class PremiumBadge extends ConsumerWidget {
             Text(
               'All features unlocked ✓',
               style: TextStyle(
-                color: const Color(0xFF40C463).withValues(alpha: 0.8),
+                color: const Color(0xFFC2A366).withValues(alpha: 0.8),
                 fontSize: 13,
               ),
             ),
@@ -238,8 +238,8 @@ class PremiumSettingsTile extends ConsumerWidget {
           gradient: premiumState.isPremium
               ? LinearGradient(
                   colors: [
-                    const Color(0xFF40C463).withValues(alpha: 0.15),
-                    const Color(0xFF30A14E).withValues(alpha: 0.1),
+                    const Color(0xFFC2A366).withValues(alpha: 0.15),
+                    const Color(0xFFA67B5B).withValues(alpha: 0.1),
                   ],
                 )
               : null,
@@ -247,7 +247,7 @@ class PremiumSettingsTile extends ConsumerWidget {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: premiumState.isPremium
-                ? const Color(0xFF40C463).withValues(alpha: 0.4)
+                ? const Color(0xFFC2A366).withValues(alpha: 0.4)
                 : Colors.white.withValues(alpha: 0.1),
           ),
         ),
@@ -259,7 +259,7 @@ class PremiumSettingsTile extends ConsumerWidget {
               decoration: BoxDecoration(
                 gradient: premiumState.isPremium
                     ? const LinearGradient(
-                        colors: [Color(0xFF40C463), Color(0xFF30A14E)],
+                        colors: [Color(0xFFC2A366), Color(0xFFA67B5B)],
                       )
                     : null,
                 color: premiumState.isPremium
@@ -273,7 +273,7 @@ class PremiumSettingsTile extends ConsumerWidget {
                     : Icons.stars,
                 color: premiumState.isPremium
                     ? Colors.white
-                    : const Color(0xFF40C463),
+                    : const Color(0xFFC2A366),
                 size: 24,
               ),
             ),
@@ -286,7 +286,7 @@ class PremiumSettingsTile extends ConsumerWidget {
                     premiumState.isPremium ? 'Premium Active' : 'Upgrade to Premium',
                     style: TextStyle(
                       color: premiumState.isPremium
-                          ? const Color(0xFF40C463)
+                          ? const Color(0xFFC2A366)
                           : Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -310,7 +310,7 @@ class PremiumSettingsTile extends ConsumerWidget {
                   ? Icons.check_circle
                   : Icons.chevron_right,
               color: premiumState.isPremium
-                  ? const Color(0xFF40C463)
+                  ? const Color(0xFFC2A366)
                   : Colors.white.withValues(alpha: 0.3),
               size: 24,
             ),
@@ -352,12 +352,12 @@ class _PremiumStatusSheet extends StatelessWidget {
             height: 64,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF40C463), Color(0xFF30A14E)],
+                colors: [Color(0xFFC2A366), Color(0xFFA67B5B)],
               ),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF40C463).withValues(alpha: 0.3),
+                  color: const Color(0xFFC2A366).withValues(alpha: 0.3),
                   blurRadius: 16,
                 ),
               ],
@@ -374,7 +374,7 @@ class _PremiumStatusSheet extends StatelessWidget {
           const Text(
             'Premium Active ✓',
             style: TextStyle(
-              color: Color(0xFF40C463),
+              color: Color(0xFFC2A366),
               fontSize: 20,
               fontWeight: FontWeight.w600,
             ),
@@ -450,12 +450,12 @@ class LockedFeatureOverlay extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF40C463).withValues(alpha: 0.2),
+                        color: const Color(0xFFC2A366).withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.lock,
-                        color: Color(0xFF40C463),
+                        color: Color(0xFFC2A366),
                         size: 28,
                       ),
                     ),

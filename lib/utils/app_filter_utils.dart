@@ -1,6 +1,5 @@
 import 'package:installed_apps/app_info.dart';
 import 'package:installed_apps/installed_apps.dart';
-import '../models/hidden_app.dart';
 
 /// 🎯 Smart 3-Layer App Filtering (Industry Best Practice)
 ///
@@ -594,35 +593,17 @@ class AppFilterUtils {
   /// 🧠 Core filtering logic - simplified for clean approach
   static bool _shouldIncludeApp(
     String packageName,
-    String appName, {
-    List<HiddenApp>? hiddenApps,
-  }) {
+    String appName,
+  ) {
     final pkg = packageName.toLowerCase();
 
     // ════════════════════════════════════════════════════
-    // PRIORITY 1: User Overrides (Highest Priority)
-    // ════════════════════════════════════════════════════
-    if (hiddenApps != null) {
-      // User explicitly hid this app
-      final hiddenByUser = hiddenApps.any(
-        (app) => app.packageName == pkg && app.isHiddenByUser,
-      );
-      if (hiddenByUser) return false;
-
-      // User explicitly unhid this app (override auto-filter)
-      final unhiddenByUser = hiddenApps.any(
-        (app) => app.packageName == pkg && !app.isHiddenByUser,
-      );
-      if (unhiddenByUser) return true;
-    }
-
-    // ════════════════════════════════════════════════════
-    // PRIORITY 2: Block This Launcher Itself
+    // PRIORITY 1: Block This Launcher Itself
     // ════════════════════════════
     if (pkg == 'com.example.minimalist_app') return false;
 
     // ════════════════════════════════════════════════════
-    // PRIORITY 3: Block Known Junk Patterns
+    // PRIORITY 2: Block Known Junk Patterns
     // ════════════════════════════════════════════════════
     if (_isKnownJunk(pkg)) return false;
 
@@ -650,9 +631,7 @@ class AppFilterUtils {
   }
 
   /// Get filtered apps - optimized async version
-  static Future<List<AppInfo>> getFilteredAppsAlternative({
-    List<HiddenApp>? hiddenApps,
-  }) async {
+  static Future<List<AppInfo>> getFilteredAppsAlternative() async {
     // ════════════════════════════════════════════════════════════
     // INDUSTRY BEST PRACTICE: Start clean, add essentials
     // ════════════════════════════════════════════════════════════
@@ -696,12 +675,11 @@ class AppFilterUtils {
       }
     }
 
-    // Step 5: Apply user overrides and final filtering
+    // Step 5: Apply final filtering
     final filtered = combinedApps.values.where((app) {
       return _shouldIncludeApp(
         app.packageName,
         app.name,
-        hiddenApps: hiddenApps,
       );
     }).toList();
 
@@ -713,51 +691,16 @@ class AppFilterUtils {
     return filtered;
   }
 
-  /// Get apps that were filtered out (for "Hidden Apps" screen)
-  static Future<List<AppInfo>> getFilteredOutApps({
-    List<HiddenApp>? hiddenApps,
-  }) async {
-    final allApps = await InstalledApps.getInstalledApps(
-      excludeSystemApps: false,
-      withIcon: false,
-    );
-
-    // Get apps that were filtered out
-    final filteredOut = allApps
-        .where(
-          (app) => !_shouldIncludeApp(
-            app.packageName,
-            app.name,
-            hiddenApps: hiddenApps,
-          ),
-        )
-        .toList();
-
-    // Remove duplicates
-    final uniqueApps = <String, AppInfo>{};
-    for (final app in filteredOut) {
-      uniqueApps.putIfAbsent(app.packageName, () => app);
-    }
-
-    // Sort alphabetically
-    final result = uniqueApps.values.toList();
-    result.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-
-    return result;
-  }
-
   /// Synchronous version for backwards compatibility
   @Deprecated('Use getFilteredAppsAlternative() instead')
   static List<AppInfo> filterUsefulApps(
-    List<AppInfo> allApps, {
-    List<HiddenApp>? hiddenApps,
-  }) {
+    List<AppInfo> allApps,
+  ) {
     final filtered = allApps
         .where(
           (app) => _shouldIncludeApp(
             app.packageName,
             app.name,
-            hiddenApps: hiddenApps,
           ),
         )
         .toList();

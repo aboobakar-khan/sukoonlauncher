@@ -84,6 +84,25 @@ class _AnimatedBackgroundState extends ConsumerState<AnimatedBackground>
           ],
           stops: const [0.0, 0.5, 1.0],
         );
+      case WallpaperType.desertGradient:
+        return LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(
+              const Color(0xFF1A150D),
+              const Color(0xFF2A1F12),
+              _controller.value,
+            )!,
+            const Color(0xFF0A0805),
+            Color.lerp(
+              const Color(0xFF1F1710),
+              const Color(0xFF2A1F12),
+              _controller.value,
+            )!,
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        );
       case WallpaperType.blueGradient:
         return LinearGradient(
           begin: Alignment.topLeft,

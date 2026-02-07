@@ -7,10 +7,13 @@ import '../screens/deen_mode_entry_screen.dart';
 import '../screens/deen_mode_screen.dart';
 import '../screens/premium_paywall_screen.dart';
 
-/// Deen Mode Widget - PREMIUM FEATURE
-/// Entry point widget for dashboard with premium gating
+/// Deen Mode Widget — Minimalist Camel Design 🐪
+/// Clean, subtle entry point on the dashboard
 class DeenModeWidget extends ConsumerWidget {
   const DeenModeWidget({super.key});
+
+  static const _sandGold = Color(0xFFC2A366);
+  static const _camelBrown = Color(0xFFA67B5B);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -19,7 +22,7 @@ class DeenModeWidget extends ConsumerWidget {
     
     // If not premium, show locked state
     if (!isPremium) {
-      return _buildLockedCard(context);
+      return _buildMinimalCard(context, false);
     }
     
     // If Deen Mode is active, show status
@@ -28,73 +31,55 @@ class DeenModeWidget extends ConsumerWidget {
     }
     
     // Show entry card
-    return _buildEntryCard(context);
+    return _buildMinimalCard(context, true);
   }
 
-  Widget _buildLockedCard(BuildContext context) {
+  Widget _buildMinimalCard(BuildContext context, bool isPremium) {
     return GestureDetector(
       onTap: () {
         HapticFeedback.mediumImpact();
-        showPremiumPaywall(
-          context,
-          triggerFeature: 'Deen Mode',
-        );
+        if (!isPremium) {
+          showPremiumPaywall(context, triggerFeature: 'Deen Mode');
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const DeenModeEntryScreen(),
+            ),
+          );
+        }
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(20),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white.withValues(alpha: 0.03),
-              Colors.white.withValues(alpha: 0.01),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(16),
+          color: _sandGold.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.08),
+            color: _sandGold.withValues(alpha: 0.1),
           ),
         ),
         child: Row(
           children: [
-            // Locked icon
+            // Minimal crescent icon
             Container(
-              padding: const EdgeInsets.all(12),
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: const Color(0xFF40C463).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                color: _sandGold.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Stack(
-                children: [
-                  Text(
-                    '☪',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      fontSize: 20,
-                    ),
+              child: Center(
+                child: Text(
+                  '☪',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: _sandGold.withValues(alpha: 0.8),
                   ),
-                  Positioned(
-                    right: -2,
-                    bottom: -2,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF40C463),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.lock,
-                        color: Colors.white,
-                        size: 10,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -104,140 +89,51 @@ class DeenModeWidget extends ConsumerWidget {
                       Text(
                         'Deen Mode',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 16,
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 14,
                           fontWeight: FontWeight.w500,
+                          letterSpacing: 0.3,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF40C463), Color(0xFF30A14E)],
+                      if (!isPremium) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [_sandGold, _camelBrown],
+                            ),
+                            borderRadius: BorderRadius.circular(3),
                           ),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'PRO',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
+                          child: const Text(
+                            'PRO',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Block distractions, focus on faith',
+                    'Silence distractions, nurture faith',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.3),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Unlock button
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF40C463).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: const Color(0xFF40C463).withValues(alpha: 0.4),
-                ),
-              ),
-              child: const Text(
-                'Unlock',
-                style: TextStyle(
-                  color: Color(0xFF40C463),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEntryCard(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const DeenModeEntryScreen(),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF40C463).withValues(alpha: 0.08),
-              const Color(0xFF30A14E).withValues(alpha: 0.04),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: const Color(0xFF40C463).withValues(alpha: 0.15),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF40C463).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '☪',
-                style: TextStyle(
-                  color: const Color(0xFF40C463).withValues(alpha: 0.9),
-                  fontSize: 20,
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Deen Mode',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Block distractions, focus on faith',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
-                      fontSize: 12,
+                      fontSize: 11,
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ],
               ),
             ),
             Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.white.withValues(alpha: 0.3),
-              size: 16,
+              isPremium ? Icons.arrow_forward_ios : Icons.lock_outline,
+              size: 14,
+              color: _sandGold.withValues(alpha: isPremium ? 0.4 : 0.35),
             ),
           ],
         ),
@@ -249,6 +145,7 @@ class DeenModeWidget extends ConsumerWidget {
     final remaining = deenMode.remainingTime;
     final hours = remaining.inHours;
     final minutes = remaining.inMinutes % 60;
+    final timeStr = hours > 0 ? '${hours}h ${minutes}m left' : '${minutes}m left';
 
     return GestureDetector(
       onTap: () {
@@ -261,39 +158,38 @@ class DeenModeWidget extends ConsumerWidget {
         );
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(20),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF40C463).withValues(alpha: 0.15),
-              const Color(0xFF30A14E).withValues(alpha: 0.08),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(16),
+          color: _sandGold.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: const Color(0xFF40C463).withValues(alpha: 0.25),
+            color: _sandGold.withValues(alpha: 0.2),
           ),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: const Color(0xFF40C463).withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
+                color: _sandGold.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: _sandGold.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                  ),
+                ],
               ),
-              child: Text(
-                '☪',
-                style: TextStyle(
-                  color: const Color(0xFF40C463).withValues(alpha: 0.95),
-                  fontSize: 20,
+              child: const Center(
+                child: Text(
+                  '☪',
+                  style: TextStyle(fontSize: 16, color: _sandGold),
                 ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,38 +197,37 @@ class DeenModeWidget extends ConsumerWidget {
                   Row(
                     children: [
                       Container(
-                        width: 8,
-                        height: 8,
+                        width: 6,
+                        height: 6,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF40C463),
+                          color: _sandGold,
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF40C463).withValues(alpha: 0.5),
-                              blurRadius: 6,
+                              color: _sandGold.withValues(alpha: 0.5),
+                              blurRadius: 4,
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Text(
                         'Deen Mode Active',
                         style: TextStyle(
-                          color: const Color(0xFF40C463).withValues(alpha: 0.95),
-                          fontSize: 16,
+                          color: _sandGold.withValues(alpha: 0.9),
+                          fontSize: 14,
                           fontWeight: FontWeight.w500,
+                          letterSpacing: 0.3,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    hours > 0 
-                        ? '${hours}h ${minutes}m remaining'
-                        : '${minutes}m remaining',
+                    timeStr,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.4),
+                      fontSize: 11,
                     ),
                   ),
                 ],
@@ -340,8 +235,8 @@ class DeenModeWidget extends ConsumerWidget {
             ),
             Icon(
               Icons.arrow_forward_ios,
-              color: const Color(0xFF40C463).withValues(alpha: 0.6),
-              size: 16,
+              size: 14,
+              color: _sandGold.withValues(alpha: 0.5),
             ),
           ],
         ),

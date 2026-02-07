@@ -76,7 +76,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: searchState.isSearching
-                ? const Color(0xFF40C463)
+                ? const Color(0xFFC2A366)
                 : Colors.white.withValues(alpha: 0.1),
           ),
         ),
@@ -87,7 +87,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
               child: Icon(
                 Icons.search,
                 color: searchState.isSearching
-                    ? const Color(0xFF40C463)
+                    ? const Color(0xFFC2A366)
                     : Colors.grey[500],
                 size: 20,
               ),
@@ -139,7 +139,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
           child: TabBar(
             controller: _tabController,
             indicator: BoxDecoration(
-              color: const Color(0xFF30A14E),
+              color: const Color(0xFFA67B5B),
               borderRadius: BorderRadius.circular(10),
             ),
             indicatorSize: TabBarIndicatorSize.tab,
@@ -292,7 +292,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
           color: const Color(0xFF21262D),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: const Color(0xFF40C463).withValues(alpha: 0.3),
+            color: const Color(0xFFC2A366).withValues(alpha: 0.3),
           ),
         ),
         child: Row(
@@ -303,7 +303,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
                 width: 16,
                 height: 16,
                 child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation(Color(0xFF40C463)),
+                  valueColor: AlwaysStoppedAnimation(Color(0xFFC2A366)),
                   strokeWidth: 2,
                 ),
               ),
@@ -313,12 +313,12 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
                 style: TextStyle(color: Colors.grey[400], fontSize: 13),
               ),
             ] else ...[
-              const Icon(Icons.add, color: Color(0xFF40C463), size: 18),
+              const Icon(Icons.add, color: Color(0xFFC2A366), size: 18),
               const SizedBox(width: 6),
               const Text(
                 'Load More Hadiths',
                 style: TextStyle(
-                  color: Color(0xFF40C463),
+                  color: Color(0xFFC2A366),
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -336,10 +336,10 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: const Color(0xFF30A14E).withValues(alpha: 0.15),
+            color: const Color(0xFFA67B5B).withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: Icon(icon, color: const Color(0xFF40C463), size: 14),
+          child: Icon(icon, color: const Color(0xFFC2A366), size: 14),
         ),
         const SizedBox(width: 8),
         Text(
@@ -364,7 +364,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isDaily
-              ? const Color(0xFF40C463).withValues(alpha: 0.3)
+              ? const Color(0xFFC2A366).withValues(alpha: 0.3)
               : Colors.white.withValues(alpha: 0.08),
         ),
       ),
@@ -407,7 +407,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
                 },
                 child: Icon(
                   isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                  color: isBookmarked ? const Color(0xFF40C463) : Colors.grey[500],
+                  color: isBookmarked ? const Color(0xFFC2A366) : Colors.grey[500],
                   size: 20,
                 ),
               ),
@@ -443,7 +443,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
           Text(
             dua.transliteration,
             style: TextStyle(
-              color: const Color(0xFF40C463).withValues(alpha: 0.9),
+              color: const Color(0xFFC2A366).withValues(alpha: 0.9),
               fontSize: 13,
               fontStyle: FontStyle.italic,
               height: 1.5,
@@ -565,7 +565,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
 
     return Row(
       children: [
-        Icon(Icons.folder_outlined, color: const Color(0xFF40C463), size: 18),
+        Icon(Icons.folder_outlined, color: const Color(0xFFC2A366), size: 18),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
@@ -661,7 +661,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: c.defaultGrade == HadithGrade.sahih
-                          ? const Color(0xFF40C463).withValues(alpha: 0.2)
+                          ? const Color(0xFFC2A366).withValues(alpha: 0.2)
                           : Colors.grey.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
@@ -669,7 +669,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
                       c.shortName,
                       style: TextStyle(
                         color: c.defaultGrade == HadithGrade.sahih
-                            ? const Color(0xFF40C463)
+                            ? const Color(0xFFC2A366)
                             : Colors.grey[400],
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -865,7 +865,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
             padding: EdgeInsets.all(16),
             child: Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation(Color(0xFF40C463)),
+                valueColor: AlwaysStoppedAnimation(Color(0xFFC2A366)),
               ),
             ),
           ),
@@ -885,7 +885,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
       child: Column(
         children: [
           const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation(Color(0xFF40C463)),
+            valueColor: AlwaysStoppedAnimation(Color(0xFFC2A366)),
             strokeWidth: 2,
           ),
           const SizedBox(height: 12),
@@ -977,7 +977,7 @@ class _EnhancedHadithCardState extends ConsumerState<EnhancedHadithCard> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: widget.isDaily
-              ? const Color(0xFF40C463).withValues(alpha: 0.3)
+              ? const Color(0xFFC2A366).withValues(alpha: 0.3)
               : Colors.white.withValues(alpha: 0.08),
         ),
       ),
@@ -1025,13 +1025,13 @@ class _EnhancedHadithCardState extends ConsumerState<EnhancedHadithCard> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFF30A14E).withValues(alpha: 0.2),
+              color: const Color(0xFFA67B5B).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
               widget.hadith.collection.split(' ').last, // Short name
               style: const TextStyle(
-                color: Color(0xFF40C463),
+                color: Color(0xFFC2A366),
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
@@ -1062,7 +1062,7 @@ class _EnhancedHadithCardState extends ConsumerState<EnhancedHadithCard> {
             onTap: () => _showBookmarkOptions(),
             child: Icon(
               isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-              color: isBookmarked ? const Color(0xFF40C463) : Colors.grey[500],
+              color: isBookmarked ? const Color(0xFFC2A366) : Colors.grey[500],
               size: 20,
             ),
           ),
@@ -1496,7 +1496,7 @@ class _EnhancedHadithCardState extends ConsumerState<EnhancedHadithCard> {
           children: [
             Row(
               children: [
-                const Icon(Icons.bookmark, color: Color(0xFF40C463), size: 20),
+                const Icon(Icons.bookmark, color: Color(0xFFC2A366), size: 20),
                 const SizedBox(width: 8),
                 const Text(
                   'Save to Collection',

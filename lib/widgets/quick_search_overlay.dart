@@ -8,9 +8,6 @@ import '../providers/installed_apps_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/favorite_apps_provider.dart';
 import '../providers/recent_apps_provider.dart';
-import '../providers/app_interrupt_provider.dart';
-import '../providers/focus_mode_provider.dart';
-import '../widgets/app_interrupt_dialog.dart';
 
 /// Quick Search Overlay - Samsung-style pull-down search
 /// 
@@ -103,29 +100,6 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
 
   Future<void> _launchApp(InstalledApp app) async {
     _searchFocus.unfocus();
-    
-    // Check focus mode
-    final focusModeNotifier = ref.read(focusModeProvider.notifier);
-    if (focusModeNotifier.isAppBlocked(app.packageName)) {
-      final focusMode = ref.read(focusModeProvider);
-      _showBlockedDialog(focusMode.blockMessage ?? 'Focus mode is active.');
-      return;
-    }
-
-    // Check interrupt
-    final interruptNotifier = ref.read(appInterruptProvider.notifier);
-    final interrupt = interruptNotifier.getInterrupt(app.packageName);
-
-    if (interrupt != null && interrupt.isEnabled) {
-      final shouldProceed = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) =>
-            AppInterruptDialog(interrupt: interrupt, onSuccess: () {}),
-      );
-
-      if (shouldProceed != true) return;
-    }
 
     // Track as recent app
     ref.read(recentAppsProvider.notifier).addRecent(app.packageName);
@@ -137,29 +111,6 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
     } catch (e) {
       // Silent fail
     }
-  }
-
-  void _showBlockedDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: Row(
-          children: [
-            Icon(Icons.lock_clock, color: Colors.orange.shade400),
-            const SizedBox(width: 12),
-            const Text('Focus Mode', style: TextStyle(color: Colors.white)),
-          ],
-        ),
-        content: Text(message, style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _dismiss() {

@@ -5,6 +5,7 @@ import 'package:hive/hive.dart';
 enum WallpaperType {
   black,
   darkGradient,
+  desertGradient,
   blueGradient,
   purpleGradient,
   redGradient,
@@ -70,6 +71,8 @@ extension WallpaperTypeUI on WallpaperType {
         return 'Pure black wallpaper';
       case WallpaperType.darkGradient:
         return 'Dark animated gradient';
+      case WallpaperType.desertGradient:
+        return '🐪 Desert camel gradient';
       case WallpaperType.blueGradient:
         return 'Blue animated gradient';
       case WallpaperType.purpleGradient:

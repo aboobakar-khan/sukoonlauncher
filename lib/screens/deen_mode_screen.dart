@@ -152,7 +152,7 @@ class _DeenModeScreenState extends ConsumerState<DeenModeScreen> {
                     Text(
                       '☪',
                       style: TextStyle(
-                        color: const Color(0xFF40C463).withValues(alpha: 0.7),
+                        color: const Color(0xFFC2A366).withValues(alpha: 0.7),
                         fontSize: 18,
                       ),
                     ),
@@ -218,7 +218,7 @@ class _DeenModeScreenState extends ConsumerState<DeenModeScreen> {
                         Text(
                           '$_quickDhikrCount',
                           style: TextStyle(
-                            color: const Color(0xFF40C463).withValues(alpha: 0.8),
+                            color: const Color(0xFFC2A366).withValues(alpha: 0.8),
                             fontSize: 32,
                             fontWeight: FontWeight.w300,
                           ),
@@ -562,7 +562,7 @@ class _HardExitSheetState extends State<_HardExitSheet> {
               child: Text(
                 'continue',
                 style: TextStyle(
-                  color: const Color(0xFF40C463).withValues(alpha: 0.7),
+                  color: const Color(0xFFC2A366).withValues(alpha: 0.7),
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                   letterSpacing: 0.5,
@@ -658,14 +658,14 @@ class _NamesOfAllahScreen extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF40C463).withValues(alpha: 0.15),
+                    color: const Color(0xFFC2A366).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Center(
                     child: Text(
                       '${index + 1}',
                       style: TextStyle(
-                        color: const Color(0xFF40C463).withValues(alpha: 0.8),
+                        color: const Color(0xFFC2A366).withValues(alpha: 0.8),
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -699,7 +699,7 @@ class _NamesOfAllahScreen extends StatelessWidget {
                 Text(
                   name['arabic']!,
                   style: TextStyle(
-                    color: const Color(0xFF40C463).withValues(alpha: 0.7),
+                    color: const Color(0xFFC2A366).withValues(alpha: 0.7),
                     fontSize: 22,
                   ),
                   textDirection: ui.TextDirection.rtl,

@@ -77,7 +77,7 @@ class _DeenModeEntryScreenState extends ConsumerState<DeenModeEntryScreen> {
                     Text(
                       '☪',
                       style: TextStyle(
-                        color: const Color(0xFF40C463).withValues(alpha: 0.7),
+                        color: const Color(0xFFC2A366).withValues(alpha: 0.7),
                         fontSize: 32,
                       ),
                     ),
@@ -130,12 +130,12 @@ class _DeenModeEntryScreenState extends ConsumerState<DeenModeEntryScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         decoration: BoxDecoration(
                           color: isSelected 
-                              ? const Color(0xFF40C463).withValues(alpha: 0.15)
+                              ? const Color(0xFFC2A366).withValues(alpha: 0.15)
                               : Colors.white.withValues(alpha: 0.03),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isSelected 
-                                ? const Color(0xFF40C463).withValues(alpha: 0.3)
+                                ? const Color(0xFFC2A366).withValues(alpha: 0.3)
                                 : Colors.white.withValues(alpha: 0.05),
                           ),
                         ),
@@ -144,7 +144,7 @@ class _DeenModeEntryScreenState extends ConsumerState<DeenModeEntryScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: isSelected 
-                                ? const Color(0xFF40C463)
+                                ? const Color(0xFFC2A366)
                                 : Colors.white.withValues(alpha: 0.5),
                             fontSize: 13,
                             fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
@@ -184,12 +184,12 @@ class _DeenModeEntryScreenState extends ConsumerState<DeenModeEntryScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
                         color: isSelected 
-                            ? const Color(0xFF40C463).withValues(alpha: 0.15)
+                            ? const Color(0xFFC2A366).withValues(alpha: 0.15)
                             : Colors.white.withValues(alpha: 0.03),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isSelected 
-                              ? const Color(0xFF40C463).withValues(alpha: 0.3)
+                              ? const Color(0xFFC2A366).withValues(alpha: 0.3)
                               : Colors.white.withValues(alpha: 0.05),
                         ),
                       ),
@@ -204,7 +204,7 @@ class _DeenModeEntryScreenState extends ConsumerState<DeenModeEntryScreen> {
                             p['label']!,
                             style: TextStyle(
                               color: isSelected 
-                                  ? const Color(0xFF40C463)
+                                  ? const Color(0xFFC2A366)
                                   : Colors.white.withValues(alpha: 0.5),
                               fontSize: 13,
                             ),
@@ -260,13 +260,13 @@ class _DeenModeEntryScreenState extends ConsumerState<DeenModeEntryScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        const Color(0xFF40C463).withValues(alpha: 0.3),
-                        const Color(0xFF30A14E).withValues(alpha: 0.3),
+                        const Color(0xFFC2A366).withValues(alpha: 0.3),
+                        const Color(0xFFA67B5B).withValues(alpha: 0.3),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: const Color(0xFF40C463).withValues(alpha: 0.4),
+                      color: const Color(0xFFC2A366).withValues(alpha: 0.4),
                     ),
                   ),
                   child: Row(
@@ -275,7 +275,7 @@ class _DeenModeEntryScreenState extends ConsumerState<DeenModeEntryScreen> {
                       Text(
                         '☪',
                         style: TextStyle(
-                          color: const Color(0xFF40C463).withValues(alpha: 0.9),
+                          color: const Color(0xFFC2A366).withValues(alpha: 0.9),
                           fontSize: 16,
                         ),
                       ),
@@ -283,7 +283,7 @@ class _DeenModeEntryScreenState extends ConsumerState<DeenModeEntryScreen> {
                       Text(
                         'START DEEN MODE',
                         style: TextStyle(
-                          color: const Color(0xFF40C463).withValues(alpha: 0.95),
+                          color: const Color(0xFFC2A366).withValues(alpha: 0.95),
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 1,

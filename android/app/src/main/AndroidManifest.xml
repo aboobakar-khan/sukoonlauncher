@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Permission to query installed apps -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
     
@@ -11,11 +12,10 @@
     
     <!-- Screen Time Analytics - Usage Stats Permission -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
-        android:tools="ignore"
-        xmlns:tools="http://schemas.android.com/tools" />
+        tools:ignore="ProtectedPermissions" />
     
     <application
-        android:label="minimalist_app"
+        android:label="Camel"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="false">

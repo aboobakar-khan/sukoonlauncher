@@ -74,12 +74,12 @@ class TafseerBottomSheet extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF30A14E).withValues(alpha: 0.2),
+                        color: const Color(0xFFA67B5B).withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
                         Icons.menu_book_rounded,
-                        color: Color(0xFF40C463),
+                        color: Color(0xFFC2A366),
                         size: 20,
                       ),
                     ),
@@ -117,7 +117,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: const Text('Copied to clipboard'),
-                              backgroundColor: const Color(0xFF30A14E),
+                              backgroundColor: const Color(0xFFA67B5B),
                               behavior: SnackBarBehavior.floating,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
@@ -197,7 +197,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                   },
                   loading: () => const Center(
                     child: CircularProgressIndicator(
-                      color: Color(0xFF40C463),
+                      color: Color(0xFFC2A366),
                     ),
                   ),
                   error: (error, _) => Center(

@@ -9,8 +9,6 @@ import '../providers/clock_style_provider.dart';
 import '../providers/time_format_provider.dart';
 import '../providers/clock_opacity_provider.dart';
 import '../providers/wallpaper_provider.dart';
-import '../providers/app_interrupt_provider.dart';
-import '../providers/focus_mode_provider.dart';
 import '../providers/arabic_font_provider.dart';
 import '../providers/premium_provider.dart';
 import '../providers/tafseer_edition_provider.dart';
@@ -18,11 +16,9 @@ import 'theme_color_picker_screen.dart';
 import 'font_picker_screen.dart';
 import 'clock_style_picker_screen.dart';
 import 'wallpaper_picker_screen.dart';
-import 'app_interrupt_settings_screen.dart';
-import 'focus_mode_settings_screen.dart';
-import 'hidden_apps_screen.dart';
 import 'debug_apps_screen.dart';
 import 'premium_paywall_screen.dart';
+import 'favorite_picker_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'credits_screen.dart';
 import '../services/offline_content_manager.dart';
@@ -196,67 +192,24 @@ class SettingsScreen extends ConsumerWidget {
                     title: 'WIDGETS',
                     items: [
                       _buildSettingsItem(
+                        icon: Icons.star_rounded,
+                        title: 'Manage Favorites',
+                        subtitle: 'Choose up to 7 favorite apps',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const FavoritePickerScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildSettingsItem(
                         icon: Icons.dashboard,
                         title: 'Widget Layout',
                         subtitle: 'Coming soon',
                         onTap: () {
                           // TODO: Implement widget customization
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  _buildSettingsSection(
-                    title: 'DIGITAL WELLBEING',
-                    items: [
-                      _buildSettingsItem(
-                        icon: Icons.app_blocking,
-                        title: 'App Interrupts',
-                        subtitle: _getInterruptsSummary(ref),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const AppInterruptSettingsScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      _buildSettingsItem(
-                        icon: Icons.lock_clock,
-                        title: 'Focus Mode',
-                        subtitle: _getFocusModeSummary(ref),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const FocusModeSettingsScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      _buildSettingsItem(
-                        icon: Icons.visibility_off,
-                        title: 'Hidden Apps',
-                        subtitle: 'Manage hidden and filtered apps',
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const HiddenAppsScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      _buildSettingsItem(
-                        icon: Icons.bug_report,
-                        title: 'Debug: All Apps',
-                        subtitle: 'View all installed apps with package names',
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const DebugAppsScreen(),
-                            ),
-                          );
                         },
                       ),
                     ],
@@ -317,7 +270,7 @@ class SettingsScreen extends ConsumerWidget {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text('✓ Premium Activated (Test)'),
-                                        backgroundColor: Color(0xFF40C463),
+                                        backgroundColor: Color(0xFFC2A366),
                                         duration: Duration(seconds: 1),
                                       ),
                                     );
@@ -326,17 +279,17 @@ class SettingsScreen extends ConsumerWidget {
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 12),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF40C463).withValues(alpha: 0.2),
+                                    color: const Color(0xFFC2A366).withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: const Color(0xFF40C463).withValues(alpha: 0.5),
+                                      color: const Color(0xFFC2A366).withValues(alpha: 0.5),
                                     ),
                                   ),
                                   child: const Center(
                                     child: Text(
                                       '🧪 Buy (Test)',
                                       style: TextStyle(
-                                        color: Color(0xFF40C463),
+                                        color: Color(0xFFC2A366),
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600,
                                       ),
@@ -449,31 +402,6 @@ class SettingsScreen extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  String _getInterruptsSummary(WidgetRef ref) {
-    final interrupts = ref.watch(appInterruptProvider);
-    final enabledCount = interrupts.values.where((i) => i.isEnabled).length;
-
-    if (enabledCount == 0) {
-      return 'Reduce distractions from apps';
-    } else if (enabledCount == 1) {
-      return '1 app has an interrupt';
-    } else {
-      return '$enabledCount apps have interrupts';
-    }
-  }
-
-  String _getFocusModeSummary(WidgetRef ref) {
-    final focusMode = ref.watch(focusModeProvider);
-
-    if (focusMode.isEnabled) {
-      return 'Active • ${focusMode.allowedApps.length} apps allowed';
-    } else if (focusMode.allowedApps.isEmpty) {
-      return 'Block distracting apps during focus';
-    } else {
-      return '${focusMode.allowedApps.length} apps configured';
-    }
   }
 
   void _openHomeLauncherSettings(BuildContext context) async {
@@ -718,7 +646,7 @@ class SettingsScreen extends ConsumerWidget {
                         trailing: isSelected
                             ? const Icon(
                                 Icons.check,
-                                color: Color(0xFF40C463),
+                                color: Color(0xFFC2A366),
                               )
                             : null,
                         onTap: () {
@@ -730,7 +658,7 @@ class SettingsScreen extends ConsumerWidget {
                   );
                 },
                 loading: () => const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF40C463)),
+                  child: CircularProgressIndicator(color: Color(0xFFC2A366)),
                 ),
                 error: (_, __) => Center(
                   child: Text(
@@ -1134,7 +1062,7 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Widget _buildPremiumBanner(BuildContext context, AppThemeColor currentTheme) {
-    const greenAccent = Color(0xFF40C463);
+    const greenAccent = Color(0xFFC2A366);
     
     return InkWell(
       onTap: () {
@@ -1169,7 +1097,7 @@ class SettingsScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF40C463), Color(0xFF30A14E)],
+                  colors: [Color(0xFFC2A366), Color(0xFFA67B5B)],
                 ),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [

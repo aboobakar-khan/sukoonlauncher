@@ -83,7 +83,7 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
           content: Text(success
               ? '${edition.name} downloaded for offline'
               : 'Failed to download tafseer'),
-          backgroundColor: success ? const Color(0xFF30A14E) : Colors.red,
+          backgroundColor: success ? const Color(0xFFA67B5B) : Colors.red,
         ),
       );
     }
@@ -166,12 +166,12 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Color(0xFF40C463),
+                      color: Color(0xFFC2A366),
                     ),
                   )
                 : Icon(
                     _isDownloaded ? Icons.cloud_done : Icons.cloud_download_outlined,
-                    color: _isDownloaded ? const Color(0xFF40C463) : Colors.white70,
+                    color: _isDownloaded ? const Color(0xFFC2A366) : Colors.white70,
                   ),
             tooltip: _isDownloaded ? 'Tafseer available offline' : 'Download tafseer for offline',
           ),
@@ -209,8 +209,8 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFF40C463),
-                          const Color(0xFF40C463).withValues(alpha: 0.7),
+                          const Color(0xFFC2A366),
+                          const Color(0xFFC2A366).withValues(alpha: 0.7),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(2),
@@ -262,14 +262,14 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
                 
                 return Card(
                   color: isHighlighted 
-                      ? const Color(0xFF40C463).withValues(alpha: 0.15)
+                      ? const Color(0xFFC2A366).withValues(alpha: 0.15)
                       : Colors.grey[900],
                   margin: const EdgeInsets.only(bottom: 16),
                   shape: isHighlighted 
                       ? RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: const BorderSide(
-                            color: Color(0xFF40C463),
+                            color: Color(0xFFC2A366),
                             width: 2,
                           ),
                         )
@@ -286,12 +286,14 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
                             CircleAvatar(
                               radius: 16,
                               backgroundColor: isHighlighted
-                                  ? const Color(0xFF40C463)
-                                  : const Color.fromARGB(255, 105, 206, 109),
+                                  ? const Color(0xFFC2A366)
+                                  : const Color(0xFFC2A366).withValues(alpha: 0.15),
                               child: Text(
                                 '${verse.id}',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: isHighlighted
+                                      ? Colors.white
+                                      : const Color(0xFFC2A366),
                                   fontSize: 15,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -314,10 +316,10 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF30A14E).withValues(alpha: 0.2),
+                                  color: const Color(0xFFA67B5B).withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
-                                    color: const Color(0xFF40C463).withValues(alpha: 0.4),
+                                    color: const Color(0xFFC2A366).withValues(alpha: 0.4),
                                     width: 1,
                                   ),
                                 ),
@@ -327,13 +329,13 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
                                     Icon(
                                       Icons.menu_book_outlined,
                                       size: 14,
-                                      color: Color(0xFF40C463),
+                                      color: Color(0xFFC2A366),
                                     ),
                                     SizedBox(width: 4),
                                     Text(
                                       'Tafseer',
                                       style: TextStyle(
-                                        color: Color(0xFF40C463),
+                                        color: Color(0xFFC2A366),
                                         fontSize: 11,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -385,7 +387,7 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
           );
         },
         loading: () =>
-            const Center(child: CircularProgressIndicator(color: Colors.green)),
+            const Center(child: CircularProgressIndicator(color: Color(0xFFC2A366))),
         error: (error, stack) => Center(
           child: Text(
             'Error loading verses: $error',

@@ -2,17 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'models/todo_item.dart';
 import 'models/note.dart';
-import 'models/app_interrupt.dart';
-import 'models/focus_mode.dart';
 import 'models/deen_mode.dart';
 import 'models/favorite_app.dart';
 import 'models/installed_app.dart';
-import 'models/hidden_app.dart';
-import 'models/event.dart';
 import 'models/prayer_record.dart';
+import 'models/productivity_models.dart';
 import 'screens/launcher_shell.dart';
+import 'screens/onboarding_screen.dart';
 import 'providers/font_provider.dart';
 import 'providers/font_size_provider.dart';
 
@@ -22,17 +19,19 @@ void main() async {
   // Initialize Hive
   await Hive.initFlutter();
 
-  Hive.registerAdapter(TodoItemAdapter());
   Hive.registerAdapter(NoteAdapter());
-  Hive.registerAdapter(AppInterruptAdapter());
-  Hive.registerAdapter(InterruptMethodAdapter());
-  Hive.registerAdapter(FocusModeSettingsAdapter());
   Hive.registerAdapter(DeenModeSettingsAdapter()); // Deen Mode
   Hive.registerAdapter(FavoriteAppAdapter());
   Hive.registerAdapter(InstalledAppAdapter());
-  Hive.registerAdapter(HiddenAppAdapter()); // User hidden/unhidden apps
-  Hive.registerAdapter(EventAdapter()); // Event tracker
   Hive.registerAdapter(PrayerRecordAdapter()); // Prayer tracking
+
+  // Productivity Hub adapters
+  Hive.registerAdapter(TodoItemAdapter());
+  Hive.registerAdapter(PomodoroSessionAdapter());
+  Hive.registerAdapter(AcademicDoubtAdapter());
+  Hive.registerAdapter(ProductivityEventAdapter());
+  Hive.registerAdapter(AppBlockRuleAdapter());
+  Hive.registerAdapter(PomodoroSettingsAdapter());
 
   // Set system UI overlay style for immersive experience
   SystemChrome.setSystemUIOverlayStyle(
@@ -92,7 +91,43 @@ class MinimalistLauncherApp extends ConsumerWidget {
           color: Colors.transparent,
         ),
       ),
-      home: const LauncherShell(),
+      home: const _LauncherEntryPoint(),
     );
+  }
+}
+
+/// Entry point that checks if onboarding is completed
+class _LauncherEntryPoint extends StatelessWidget {
+  const _LauncherEntryPoint();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: _checkOnboardingStatus(),
+      builder: (context, snapshot) {
+        // Show loading while checking
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            backgroundColor: Colors.black,
+            body: Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFFC2A366), // CamelColors.sandGold
+              ),
+            ),
+          );
+        }
+
+        // Show onboarding if not completed, otherwise show launcher
+        final onboardingCompleted = snapshot.data ?? false;
+        return onboardingCompleted 
+            ? const LauncherShell() 
+            : const OnboardingScreen();
+      },
+    );
+  }
+
+  Future<bool> _checkOnboardingStatus() async {
+    final box = await Hive.openBox('settingsBox');
+    return box.get('onboarding_completed', defaultValue: false);
   }
 }

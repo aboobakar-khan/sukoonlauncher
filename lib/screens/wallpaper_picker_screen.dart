@@ -184,6 +184,17 @@ class WallpaperPickerScreen extends ConsumerWidget {
             Colors.black,
           ],
         );
+      case WallpaperType.desertGradient:
+        // 🐪 Camel desert gradient preview
+        return LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF1A150D),
+            const Color(0xFF2A1F12),
+            Colors.black,
+          ],
+        );
       case WallpaperType.blueGradient:
         return LinearGradient(
           begin: Alignment.topLeft,

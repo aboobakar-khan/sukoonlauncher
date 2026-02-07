@@ -192,17 +192,32 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                   itemBuilder: (context, index) {
                     final surah = _filteredSurahs[index];
                     return Card(
-                      color: Colors.grey[900],
-                      margin: const EdgeInsets.only(bottom: 12),
+                      color: const Color(0xFF1A1A1A),
+                      elevation: 0,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: const Color(0xFFC2A366).withValues(alpha: 0.08),
+                        ),
+                      ),
                       child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.green,
-                          child: Text(
+                        leading: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFC2A366).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(
                             '${surah.id}',
                             style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFC2A366),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
                             ),
+                          ),
                           ),
                         ),
                         title: Row(
@@ -247,10 +262,10 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                             ),
                           ],
                         ),
-                        trailing: const Icon(
+                        trailing: Icon(
                           Icons.arrow_forward_ios,
-                          color: Color.fromARGB(255, 147, 244, 150),
-                          size: 16,
+                          color: const Color(0xFFC2A366).withValues(alpha: 0.4),
+                          size: 14,
                         ),
                         onTap: () {
                           HapticFeedback.lightImpact();
@@ -262,7 +277,7 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                 );
               },
               loading: () => const Center(
-                child: CircularProgressIndicator(color: Colors.green),
+                child: CircularProgressIndicator(color: Color(0xFFC2A366)),
               ),
               error: (error, stack) => Center(
                 child: Text(
@@ -282,10 +297,10 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF40C463).withValues(alpha: 0.12),
+        color: const Color(0xFFC2A366).withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: const Color(0xFF40C463).withValues(alpha: 0.25),
+          color: const Color(0xFFC2A366).withValues(alpha: 0.25),
           width: 1,
         ),
       ),
@@ -301,7 +316,7 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                 // Play icon
                 const Icon(
                   Icons.play_circle_filled,
-                  color: Color(0xFF40C463),
+                  color: Color(0xFFC2A366),
                   size: 18,
                 ),
                 const SizedBox(width: 10),
@@ -336,7 +351,7 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                 // Arrow
                 Icon(
                   Icons.chevron_right,
-                  color: const Color(0xFF40C463).withValues(alpha: 0.7),
+                  color: const Color(0xFFC2A366).withValues(alpha: 0.7),
                   size: 20,
                 ),
               ],

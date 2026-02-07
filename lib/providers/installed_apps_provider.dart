@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 import '../models/installed_app.dart';
-import '../models/hidden_app.dart';
 import '../utils/app_filter_utils.dart';
 
 /// Provider for installed apps stored permanently in Hive
@@ -32,18 +31,15 @@ class InstalledAppsNotifier extends StateNotifier<List<InstalledApp>> {
   }
 
   /// Refresh apps from system (call manually when needed)
-  /// Pass hiddenApps to respect user overrides
-  Future<void> refreshApps({List<HiddenApp>? hiddenApps}) async {
+  Future<void> refreshApps() async {
     if (_isRefreshing) return;
     _isRefreshing = true;
 
     try {
       _box ??= await Hive.openBox<InstalledApp>('installed_apps');
 
-      // Get filtered apps from system with user overrides
-      final systemApps = await AppFilterUtils.getFilteredAppsAlternative(
-        hiddenApps: hiddenApps,
-      );
+      // Get filtered apps from system
+      final systemApps = await AppFilterUtils.getFilteredAppsAlternative();
 
       // Clear old data
       await _box!.clear();
