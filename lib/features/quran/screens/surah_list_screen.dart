@@ -83,86 +83,66 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
               error: (_, __) => const SizedBox.shrink(),
             ),
           
-          // Collapsible search - icon only when not searching
-          if (_isSearching)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      focusNode: _searchFocusNode,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
-                      autofocus: true,
-                      decoration: InputDecoration(
-                        hintText: 'search...',
-                        hintStyle: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.35),
-                          fontSize: 13,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.search,
-                          color: Colors.white.withValues(alpha: 0.4),
-                          size: 16,
-                        ),
-                        prefixIconConstraints: const BoxConstraints(minWidth: 36),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        filled: true,
-                        fillColor: Colors.white.withValues(alpha: 0.06),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      onChanged: (value) => setState(() {}),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _searchController.clear();
-                        _isSearching = false;
-                      });
-                    },
-                    child: Text(
-                      'cancel',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            // Just a subtle search hint row
-            GestureDetector(
-              onTap: () => setState(() => _isSearching = true),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.search,
-                      color: Colors.white.withValues(alpha: 0.25),
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'search',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.25),
-                        fontSize: 12,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
+          // Search bar — always visible, elegant
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _isSearching
+                      ? const Color(0xFFC2A366).withValues(alpha: 0.25)
+                      : Colors.white.withValues(alpha: 0.06),
                 ),
               ),
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                onTap: () => setState(() => _isSearching = true),
+                decoration: InputDecoration(
+                  hintText: 'Search surah by name or number...',
+                  hintStyle: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w300,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: _isSearching
+                        ? const Color(0xFFC2A366).withValues(alpha: 0.6)
+                        : Colors.white.withValues(alpha: 0.25),
+                    size: 18,
+                  ),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 44),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _searchController.clear();
+                              _isSearching = false;
+                              _searchFocusNode.unfocus();
+                            });
+                          },
+                          child: Icon(
+                            Icons.close_rounded,
+                            color: Colors.white.withValues(alpha: 0.3),
+                            size: 16,
+                          ),
+                        )
+                      : null,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 0, vertical: 12),
+                  filled: false,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                ),
+                onChanged: (value) => setState(() {}),
+              ),
             ),
+          ),
 
           // Surah List
           Expanded(

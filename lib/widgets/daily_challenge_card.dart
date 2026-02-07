@@ -384,44 +384,32 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               children: [
-                // Challenge dots
+                // Progress line with percentage
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: _dailyChallenges.map((challenge) {
-                    final isComplete = _todayChallenges[challenge['id']] == true;
-                    return Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: isComplete
-                            ? _primaryGreen
-                            : Colors.white.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isComplete
-                              ? _primaryGreen
-                              : Colors.white.withOpacity(0.2),
-                          width: 2,
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          backgroundColor: Colors.white.withOpacity(0.08),
+                          valueColor: AlwaysStoppedAnimation(
+                            allComplete ? _goldReward : _primaryGreen,
+                          ),
+                          minHeight: 5,
                         ),
                       ),
-                      child: isComplete
-                          ? const Icon(Icons.check, color: Colors.white, size: 14)
-                          : null,
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 8),
-                // Progress bar
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    backgroundColor: Colors.white.withOpacity(0.08),
-                    valueColor: AlwaysStoppedAnimation(
-                      allComplete ? _goldReward : _primaryGreen,
                     ),
-                    minHeight: 4,
-                  ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '${(progress * 100).toInt()}%',
+                      style: TextStyle(
+                        color: allComplete ? _goldReward : _primaryGreen,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

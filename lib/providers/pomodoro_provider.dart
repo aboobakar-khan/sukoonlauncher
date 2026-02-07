@@ -58,8 +58,11 @@ class PomodoroState {
 class PomodoroNotifier extends StateNotifier<PomodoroState> {
   Timer? _timer;
   final AudioPlayer _audioPlayer = AudioPlayer();
+  final AmbientSoundNotifier? _ambientSound;
 
-  PomodoroNotifier() : super(const PomodoroState());
+  PomodoroNotifier({AmbientSoundNotifier? ambientSound}) 
+      : _ambientSound = ambientSound,
+        super(const PomodoroState());
 
   @override
   void dispose() {
@@ -77,6 +80,11 @@ class PomodoroNotifier extends StateNotifier<PomodoroState> {
       totalSeconds: state.remainingSeconds,
     );
 
+    // Auto-play ambient sound if one is selected
+    if (state.ambientSoundId != null && _ambientSound != null) {
+      _ambientSound.selectAndPlay(state.ambientSoundId!);
+    }
+
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (state.remainingSeconds > 0) {
         state = state.copyWith(remainingSeconds: state.remainingSeconds - 1);
@@ -89,10 +97,16 @@ class PomodoroNotifier extends StateNotifier<PomodoroState> {
   void pauseTimer() {
     _timer?.cancel();
     state = state.copyWith(isRunning: false);
+    // Pause ambient sound when timer pauses
+    if (_ambientSound != null && _ambientSound.state.isPlaying) {
+      _ambientSound.togglePlayPause();
+    }
   }
 
   void resetTimer() {
     _timer?.cancel();
+    // Stop ambient sound on reset
+    _ambientSound?.stop();
     final duration = state.workDuration * 60;
     state = state.copyWith(
       isRunning: false,
@@ -109,6 +123,9 @@ class PomodoroNotifier extends StateNotifier<PomodoroState> {
 
   void _onTimerComplete() async {
     _timer?.cancel();
+
+    // Stop ambient sound when session completes
+    _ambientSound?.stop();
 
     // Play completion sound and haptic feedback
     await _playCompletionSound();
@@ -186,5 +203,8 @@ class PomodoroNotifier extends StateNotifier<PomodoroState> {
 
 /// Global pomodoro provider - keeps timer running across screen changes
 final pomodoroProvider = StateNotifierProvider<PomodoroNotifier, PomodoroState>(
-  (ref) => PomodoroNotifier(),
+  (ref) {
+    final ambientNotifier = ref.read(ambientSoundProvider.notifier);
+    return PomodoroNotifier(ambientSound: ambientNotifier);
+  },
 );

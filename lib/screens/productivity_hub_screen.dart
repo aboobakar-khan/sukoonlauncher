@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../providers/productivity_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/installed_apps_provider.dart';
+import '../models/installed_app.dart';
 import '../providers/premium_provider.dart';
 import '../models/productivity_models.dart';
 import 'premium_paywall_screen.dart';
@@ -2238,7 +2239,12 @@ class _BlockerTab extends ConsumerWidget {
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    ref.read(appBlockRuleProvider.notifier).toggleRule(rule.id);
+                    if (rule.isEnabled) {
+                      // Show confirmation before deactivating
+                      _showDeactivateConfirmation(context, ref, rule);
+                    } else {
+                      ref.read(appBlockRuleProvider.notifier).toggleRule(rule.id);
+                    }
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -2299,41 +2305,21 @@ class _BlockerTab extends ConsumerWidget {
           ),
           if (rule.allowBreaks) ...[
             const SizedBox(height: 4),
-            Text(
-              'Breaks: ${rule.breaksTaken}/${rule.maxBreaksPerSession}',
-              style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.25), fontSize: 10),
-            ),
-          ],
-          // Actions row
-          if (!rule.isHardBlock)
             Row(
-              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                GestureDetector(
-                  onTap: () => _showEditApps(context, ref, rule),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Text('Edit Apps',
-                        style: TextStyle(
-                            color: _sandGold.withValues(alpha: 0.5),
-                            fontSize: 11)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: () =>
-                      ref.read(appBlockRuleProvider.notifier).deleteRule(rule.id),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(Icons.delete_outline,
-                        size: 16,
-                        color: Colors.red.withValues(alpha: 0.4)),
-                  ),
+                Icon(Icons.free_breakfast_outlined, size: 11,
+                    color: Colors.white.withValues(alpha: 0.25)),
+                const SizedBox(width: 4),
+                Text(
+                  'Breaks allowed',
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.25), fontSize: 10),
                 ),
               ],
-            )
-          else
+            ),
+          ],
+          // Locked info for all rules
+          if (rule.isHardBlock)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Row(
@@ -2361,6 +2347,152 @@ class _BlockerTab extends ConsumerWidget {
     final hour = h % 12 == 0 ? 12 : h % 12;
     final ampm = h < 12 ? 'AM' : 'PM';
     return '$hour:${(m ?? 0).toString().padLeft(2, '0')} $ampm';
+  }
+
+  // ── Deactivation confirmation for easy-mode blockers ──
+  void _showDeactivateConfirmation(BuildContext context, WidgetRef ref, AppBlockRule rule) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+        decoration: const BoxDecoration(
+          color: Color(0xFF141414),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 28),
+            // Shield icon
+            Container(
+              width: 64, height: 64,
+              decoration: BoxDecoration(
+                color: _desertSunset.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.shield_outlined, size: 30,
+                  color: _desertSunset.withValues(alpha: 0.8)),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Stay Focused',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.95),
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'You set this blocker for a reason.\nDisabling it now means giving in to distraction.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: _sandGold.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _sandGold.withValues(alpha: 0.15)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.format_quote, size: 14,
+                      color: _sandGold.withValues(alpha: 0.6)),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      '"Discipline is choosing between what you\nwant now and what you want most."',
+                      style: TextStyle(
+                        color: _sandGold.withValues(alpha: 0.8),
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Keep it ON button (primary)
+            SizedBox(
+              width: double.infinity,
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.pop(ctx);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: _desertSunset.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _desertSunset.withValues(alpha: 0.4)),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Keep Blocker Active',
+                      style: TextStyle(
+                        color: _desertSunset,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            // Confirm deactivate button (subtle)
+            SizedBox(
+              width: double.infinity,
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  ref.read(appBlockRuleProvider.notifier).toggleRule(rule.id);
+                  Navigator.pop(ctx);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Confirm Deactivate',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.35),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showEditApps(BuildContext context, WidgetRef ref, AppBlockRule rule) {
@@ -2456,13 +2588,69 @@ class _BlockerTab extends ConsumerWidget {
     );
   }
 
+  // ── Task 6: Show block type chooser first ──
   void _showAddRule(BuildContext context, WidgetRef ref) {
-    final nameCtrl = TextEditingController();
-    bool isTimeBased = false;
-    bool isHardBlock = false;
-    int startH = 9, startM = 0, endH = 17, endM = 0;
-    Set<int> activeDays = {1, 2, 3, 4, 5}; // Mon-Fri
-    Set<String> selectedApps = {}; // Apps to block
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('New Block Rule',
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Text('Choose block type',
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.35),
+                    fontSize: 13)),
+            const SizedBox(height: 20),
+            // Option A: Block Now
+            _BlockTypeOption(
+              icon: Icons.flash_on_rounded,
+              color: _desertSunset,
+              title: 'Block Now',
+              subtitle: 'Instantly block apps for a set duration',
+              onTap: () {
+                Navigator.pop(ctx);
+                _showQuickBlockSheet(context, ref);
+              },
+            ),
+            const SizedBox(height: 10),
+            // Option B: Scheduled Block
+            _BlockTypeOption(
+              icon: Icons.schedule_rounded,
+              color: _sandGold,
+              title: 'Scheduled Block',
+              subtitle: 'Block apps during specific time windows',
+              onTap: () {
+                Navigator.pop(ctx);
+                _showScheduledBlockSheet(context, ref);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Quick Block (Block Now for X minutes) ──
+  void _showQuickBlockSheet(BuildContext context, WidgetRef ref) {
+    final nameCtrl = TextEditingController(text: 'Quick Focus');
+    int durationMinutes = 30;
+    int breakDifficulty = 0; // 0 = Easy, 1 = Hard
+    Set<String> selectedApps = {};
+    final durations = [15, 30, 45, 60, 90, 120];
 
     showModalBottomSheet(
       context: context,
@@ -2472,6 +2660,8 @@ class _BlockerTab extends ConsumerWidget {
         builder: (ctx, setBS) => Container(
           padding: EdgeInsets.fromLTRB(
               20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.85),
           decoration: const BoxDecoration(
             color: Color(0xFF1A1A1A),
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -2481,11 +2671,166 @@ class _BlockerTab extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('New Block Rule',
+                Row(children: [
+                  Icon(Icons.flash_on_rounded,
+                      color: _desertSunset.withValues(alpha: 0.7), size: 20),
+                  const SizedBox(width: 8),
+                  Text('Block Now',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600)),
+                ]),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Rule name',
+                    hintStyle:
+                        TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.06),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Duration selector
+                Text('Duration',
                     style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600)),
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 13)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: durations.map((d) {
+                    final isSelected = durationMinutes == d;
+                    final label =
+                        d >= 60 ? '${d ~/ 60}h${d % 60 > 0 ? " ${d % 60}m" : ""}' : '${d}m';
+                    return GestureDetector(
+                      onTap: () => setBS(() => durationMinutes = d),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? _desertSunset.withValues(alpha: 0.15)
+                              : Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: isSelected
+                                  ? _desertSunset.withValues(alpha: 0.4)
+                                  : Colors.white.withValues(alpha: 0.06)),
+                        ),
+                        child: Text(label,
+                            style: TextStyle(
+                                color: isSelected
+                                    ? _desertSunset
+                                    : Colors.white.withValues(alpha: 0.5),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500)),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                // Add Apps button
+                _buildAddAppsButton(ctx, ref, selectedApps, setBS),
+                const SizedBox(height: 16),
+                // Break difficulty
+                _buildBreakDifficultySelector(ref, breakDifficulty, (v) => setBS(() => breakDifficulty = v), ctx),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (selectedApps.isEmpty) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                          content: const Text('Please add at least one app to block'),
+                          backgroundColor: Colors.red.withValues(alpha: 0.8),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ));
+                        return;
+                      }
+                      final now = DateTime.now();
+                      final endTime = now.add(Duration(minutes: durationMinutes));
+                      ref.read(appBlockRuleProvider.notifier).addRule(
+                            name: nameCtrl.text.trim().isEmpty
+                                ? 'Quick Focus'
+                                : nameCtrl.text.trim(),
+                            blockedPackages: selectedApps.toList(),
+                            isTimeBased: true,
+                            startHour: now.hour,
+                            startMinute: now.minute,
+                            endHour: endTime.hour,
+                            endMinute: endTime.minute,
+                            activeDays: [now.weekday],
+                            isHardBlock: breakDifficulty == 1,
+                            allowBreaks: breakDifficulty == 0,
+                          );
+                      Navigator.pop(ctx);
+                      HapticFeedback.lightImpact();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _desertSunset.withValues(alpha: 0.2),
+                      foregroundColor: _desertSunset,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: Text('Start Blocking · ${durationMinutes}min'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Scheduled Block (time-duration based) ──
+  void _showScheduledBlockSheet(BuildContext context, WidgetRef ref) {
+    final nameCtrl = TextEditingController();
+    int startH = 9, startM = 0, endH = 17, endM = 0;
+    Set<int> activeDays = {1, 2, 3, 4, 5}; // Mon-Fri
+    Set<String> selectedApps = {};
+    int breakDifficulty = 0; // 0 = Easy, 1 = Hard
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setBS) => Container(
+          padding: EdgeInsets.fromLTRB(
+              20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Icon(Icons.schedule_rounded,
+                      color: _sandGold.withValues(alpha: 0.7), size: 20),
+                  const SizedBox(width: 8),
+                  Text('Scheduled Block',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600)),
+                ]),
                 const SizedBox(height: 16),
                 TextField(
                   controller: nameCtrl,
@@ -2502,355 +2847,150 @@ class _BlockerTab extends ConsumerWidget {
                         borderSide: BorderSide.none),
                   ),
                 ),
-                const SizedBox(height: 12),
-                // Time-based toggle
-                Row(
-                  children: [
-                    Text('Schedule',
-                        style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.6),
-                            fontSize: 13)),
-                    const Spacer(),
-                    Switch(
-                      value: isTimeBased,
-                      onChanged: (v) => setBS(() => isTimeBased = v),
-                      activeColor: _sandGold,
-                    ),
-                  ],
-                ),
-                if (isTimeBased) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () async {
-                            final time = await showTimePicker(
-                              context: ctx,
-                              initialTime:
-                                  TimeOfDay(hour: startH, minute: startM),
-                            );
-                            if (time != null) {
-                              setBS(() {
-                                startH = time.hour;
-                                startM = time.minute;
-                              });
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.06),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              'Start: ${_formatHour(startH, startM)}',
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 13),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () async {
-                            final time = await showTimePicker(
-                              context: ctx,
-                              initialTime:
-                                  TimeOfDay(hour: endH, minute: endM),
-                            );
-                            if (time != null) {
-                              setBS(() {
-                                endH = time.hour;
-                                endM = time.minute;
-                              });
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.06),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              'End: ${_formatHour(endH, endM)}',
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 13),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  // Day selector
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: List.generate(7, (i) {
-                      final day = i + 1; // 1=Mon ... 7=Sun
-                      final labels = [
-                        'M',
-                        'T',
-                        'W',
-                        'T',
-                        'F',
-                        'S',
-                        'S'
-                      ];
-                      final active = activeDays.contains(day);
-                      return GestureDetector(
-                        onTap: () => setBS(() {
-                          if (active) {
-                            activeDays.remove(day);
-                          } else {
-                            activeDays.add(day);
-                          }
-                        }),
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: active
-                                ? _sandGold.withValues(alpha: 0.2)
-                                : Colors.white.withValues(alpha: 0.04),
-                          ),
-                          child: Center(
-                            child: Text(
-                              labels[i],
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: active
-                                    ? _sandGold
-                                    : Colors.white.withValues(alpha: 0.3),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                ],
                 const SizedBox(height: 16),
-                // Select Apps to Block
-                Text('Apps to Block',
+                // Time picker row
+                Text('Schedule',
                     style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 13)),
                 const SizedBox(height: 8),
-                Builder(
-                  builder: (ctx) {
-                    final allApps = ref.read(installedAppsProvider);
-                    if (allApps.isEmpty) {
-                      return Text('Loading apps...',
-                          style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.3),
-                              fontSize: 12));
-                    }
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Selected count
-                        if (selectedApps.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Text(
-                              '${selectedApps.length} app${selectedApps.length == 1 ? '' : 's'} selected',
-                              style: TextStyle(
-                                  color: _desertSunset.withValues(alpha: 0.7),
-                                  fontSize: 11),
-                            ),
-                          ),
-                        // App chips (scrollable)
-                        Container(
-                          constraints: const BoxConstraints(maxHeight: 160),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final time = await showTimePicker(
+                            context: ctx,
+                            initialTime:
+                                TimeOfDay(hour: startH, minute: startM),
+                          );
+                          if (time != null) {
+                            setBS(() {
+                              startH = time.hour;
+                              startM = time.minute;
+                            });
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.03),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.06)),
+                            color: Colors.white.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            itemCount: allApps.length,
-                            itemBuilder: (ctx, i) {
-                              final app = allApps[i];
-                              final isSelected = selectedApps.contains(app.packageName);
-                              return GestureDetector(
-                                onTap: () {
-                                  setBS(() {
-                                    if (isSelected) {
-                                      selectedApps.remove(app.packageName);
-                                    } else {
-                                      selectedApps.add(app.packageName);
-                                    }
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 10),
-                                  color: isSelected
-                                      ? _desertSunset.withValues(alpha: 0.06)
-                                      : Colors.transparent,
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          app.appName,
-                                          style: TextStyle(
-                                            color: isSelected
-                                                ? Colors.white.withValues(alpha: 0.9)
-                                                : Colors.white.withValues(alpha: 0.5),
-                                            fontSize: 13,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      Icon(
-                                        isSelected
-                                            ? Icons.check_circle
-                                            : Icons.circle_outlined,
-                                        color: isSelected
-                                            ? _desertSunset
-                                            : Colors.white.withValues(alpha: 0.15),
-                                        size: 18,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
+                          child: Text(
+                            'Start: ${_formatHour(startH, startM)}',
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 13),
+                            textAlign: TextAlign.center,
                           ),
                         ),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-                // Hard Block toggle (Premium)
-                GestureDetector(
-                  onTap: () {
-                    final isPremium = ref.read(premiumProvider).isPremium;
-                    if (!isPremium) {
-                      Navigator.pop(ctx);
-                      showPremiumPaywall(context, triggerFeature: 'Hard Block');
-                      return;
-                    }
-                    setBS(() => isHardBlock = !isHardBlock);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isHardBlock
-                          ? _desertSunset.withValues(alpha: 0.08)
-                          : Colors.white.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isHardBlock
-                            ? _desertSunset.withValues(alpha: 0.25)
-                            : Colors.white.withValues(alpha: 0.06),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isHardBlock ? Icons.lock : Icons.lock_outline,
-                          size: 18,
-                          color: isHardBlock
-                              ? _desertSunset.withValues(alpha: 0.8)
-                              : Colors.white.withValues(alpha: 0.35),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    'Hard Block',
-                                    style: TextStyle(
-                                      color: isHardBlock
-                                          ? _desertSunset.withValues(alpha: 0.9)
-                                          : Colors.white.withValues(alpha: 0.6),
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  if (!ref.read(premiumProvider).isPremium)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: _sandGold.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        'PRO',
-                                        style: TextStyle(
-                                          color: _sandGold.withValues(alpha: 0.8),
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Cannot be deleted, toggled, or edited',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.25),
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final time = await showTimePicker(
+                            context: ctx,
+                            initialTime:
+                                TimeOfDay(hour: endH, minute: endM),
+                          );
+                          if (time != null) {
+                            setBS(() {
+                              endH = time.hour;
+                              endM = time.minute;
+                            });
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'End: ${_formatHour(endH, endM)}',
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 13),
+                            textAlign: TextAlign.center,
                           ),
                         ),
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 20,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(6),
-                            color: isHardBlock
-                                ? _desertSunset.withValues(alpha: 0.25)
-                                : Colors.white.withValues(alpha: 0.06),
-                            border: Border.all(
-                              color: isHardBlock
-                                  ? _desertSunset.withValues(alpha: 0.5)
-                                  : Colors.white.withValues(alpha: 0.12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Day selector
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: List.generate(7, (i) {
+                    final day = i + 1;
+                    final labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                    final active = activeDays.contains(day);
+                    return GestureDetector(
+                      onTap: () => setBS(() {
+                        if (active) {
+                          activeDays.remove(day);
+                        } else {
+                          activeDays.add(day);
+                        }
+                      }),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: active
+                              ? _sandGold.withValues(alpha: 0.2)
+                              : Colors.white.withValues(alpha: 0.04),
+                        ),
+                        child: Center(
+                          child: Text(
+                            labels[i],
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: active
+                                  ? _sandGold
+                                  : Colors.white.withValues(alpha: 0.3),
                             ),
                           ),
-                          child: isHardBlock
-                              ? const Icon(Icons.check_rounded, color: _desertSunset, size: 14)
-                              : null,
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  }),
                 ),
                 const SizedBox(height: 16),
+                // Add Apps button
+                _buildAddAppsButton(ctx, ref, selectedApps, setBS),
+                const SizedBox(height: 16),
+                // Break difficulty
+                _buildBreakDifficultySelector(ref, breakDifficulty, (v) => setBS(() => breakDifficulty = v), ctx),
+                const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
                       if (nameCtrl.text.trim().isEmpty) return;
+                      if (selectedApps.isEmpty) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                          content: const Text('Please add at least one app to block'),
+                          backgroundColor: Colors.red.withValues(alpha: 0.8),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ));
+                        return;
+                      }
                       ref.read(appBlockRuleProvider.notifier).addRule(
                             name: nameCtrl.text.trim(),
                             blockedPackages: selectedApps.toList(),
-                            isTimeBased: isTimeBased,
-                            startHour: isTimeBased ? startH : null,
-                            startMinute: isTimeBased ? startM : null,
-                            endHour: isTimeBased ? endH : null,
-                            endMinute: isTimeBased ? endM : null,
-                            activeDays:
-                                isTimeBased ? activeDays.toList() : null,
-                            isHardBlock: isHardBlock,
+                            isTimeBased: true,
+                            startHour: startH,
+                            startMinute: startM,
+                            endHour: endH,
+                            endMinute: endM,
+                            activeDays: activeDays.toList(),
+                            isHardBlock: breakDifficulty == 1,
+                            allowBreaks: breakDifficulty == 0,
                           );
                       Navigator.pop(ctx);
                       HapticFeedback.lightImpact();
@@ -2868,6 +3008,510 @@ class _BlockerTab extends ConsumerWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // ── Shared: "Add Apps" button + selected chips ──
+  Widget _buildAddAppsButton(
+      BuildContext ctx, WidgetRef ref, Set<String> selectedApps, StateSetter setBS) {
+    final allApps = ref.read(installedAppsProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Text('Apps to Block',
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+          const Spacer(),
+          if (selectedApps.isNotEmpty)
+            Text('${selectedApps.length} selected',
+                style: TextStyle(
+                    color: _desertSunset.withValues(alpha: 0.6), fontSize: 11)),
+        ]),
+        const SizedBox(height: 8),
+        // Selected app chips
+        if (selectedApps.isNotEmpty) ...[
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: selectedApps.map((pkg) {
+              final appName = allApps
+                  .where((a) => a.packageName == pkg)
+                  .map((a) => a.appName)
+                  .firstOrNull ?? pkg.split('.').last;
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _desertSunset.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: _desertSunset.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(appName,
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 12)),
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: () => setBS(() => selectedApps.remove(pkg)),
+                      child: Icon(Icons.close,
+                          size: 14,
+                          color: Colors.white.withValues(alpha: 0.3)),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 10),
+        ],
+        // "Add Apps" button
+        GestureDetector(
+          onTap: () async {
+            final result = await Navigator.of(ctx, rootNavigator: true).push<Set<String>>(
+              PageRouteBuilder(
+                fullscreenDialog: true,
+                transitionDuration: const Duration(milliseconds: 300),
+                reverseTransitionDuration: const Duration(milliseconds: 200),
+                pageBuilder: (c, anim, _) => _AppSelectionScreen(
+                  allApps: allApps,
+                  preSelected: selectedApps,
+                ),
+                transitionsBuilder: (c, anim, _, child) =>
+                    SlideTransition(
+                      position: Tween<Offset>(
+                              begin: const Offset(0, 0.3), end: Offset.zero)
+                          .animate(CurvedAnimation(
+                              parent: anim, curve: Curves.easeOutCubic)),
+                      child: child,
+                    ),
+              ),
+            );
+            if (result != null) {
+              setBS(() {
+                selectedApps.clear();
+                selectedApps.addAll(result);
+              });
+            }
+          },
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.add_rounded,
+                    color: _desertSunset.withValues(alpha: 0.6), size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  selectedApps.isEmpty ? 'Add Apps' : 'Change Apps',
+                  style: TextStyle(
+                      color: _desertSunset.withValues(alpha: 0.7),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Shared: Break Difficulty Selector ──
+  Widget _buildBreakDifficultySelector(
+      WidgetRef ref, int difficulty, ValueChanged<int> onChanged, BuildContext ctx) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Break Difficulty',
+            style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+        const SizedBox(height: 8),
+        Row(children: [
+          // Easy
+          Expanded(
+            child: GestureDetector(
+              onTap: () { HapticFeedback.selectionClick(); onChanged(0); },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: difficulty == 0
+                      ? _oasisGreen.withValues(alpha: 0.08)
+                      : Colors.white.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: difficulty == 0
+                        ? _oasisGreen.withValues(alpha: 0.3)
+                        : Colors.white.withValues(alpha: 0.06),
+                  ),
+                ),
+                child: Column(children: [
+                  Icon(Icons.lock_open_rounded,
+                      size: 22,
+                      color: difficulty == 0
+                          ? _oasisGreen
+                          : Colors.white.withValues(alpha: 0.3)),
+                  const SizedBox(height: 6),
+                  Text('Easy',
+                      style: TextStyle(
+                          color: difficulty == 0
+                              ? _oasisGreen
+                              : Colors.white.withValues(alpha: 0.5),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text('Can take breaks\n& pause anytime',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.25),
+                          fontSize: 10)),
+                ]),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Hard
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                final isPremium = ref.read(premiumProvider).isPremium;
+                if (!isPremium) {
+                  Navigator.pop(ctx);
+                  showPremiumPaywall(ctx, triggerFeature: 'Hard Block');
+                  return;
+                }
+                HapticFeedback.selectionClick();
+                onChanged(1);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: difficulty == 1
+                      ? _desertSunset.withValues(alpha: 0.08)
+                      : Colors.white.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: difficulty == 1
+                        ? _desertSunset.withValues(alpha: 0.3)
+                        : Colors.white.withValues(alpha: 0.06),
+                  ),
+                ),
+                child: Column(children: [
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Icon(Icons.lock_rounded,
+                        size: 22,
+                        color: difficulty == 1
+                            ? _desertSunset
+                            : Colors.white.withValues(alpha: 0.3)),
+                    if (!ref.read(premiumProvider).isPremium) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _sandGold.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text('PRO',
+                            style: TextStyle(
+                                color: _sandGold.withValues(alpha: 0.8),
+                                fontSize: 8,
+                                fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ]),
+                  const SizedBox(height: 6),
+                  Text('Hard',
+                      style: TextStyle(
+                          color: difficulty == 1
+                              ? _desertSunset
+                              : Colors.white.withValues(alpha: 0.5),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text("Can't break, leave\nor uninstall app",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.25),
+                          fontSize: 10)),
+                ]),
+              ),
+            ),
+          ),
+        ]),
+      ],
+    );
+  }
+}
+
+// ─── Block Type Chooser Option ──────────────────────────────────────────────
+
+class _BlockTypeOption extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  const _BlockTypeOption({
+    required this.icon, required this.color, required this.title,
+    required this.subtitle, required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () { HapticFeedback.lightImpact(); onTap(); },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.15)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color.withValues(alpha: 0.8), size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          fontSize: 12)),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios,
+                size: 14, color: Colors.white.withValues(alpha: 0.15)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Full-Screen App Selection ──────────────────────────────────────────────
+
+class _AppSelectionScreen extends StatefulWidget {
+  final List<InstalledApp> allApps;
+  final Set<String> preSelected;
+  const _AppSelectionScreen({required this.allApps, required this.preSelected});
+
+  @override
+  State<_AppSelectionScreen> createState() => _AppSelectionScreenState();
+}
+
+class _AppSelectionScreenState extends State<_AppSelectionScreen> {
+  late Set<String> _selected;
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = Set.from(widget.preSelected);
+  }
+
+  List<InstalledApp> get _filteredApps {
+    if (_searchQuery.isEmpty) return widget.allApps;
+    final q = _searchQuery.toLowerCase();
+    return widget.allApps
+        .where((a) =>
+            a.appName.toLowerCase().contains(q) ||
+            a.packageName.toLowerCase().contains(q))
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D0D0D),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(children: [
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.arrow_back_ios_new,
+                        color: Colors.white.withValues(alpha: 0.4), size: 16),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Select Apps',
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600)),
+                      Text('${_selected.length} app${_selected.length == 1 ? '' : 's'} selected',
+                          style: TextStyle(
+                              color: _desertSunset.withValues(alpha: 0.6),
+                              fontSize: 12)),
+                    ],
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.pop(context, _selected);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _sandGold.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text('Done',
+                        style: TextStyle(
+                            color: _sandGold,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ]),
+            ),
+            // Search
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: TextField(
+                onChanged: (v) => setState(() => _searchQuery = v),
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Search apps...',
+                  hintStyle:
+                      TextStyle(color: Colors.white.withValues(alpha: 0.25)),
+                  prefixIcon: Icon(Icons.search,
+                      color: Colors.white.withValues(alpha: 0.2)),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.05),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none),
+                ),
+              ),
+            ),
+            // Quick actions
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(children: [
+                GestureDetector(
+                  onTap: () => setState(() {
+                    _selected = widget.allApps
+                        .map((a) => a.packageName)
+                        .toSet();
+                  }),
+                  child: Text('Select All',
+                      style: TextStyle(
+                          color: _sandGold.withValues(alpha: 0.5),
+                          fontSize: 12)),
+                ),
+                const SizedBox(width: 16),
+                GestureDetector(
+                  onTap: () => setState(() => _selected.clear()),
+                  child: Text('Clear',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          fontSize: 12)),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 8),
+            // App list
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                itemCount: _filteredApps.length,
+                itemBuilder: (ctx, i) {
+                  final app = _filteredApps[i];
+                  final isSelected = _selected.contains(app.packageName);
+                  return ListTile(
+                    dense: true,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() {
+                        if (isSelected) {
+                          _selected.remove(app.packageName);
+                        } else {
+                          _selected.add(app.packageName);
+                        }
+                      });
+                    },
+                    title: Text(app.appName,
+                        style: TextStyle(
+                            color: isSelected
+                                ? Colors.white.withValues(alpha: 0.9)
+                                : Colors.white.withValues(alpha: 0.6),
+                            fontSize: 14)),
+                    subtitle: Text(app.packageName,
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            fontSize: 10)),
+                    trailing: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(7),
+                        color: isSelected
+                            ? _desertSunset.withValues(alpha: 0.2)
+                            : Colors.white.withValues(alpha: 0.04),
+                        border: Border.all(
+                            color: isSelected
+                                ? _desertSunset.withValues(alpha: 0.5)
+                                : Colors.white.withValues(alpha: 0.1)),
+                      ),
+                      child: isSelected
+                          ? const Icon(Icons.check_rounded,
+                              color: _desertSunset, size: 16)
+                          : null,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

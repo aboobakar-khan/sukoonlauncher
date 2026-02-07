@@ -12,6 +12,7 @@ import 'productivity_hub_screen.dart';
 import '../features/quran/screens/surah_list_screen.dart';
 import '../features/hadith_dua/screens/minimalist_hadith_screen.dart';
 import '../features/hadith_dua/screens/minimalist_dua_screen.dart';
+import '../utils/debug_reset_helper.dart';
 
 /// Main launcher shell with swipeable pages
 /// Layout: [Islamic Hub] ← [Dashboard] ← [HOME] → [App List] → [Productivity]
@@ -74,78 +75,47 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
     _animController.dispose();
     super.dispose();
   }
-  
-  void _onDragStart(DragStartDetails details) {
-    // Don't start new gesture if animation is in progress
+
+  // ── Horizontal-only drag handlers (don't compete with vertical scroll) ──
+
+  void _onHDragStart(DragStartDetails details) {
     if (_isAnimating) return;
-    
     _dragStartX = details.globalPosition.dx;
-    _dragStartY = details.globalPosition.dy;
     _dragStartPage = _pageController.page ?? _homeIndex.toDouble();
     _isDragging = true;
-    _isHorizontalDrag = false;
-    _gestureDecided = false;
+    _isHorizontalDrag = true;
   }
   
-  void _onDragUpdate(DragUpdateDetails details) {
+  void _onHDragUpdate(DragUpdateDetails details) {
     if (!_isDragging || _isAnimating) return;
     
     final dx = details.globalPosition.dx - _dragStartX;
-    final dy = details.globalPosition.dy - _dragStartY;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final pageDelta = -dx / screenWidth;
+    final newPage = (_dragStartPage + pageDelta).clamp(0.0, 4.0);
     
-    // Decide direction once we've moved enough
-    if (!_gestureDecided) {
-      final absDx = dx.abs();
-      final absDy = dy.abs();
-      
-      if (absDx > _decisionThreshold || absDy > _decisionThreshold) {
-        // Check if this is a horizontal swipe
-        _isHorizontalDrag = absDx > absDy * _horizontalBias;
-        _gestureDecided = true;
-        
-        if (!_isHorizontalDrag) {
-          // Not horizontal, stop tracking
-          _isDragging = false;
-          return;
-        }
-      } else {
-        return; // Wait for more movement
-      }
-    }
-    
-    // Smooth 1:1 finger tracking
-    if (_isHorizontalDrag) {
-      final screenWidth = MediaQuery.of(context).size.width;
-      final pageDelta = -dx / screenWidth;
-      final newPage = (_dragStartPage + pageDelta).clamp(0.0, 4.0);
-      
-      // Use jumpToPage for smoother tracking without animation conflicts
-      if (_pageController.hasClients) {
-        _pageController.jumpTo(newPage * screenWidth);
-      }
+    if (_pageController.hasClients) {
+      _pageController.jumpTo(newPage * screenWidth);
     }
   }
   
-  void _onDragEnd(DragEndDetails details) {
-    if (!_isDragging || !_isHorizontalDrag || _isAnimating) {
+  void _onHDragEnd(DragEndDetails details) {
+    if (!_isDragging || _isAnimating) {
       _isDragging = false;
       return;
     }
     
-    final velocity = details.velocity.pixelsPerSecond.dx;
+    final velocity = details.primaryVelocity ?? 0;
     final currentPage = _pageController.page ?? _homeIndex.toDouble();
     int targetPage;
     
-    // Velocity-based page switching with clearer thresholds
     if (velocity.abs() > 800) {
-      // Fast swipe - definitely go to next/prev page
       if (velocity < 0) {
         targetPage = (currentPage + 0.1).ceil().clamp(0, 4);
       } else {
         targetPage = (currentPage - 0.1).floor().clamp(0, 4);
       }
     } else if (velocity.abs() > 300) {
-      // Medium swipe - consider current position
       final fraction = currentPage - currentPage.floor();
       if (velocity < 0 && fraction > 0.15) {
         targetPage = currentPage.ceil().clamp(0, 4);
@@ -155,7 +125,6 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
         targetPage = currentPage.round().clamp(0, 4);
       }
     } else {
-      // Slow/no velocity - snap to nearest with 40% threshold
       final fraction = currentPage - currentPage.floor();
       if (fraction > 0.4) {
         targetPage = currentPage.ceil().clamp(0, 4);
@@ -165,8 +134,6 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
     }
     
     _isDragging = false;
-    
-    // Smooth animation to target with completion tracking
     _isAnimating = true;
     _pageController.animateToPage(
       targetPage,
@@ -247,10 +214,11 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
             ),
 
             // Custom gesture handler for smooth Samsung-like navigation
+            // Uses horizontal drag (not pan) so vertical scroll in children works
             GestureDetector(
-              onPanStart: _onDragStart,
-              onPanUpdate: _onDragUpdate,
-              onPanEnd: _onDragEnd,
+              onHorizontalDragStart: _onHDragStart,
+              onHorizontalDragUpdate: _onHDragUpdate,
+              onHorizontalDragEnd: _onHDragEnd,
               behavior: HitTestBehavior.translucent,
               child: PageView(
                 controller: _pageController,
@@ -264,6 +232,9 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
                 ],
               ),
             ),
+
+            // 🔧 DEBUG: Long-press to reset onboarding (remove in production)
+            const DebugResetButton(),
           ],
         ),
       ),
@@ -446,7 +417,7 @@ class _IslamicHubScreenState extends ConsumerState<IslamicHubScreen>
                   ),
                   EdgeSwipeWrapper(
                     onSwipeRight: navigateToDashboard,
-                    child: const MinimalistHadithScreen(),
+                    child: MinimalistHadithScreen(),
                   ),
                   EdgeSwipeWrapper(
                     onSwipeRight: navigateToDashboard,
