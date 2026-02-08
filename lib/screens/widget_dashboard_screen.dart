@@ -4,6 +4,8 @@ import '../widgets/calendar_widget.dart';
 import '../widgets/daily_challenge_card.dart';
 import '../widgets/prayer_tracker_widget.dart';
 import '../widgets/dhikr_counter_widget.dart';
+import '../widgets/dhikr_analytics_widget.dart';
+import '../widgets/prayer_analytics_widget.dart';
 import 'premium_paywall_screen.dart';
 import '../features/quran/providers/quran_provider.dart';
 import '../features/quran/widgets/tafseer_bottom_sheet.dart';
@@ -47,7 +49,6 @@ class WidgetDashboardScreen extends ConsumerWidget {
                           if (verse == null) return const SizedBox.shrink();
                           return GestureDetector(
                             onTap: () {
-                              // Invalidate the provider to get a new random verse
                               ref.invalidate(randomVerseProvider);
                             },
                             child: Container(
@@ -55,10 +56,10 @@ class WidgetDashboardScreen extends ConsumerWidget {
                               margin: const EdgeInsets.only(bottom: 16),
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
-                                color: Colors.grey[900],
+                                color: Colors.white.withValues(alpha: 0.03),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: const Color(0xFFC2A366).withValues(alpha: 0.3),
+                                  color: const Color(0xFFC2A366).withValues(alpha: 0.15),
                                   width: 1,
                                 ),
                               ),
@@ -67,55 +68,84 @@ class WidgetDashboardScreen extends ConsumerWidget {
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(
-                                        Icons.auto_awesome,
-                                        color: const Color(0xFFC2A366),
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Tap for next Verse',
-                                        style: TextStyle(
-                                          color: Colors.grey[400],
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
+                                      Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFC2A366).withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(8),
                                         ),
+                                        child: const Icon(
+                                          Icons.auto_awesome,
+                                          color: Color(0xFFC2A366),
+                                          size: 16,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        'Verse of the Moment',
+                                        style: TextStyle(
+                                          color: const Color(0xFFC2A366).withValues(alpha: 0.7),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Icon(
+                                        Icons.refresh_rounded,
+                                        color: Colors.white.withValues(alpha: 0.15),
+                                        size: 16,
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 16),
+                                  const SizedBox(height: 18),
+                                  // Decorative divider
+                                  Center(
+                                    child: Container(
+                                      width: 50,
+                                      height: 1,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(colors: [
+                                          Colors.transparent,
+                                          const Color(0xFFC2A366).withValues(alpha: 0.25),
+                                          Colors.transparent,
+                                        ]),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
                                   Text(
                                     verse['arabic'] as String,
                                     textAlign: TextAlign.right,
                                     textDirection: TextDirection.rtl,
                                     style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: 25,
-                                      height: 1.8,
-                                      fontWeight: FontWeight.w500,
+                                      fontSize: 24,
+                                      height: 2.0,
+                                      fontWeight: FontWeight.w400,
                                       fontFamily: arabicFont.fontFamily,
                                     ),
                                   ),
                                   if (verse['translation'] != null) ...[
-                                    const SizedBox(height: 12),
+                                    const SizedBox(height: 14),
                                     Text(
                                       textAlign: TextAlign.left,
                                       verse['translation'] as String,
                                       style: TextStyle(
-                                        color: Colors.grey[300],
+                                        color: Colors.white.withValues(alpha: 0.6),
                                         fontSize: 14,
                                         height: 1.6,
                                       ),
                                     ),
                                   ],
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 14),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
                                         '${verse['surahTransliteration']} ${verse['verseNumber']}',
                                         style: TextStyle(
-                                          color: const Color(0xFFC2A366),
+                                          color: const Color(0xFFC2A366).withValues(alpha: 0.6),
                                           fontSize: 12,
                                           fontWeight: FontWeight.w500,
                                         ),
@@ -200,6 +230,12 @@ class WidgetDashboardScreen extends ConsumerWidget {
                   // Future widgets can go here
                   // App Usage, Habits, etc.
 
+                  // Dhikr Analytics PRO Widget
+                  const DhikrAnalyticsWidget(),
+
+                  // Prayer Analytics Widget
+                  const PrayerAnalyticsWidget(),
+
                   // Premium card (only show if not premium)
                   if (!isPremium.isPremium) _buildPremiumCard(context, currentTheme),
 
@@ -214,13 +250,10 @@ class WidgetDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildPremiumCard(BuildContext context, AppThemeColor currentTheme) {
-    const camelGold = Color(0xFFC2A366);
-    const camelWarm = Color(0xFFD4A96A);
-    const camelBrown = Color(0xFFA67B5B);
+    const gold = Color(0xFFC2A366);
     
     return GestureDetector(
       onTap: () {
-        // Open new psychology-optimized paywall
         Navigator.of(context).push(
           PageRouteBuilder(
             opaque: false,
@@ -233,124 +266,59 @@ class WidgetDashboardScreen extends ConsumerWidget {
       },
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              camelGold.withValues(alpha: 0.15),
-              camelBrown.withValues(alpha: 0.05),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
+          color: gold.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: camelGold.withValues(alpha: 0.4),
-            width: 1.5,
+            color: gold.withValues(alpha: 0.18),
+            width: 1,
           ),
         ),
-        child: Column(
+        child: Row(
           children: [
-            // Premium icon with camel glow
+            // Icon
             Container(
-              width: 56,
-              height: 56,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFC2A366), Color(0xFFA67B5B)],
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: camelGold.withValues(alpha: 0.4),
-                    blurRadius: 16,
-                    spreadRadius: 2,
-                  ),
-                ],
+                color: gold.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: const Center(
-                child: Text('🐪', style: TextStyle(fontSize: 26)),
+                child: Icon(Icons.workspace_premium_rounded, color: gold, size: 22),
               ),
             ),
-            const SizedBox(height: 16),
-            
-            // Title with badge
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  'Go Premium',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: camelGold.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    '75% OFF',
+            const SizedBox(width: 14),
+            // Text
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Upgrade to Premium',
                     style: TextStyle(
-                      color: Color(0xFFE8D5B7),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            
-            Text(
-              'Unlock Deen Mode, all themes & more',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 6),
-            
-            // Social proof
-            Text(
-              '🐪 10K+ Muslims already upgraded',
-              style: TextStyle(
-                color: camelGold.withValues(alpha: 0.7),
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            // CTA Button with camel gradient
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFC2A366), Color(0xFFA67B5B)],
-                ),
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: camelGold.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Unlock all themes, Deen Mode & more',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.4),
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
-              child: const Text(
-                'VIEW PLANS',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1,
-                ),
-              ),
+            ),
+            // Arrow
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: gold.withValues(alpha: 0.5),
+              size: 16,
             ),
           ],
         ),

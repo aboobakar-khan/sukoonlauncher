@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/wallpaper_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/amoled_provider.dart';
 import '../services/offline_content_manager.dart';
 import '../widgets/edge_swipe_wrapper.dart';
 import 'home_clock_screen.dart';
@@ -12,7 +14,6 @@ import 'productivity_hub_screen.dart';
 import '../features/quran/screens/surah_list_screen.dart';
 import '../features/hadith_dua/screens/minimalist_hadith_screen.dart';
 import '../features/hadith_dua/screens/minimalist_dua_screen.dart';
-import '../utils/debug_reset_helper.dart';
 
 /// Main launcher shell with swipeable pages
 /// Layout: [Islamic Hub] ← [Dashboard] ← [HOME] → [App List] → [Productivity]
@@ -40,9 +41,9 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
   bool _gestureDecided = false;
   bool _isAnimating = false;
   
-  // Thresholds - tuned for reliable detection
-  static const double _decisionThreshold = 15.0; // Slightly higher for accuracy
-  static const double _horizontalBias = 1.2; // Favor horizontal slightly
+  // Thresholds - tuned for smooth, responsive navigation
+  static const double _decisionThreshold = 10.0; // Lower for quicker response
+  static const double _horizontalBias = 1.0; // Equal bias for natural feel
 
   @override
   void initState() {
@@ -90,6 +91,11 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
     if (!_isDragging || _isAnimating) return;
     
     final dx = details.globalPosition.dx - _dragStartX;
+    
+    // Require minimum 8px horizontal movement before shifting pages
+    // This prevents accidental page shift during vertical swipe attempts
+    if (dx.abs() < 8) return;
+    
     final screenWidth = MediaQuery.of(context).size.width;
     final pageDelta = -dx / screenWidth;
     final newPage = (_dragStartPage + pageDelta).clamp(0.0, 4.0);
@@ -109,24 +115,27 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
     final currentPage = _pageController.page ?? _homeIndex.toDouble();
     int targetPage;
     
-    if (velocity.abs() > 800) {
+    if (velocity.abs() > 500) {
+      // Fast swipe — snap to next page immediately
       if (velocity < 0) {
         targetPage = (currentPage + 0.1).ceil().clamp(0, 4);
       } else {
         targetPage = (currentPage - 0.1).floor().clamp(0, 4);
       }
-    } else if (velocity.abs() > 300) {
+    } else if (velocity.abs() > 150) {
+      // Medium swipe — snap with lower threshold
       final fraction = currentPage - currentPage.floor();
-      if (velocity < 0 && fraction > 0.15) {
+      if (velocity < 0 && fraction > 0.08) {
         targetPage = currentPage.ceil().clamp(0, 4);
-      } else if (velocity > 0 && fraction < 0.85) {
+      } else if (velocity > 0 && fraction < 0.92) {
         targetPage = currentPage.floor().clamp(0, 4);
       } else {
         targetPage = currentPage.round().clamp(0, 4);
       }
     } else {
+      // Slow drag — position-based with lower threshold
       final fraction = currentPage - currentPage.floor();
-      if (fraction > 0.4) {
+      if (fraction > 0.25) {
         targetPage = currentPage.ceil().clamp(0, 4);
       } else {
         targetPage = currentPage.floor().clamp(0, 4);
@@ -137,7 +146,7 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
     _isAnimating = true;
     _pageController.animateToPage(
       targetPage,
-      duration: const Duration(milliseconds: 350),
+      duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
     ).then((_) {
       _isAnimating = false;
@@ -149,9 +158,13 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
   @override
   Widget build(BuildContext context) {
     final wallpaper = ref.watch(wallpaperProvider);
+    final isAmoled = ref.watch(amoledProvider);
     
     // Initialize offline content manager for automatic background downloads
     ref.read(offlineContentProvider);
+
+    // Use effective wallpaper: AMOLED forces pure black
+    final effectiveWallpaper = isAmoled ? WallpaperType.black : wallpaper;
 
     // Block system back gesture for launcher
     return PopScope(
@@ -160,7 +173,7 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
         body: Stack(
           children: [
             // Background
-            _buildBackground(wallpaper),
+            _buildBackground(effectiveWallpaper),
 
             // LEFT edge - swipe right to go to previous page
             Positioned(
@@ -171,13 +184,13 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
               child: GestureDetector(
                 onHorizontalDragEnd: (details) {
                   final velocity = details.primaryVelocity ?? 0;
-                  if (velocity > 200) {
+                  if (velocity > 100) {
                     // Swipe right - go to previous page
                     final currentPage = (_pageController.page ?? _homeIndex).round();
                     if (currentPage > 0) {
                       _pageController.animateToPage(
                         currentPage - 1,
-                        duration: const Duration(milliseconds: 450),
+                        duration: const Duration(milliseconds: 350),
                         curve: Curves.easeOutCubic,
                       );
                     }
@@ -196,13 +209,13 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
               child: GestureDetector(
                 onHorizontalDragEnd: (details) {
                   final velocity = details.primaryVelocity ?? 0;
-                  if (velocity < -200) {
+                  if (velocity < -100) {
                     // Swipe left - go to next page
                     final currentPage = (_pageController.page ?? _homeIndex).round();
                     if (currentPage < 4) {
                       _pageController.animateToPage(
                         currentPage + 1,
-                        duration: const Duration(milliseconds: 450),
+                        duration: const Duration(milliseconds: 350),
                         curve: Curves.easeOutCubic,
                       );
                     }
@@ -223,6 +236,7 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
               child: PageView(
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
+                clipBehavior: Clip.hardEdge,
                 children: [
                   IslamicHubScreen(pageController: _pageController),  // Index 0
                   const WidgetDashboardScreen(),  // Index 1
@@ -233,8 +247,55 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
               ),
             ),
 
-            // 🔧 DEBUG: Long-press to reset onboarding (remove in production)
-            const DebugResetButton(),
+            // ── Bottom-center swipe up → go Home (for launcher pages only) ──
+            // System Android gesture works for apps, but on our launcher pages
+            // we need our own "swipe up to go home" since we ARE the home app.
+            AnimatedBuilder(
+              animation: _pageController,
+              builder: (context, _) {
+                final currentPage = (_pageController.page ?? _homeIndex.toDouble()).round();
+                // Only show on non-home pages (Dashboard, Islamic Hub, App List, Productivity)
+                final showIndicator = currentPage != _homeIndex;
+                return Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: 44,
+                  child: IgnorePointer(
+                    ignoring: !showIndicator,
+                    child: GestureDetector(
+                      onVerticalDragEnd: (details) {
+                        final velocity = details.primaryVelocity ?? 0;
+                        if (velocity < -200 && showIndicator) {
+                          HapticFeedback.lightImpact();
+                          _pageController.animateToPage(
+                            _homeIndex,
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeOutCubic,
+                          );
+                        }
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 250),
+                        opacity: showIndicator ? 1.0 : 0.0,
+                        child: Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),

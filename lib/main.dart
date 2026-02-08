@@ -12,6 +12,7 @@ import 'screens/launcher_shell.dart';
 import 'screens/onboarding_screen.dart';
 import 'providers/font_provider.dart';
 import 'providers/font_size_provider.dart';
+import 'providers/amoled_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,6 +61,8 @@ class MinimalistLauncherApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final appFont = ref.watch(fontProvider);
     final fontSize = ref.watch(fontSizeProvider);
+    final isAmoled = ref.watch(amoledProvider);
+    final bgColor = isAmoled ? Colors.black : Colors.black.withValues(alpha: 0.5);
 
     return MaterialApp(
       title: 'Camel Launcher',
@@ -74,13 +77,32 @@ class MinimalistLauncherApp extends ConsumerWidget {
       },
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.black.withValues(alpha: 0.5),
+        scaffoldBackgroundColor: bgColor,
         primarySwatch: Colors.grey,
         useMaterial3: true,
         fontFamily: appFont.fontFamily,
-        // Prevent any default underlines
-        textTheme: const TextTheme().apply(
-          decoration: TextDecoration.none,
+        // 2-font hierarchy: headings use heading font, body uses body font
+        textTheme: TextTheme(
+          // Display styles — large headings
+          displayLarge: TextStyle(fontFamily: appFont.headingFamily, decoration: TextDecoration.none),
+          displayMedium: TextStyle(fontFamily: appFont.headingFamily, decoration: TextDecoration.none),
+          displaySmall: TextStyle(fontFamily: appFont.headingFamily, decoration: TextDecoration.none),
+          // Headline styles — section headings
+          headlineLarge: TextStyle(fontFamily: appFont.headingFamily, decoration: TextDecoration.none),
+          headlineMedium: TextStyle(fontFamily: appFont.headingFamily, decoration: TextDecoration.none),
+          headlineSmall: TextStyle(fontFamily: appFont.headingFamily, decoration: TextDecoration.none),
+          // Title styles — card / appbar titles
+          titleLarge: TextStyle(fontFamily: appFont.headingFamily, decoration: TextDecoration.none),
+          titleMedium: TextStyle(fontFamily: appFont.fontFamily, decoration: TextDecoration.none),
+          titleSmall: TextStyle(fontFamily: appFont.fontFamily, decoration: TextDecoration.none),
+          // Body styles — paragraphs, content
+          bodyLarge: TextStyle(fontFamily: appFont.fontFamily, decoration: TextDecoration.none),
+          bodyMedium: TextStyle(fontFamily: appFont.fontFamily, decoration: TextDecoration.none),
+          bodySmall: TextStyle(fontFamily: appFont.fontFamily, decoration: TextDecoration.none),
+          // Label styles — buttons, chips
+          labelLarge: TextStyle(fontFamily: appFont.fontFamily, decoration: TextDecoration.none),
+          labelMedium: TextStyle(fontFamily: appFont.fontFamily, decoration: TextDecoration.none),
+          labelSmall: TextStyle(fontFamily: appFont.fontFamily, decoration: TextDecoration.none),
         ),
         inputDecorationTheme: const InputDecorationTheme(
           border: InputBorder.none,

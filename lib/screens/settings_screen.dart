@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import '../providers/theme_provider.dart';
 import '../providers/font_provider.dart';
 import '../providers/font_size_provider.dart';
@@ -12,17 +11,18 @@ import '../providers/wallpaper_provider.dart';
 import '../providers/arabic_font_provider.dart';
 import '../providers/premium_provider.dart';
 import '../providers/tafseer_edition_provider.dart';
+import '../providers/amoled_provider.dart';
 import 'theme_color_picker_screen.dart';
 import 'font_picker_screen.dart';
 import 'clock_style_picker_screen.dart';
 import 'wallpaper_picker_screen.dart';
-import 'debug_apps_screen.dart';
 import 'premium_paywall_screen.dart';
 import 'favorite_picker_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'credits_screen.dart';
 import '../services/offline_content_manager.dart';
 import '../widgets/offline_download_indicator.dart';
+import '../widgets/swipe_back_wrapper.dart';
 
 /// Settings Screen - Customization options
 class SettingsScreen extends ConsumerWidget {
@@ -39,6 +39,7 @@ class SettingsScreen extends ConsumerWidget {
     final currentWallpaper = ref.watch(wallpaperProvider);
     final currentArabicFont = ref.watch(arabicFontProvider);
     final isPremium = ref.watch(premiumProvider);
+    final isAmoled = ref.watch(amoledProvider);
 
     // Find current font size preset name
     final fontSizePreset = fontSizePresets.firstWhere(
@@ -46,7 +47,8 @@ class SettingsScreen extends ConsumerWidget {
       orElse: () => fontSizePresets[1], // Default to Normal
     );
 
-    return Scaffold(
+    return SwipeBackWrapper(
+      child: Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
@@ -78,7 +80,7 @@ class SettingsScreen extends ConsumerWidget {
                       _buildSettingsItem(
                         icon: Icons.font_download,
                         title: 'Font Style',
-                        subtitle: currentFont.name,
+                        subtitle: '${currentFont.name} · ${AppFonts.categoryName(currentFont.category)}',
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
@@ -158,6 +160,7 @@ class SettingsScreen extends ConsumerWidget {
                           );
                         },
                       ),
+                      _buildAmoledToggle(context, ref, isAmoled),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -204,14 +207,6 @@ class SettingsScreen extends ConsumerWidget {
                           );
                         },
                       ),
-                      _buildSettingsItem(
-                        icon: Icons.dashboard,
-                        title: 'Widget Layout',
-                        subtitle: 'Coming soon',
-                        onTap: () {
-                          // TODO: Implement widget customization
-                        },
-                      ),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -239,7 +234,6 @@ class SettingsScreen extends ConsumerWidget {
                   _buildSettingsSection(
                     title: 'PREMIUM',
                     items: [
-                      // Main premium tile - opens paywall
                       _buildSettingsItem(
                         icon: isPremium.isPremium ? Icons.workspace_premium : Icons.stars,
                         title: isPremium.isPremium
@@ -251,111 +245,6 @@ class SettingsScreen extends ConsumerWidget {
                         onTap: () {
                           showPremiumPaywall(context);
                         },
-                      ),
-                      
-                      // Testing controls (remove in production)
-                      const SizedBox(height: 8),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          children: [
-                            // Buy Premium Button
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () async {
-                                  await ref.read(premiumProvider.notifier).activatePremium(
-                                    type: 'lifetime',
-                                  );
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('✓ Premium Activated (Test)'),
-                                        backgroundColor: Color(0xFFC2A366),
-                                        duration: Duration(seconds: 1),
-                                      ),
-                                    );
-                                  }
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFC2A366).withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: const Color(0xFFC2A366).withValues(alpha: 0.5),
-                                    ),
-                                  ),
-                                  child: const Center(
-                                    child: Text(
-                                      '🧪 Buy (Test)',
-                                      style: TextStyle(
-                                        color: Color(0xFFC2A366),
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Cancel Premium Button
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () async {
-                                  // Reset premium status
-                                  final box = await Hive.openBox('premiumBox');
-                                  await box.put('isPremium', false);
-                                  await box.put('subscriptionType', null);
-                                  await box.put('expiryDate', null);
-                                  
-                                  // Force refresh by re-reading
-                                  ref.invalidate(premiumProvider);
-                                  
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: const Text('✗ Premium Cancelled (Test)'),
-                                        backgroundColor: Colors.red.shade700,
-                                        duration: const Duration(seconds: 1),
-                                      ),
-                                    );
-                                  }
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: Colors.red.withValues(alpha: 0.4),
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      '🧪 Cancel (Test)',
-                                      style: TextStyle(
-                                        color: Colors.red.shade300,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Center(
-                        child: Text(
-                          'Testing controls - Remove before release',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            fontSize: 10,
-                          ),
-                        ),
                       ),
                     ],
                   ),
@@ -401,6 +290,7 @@ class SettingsScreen extends ConsumerWidget {
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -423,26 +313,44 @@ class SettingsScreen extends ConsumerWidget {
 
   Widget _buildHeader(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       child: Row(
         children: [
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
-            child: Icon(
-              Icons.arrow_back,
-              color: Colors.white.withValues(alpha: 0.7),
-              size: 24,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white.withValues(alpha: 0.5),
+                size: 18,
+              ),
             ),
           ),
-          const SizedBox(width: 16),
-          Text(
-            'SETTINGS',
-            style: TextStyle(
-              fontSize: 20,
-              letterSpacing: 4,
-              fontWeight: FontWeight.w300,
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
+          const SizedBox(width: 14),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Settings',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withValues(alpha: 0.9),
+                ),
+              ),
+              Text(
+                'Customize your experience',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.white.withValues(alpha: 0.35),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -457,15 +365,28 @@ class SettingsScreen extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 11,
-              letterSpacing: 2,
-              fontWeight: FontWeight.w400,
-              color: Colors.white.withValues(alpha: 0.4),
-            ),
+          padding: const EdgeInsets.only(left: 4, bottom: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 3,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFC2A366).withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 11,
+                  letterSpacing: 1.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFFC2A366).withValues(alpha: 0.6),
+                ),
+              ),
+            ],
           ),
         ),
         ...items,
@@ -477,35 +398,37 @@ class SettingsScreen extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1a1a1a),
+        backgroundColor: const Color(0xFF141414),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          side: BorderSide(
+            color: const Color(0xFFC2A366).withValues(alpha: 0.15),
+          ),
         ),
-        title: Text(
-          'FONT SIZE',
+        title: const Text(
+          'Font Size',
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.9),
-            fontSize: 16,
-            letterSpacing: 2,
-            fontWeight: FontWeight.w300,
+            color: Colors.white,
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
           ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: fontSizePresets.map((preset) {
+            final isSelected = ref.watch(fontSizeProvider) == preset.scale;
             return ListTile(
               title: Text(
                 preset.name,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.6),
                   fontSize: 14 * preset.scale,
                 ),
               ),
-              trailing: ref.watch(fontSizeProvider) == preset.scale
-                  ? Icon(
-                      Icons.check,
-                      color: Colors.white.withValues(alpha: 0.7),
+              trailing: isSelected
+                  ? const Icon(
+                      Icons.check_rounded,
+                      color: Color(0xFFC2A366),
                     )
                   : null,
               onTap: () {
@@ -523,18 +446,19 @@ class SettingsScreen extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1a1a1a),
+        backgroundColor: const Color(0xFF141414),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          side: BorderSide(
+            color: const Color(0xFFC2A366).withValues(alpha: 0.15),
+          ),
         ),
-        title: Text(
-          'ARABIC FONT',
+        title: const Text(
+          'Arabic Font',
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.9),
-            fontSize: 16,
-            letterSpacing: 2,
-            fontWeight: FontWeight.w300,
+            color: Colors.white,
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
           ),
         ),
         content: SizedBox(
@@ -551,7 +475,7 @@ class SettingsScreen extends ConsumerWidget {
                 title: Text(
                   font.name,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
+                    color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.6),
                     fontSize: 14,
                   ),
                 ),
@@ -559,15 +483,15 @@ class SettingsScreen extends ConsumerWidget {
                   'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
                   textDirection: TextDirection.rtl,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
+                    color: Colors.white.withValues(alpha: 0.5),
                     fontSize: 16,
                     fontFamily: font.fontFamily,
                   ),
                 ),
                 trailing: isSelected
-                    ? Icon(
-                        Icons.check,
-                        color: Colors.white.withValues(alpha: 0.7),
+                    ? const Icon(
+                        Icons.check_rounded,
+                        color: Color(0xFFC2A366),
                       )
                     : null,
                 onTap: () {
@@ -591,18 +515,19 @@ class SettingsScreen extends ConsumerWidget {
           final selectedEdition = ref.watch(selectedTafseerEditionProvider);
 
           return AlertDialog(
-            backgroundColor: const Color(0xFF1a1a1a),
+            backgroundColor: const Color(0xFF141414),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+              side: BorderSide(
+                color: const Color(0xFFC2A366).withValues(alpha: 0.15),
+              ),
             ),
-            title: Text(
-              'TAFSEER EDITION',
+            title: const Text(
+              'Tafseer Edition',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.9),
-                fontSize: 16,
-                letterSpacing: 2,
-                fontWeight: FontWeight.w300,
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
               ),
             ),
             content: SizedBox(
@@ -683,20 +608,24 @@ class SettingsScreen extends ConsumerWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.03),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.1),
-            width: 1,
-          ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: Colors.white.withValues(alpha: 0.5), size: 22),
-            const SizedBox(width: 16),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFC2A366).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: const Color(0xFFC2A366).withValues(alpha: 0.6), size: 18),
+            ),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -704,18 +633,17 @@ class SettingsScreen extends ConsumerWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 15,
-                      letterSpacing: 0.5,
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
+                      color: Colors.white.withValues(alpha: 0.35),
                       fontSize: 12,
-                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
@@ -724,11 +652,90 @@ class SettingsScreen extends ConsumerWidget {
             if (onTap != null)
               Icon(
                 Icons.chevron_right,
-                color: Colors.white.withValues(alpha: 0.3),
-                size: 20,
+                color: Colors.white.withValues(alpha: 0.2),
+                size: 18,
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAmoledToggle(BuildContext context, WidgetRef ref, bool isEnabled) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFC2A366).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.brightness_1,
+                color: const Color(0xFFC2A366).withValues(alpha: 0.6), size: 18),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'AMOLED Mode',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  isEnabled ? 'Pure black · Saves battery' : 'Disabled',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.35),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              ref.read(amoledProvider.notifier).toggle();
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 44,
+              height: 24,
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: isEnabled
+                    ? const Color(0xFFC2A366).withValues(alpha: 0.3)
+                    : Colors.white.withValues(alpha: 0.1),
+              ),
+              child: AnimatedAlign(
+                duration: const Duration(milliseconds: 200),
+                alignment: isEnabled ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isEnabled ? const Color(0xFFC2A366) : Colors.white38,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -766,23 +773,19 @@ class SettingsScreen extends ConsumerWidget {
         );
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.03),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.1),
-            width: 1,
-          ),
         ),
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.15),
+                color: iconColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: status.isDownloading
@@ -811,7 +814,7 @@ class SettingsScreen extends ConsumerWidget {
                     )
                   : Icon(icon, color: iconColor, size: 22),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -819,18 +822,17 @@ class SettingsScreen extends ConsumerWidget {
                   Text(
                     'Offline Content',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 15,
-                      letterSpacing: 0.5,
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
+                      color: Colors.white.withValues(alpha: 0.35),
                       fontSize: 12,
-                      letterSpacing: 0.5,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -858,13 +860,19 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF1a1a1a),
+          backgroundColor: const Color(0xFF141414),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: const Color(0xFFC2A366).withValues(alpha: 0.15),
+            ),
+          ),
           title: const Text(
-            'Select Time Format',
+            'Time Format',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
             ),
           ),
           content: Column(
@@ -900,23 +908,24 @@ class SettingsScreen extends ConsumerWidget {
     TimeFormat currentFormat,
   ) {
     final isSelected = format == currentFormat;
+    const gold = Color(0xFFC2A366);
     return InkWell(
       onTap: () {
         ref.read(timeFormatProvider.notifier).setTimeFormat(format);
         Navigator.of(context).pop();
       },
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
         decoration: BoxDecoration(
           color: isSelected
-              ? Colors.white.withValues(alpha: 0.1)
+              ? gold.withValues(alpha: 0.08)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected
-                ? Colors.white.withValues(alpha: 0.3)
-                : Colors.white.withValues(alpha: 0.1),
+                ? gold.withValues(alpha: 0.3)
+                : Colors.white.withValues(alpha: 0.06),
             width: 1,
           ),
         ),
@@ -925,8 +934,8 @@ class SettingsScreen extends ConsumerWidget {
             Icon(
               isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
               color: isSelected
-                  ? Colors.white
-                  : Colors.white.withValues(alpha: 0.4),
+                  ? gold
+                  : Colors.white.withValues(alpha: 0.3),
               size: 20,
             ),
             const SizedBox(width: 12),
@@ -935,9 +944,8 @@ class SettingsScreen extends ConsumerWidget {
               style: TextStyle(
                 color: isSelected
                     ? Colors.white
-                    : Colors.white.withValues(alpha: 0.7),
-                fontSize: 15,
-                letterSpacing: 0.5,
+                    : Colors.white.withValues(alpha: 0.6),
+                fontSize: 14,
               ),
             ),
           ],
@@ -955,13 +963,19 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF1a1a1a),
+          backgroundColor: const Color(0xFF141414),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: const Color(0xFFC2A366).withValues(alpha: 0.15),
+            ),
+          ),
           title: const Text(
-            'Select Clock Opacity',
+            'Clock Opacity',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
             ),
           ),
           content: Column(
@@ -1015,23 +1029,24 @@ class SettingsScreen extends ConsumerWidget {
     ClockOpacity currentOpacity,
   ) {
     final isSelected = opacity == currentOpacity;
+    const gold = Color(0xFFC2A366);
     return InkWell(
       onTap: () {
         ref.read(clockOpacityProvider.notifier).setOpacity(opacity);
         Navigator.of(context).pop();
       },
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
         decoration: BoxDecoration(
           color: isSelected
-              ? Colors.white.withValues(alpha: 0.1)
+              ? gold.withValues(alpha: 0.08)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected
-                ? Colors.white.withValues(alpha: 0.3)
-                : Colors.white.withValues(alpha: 0.1),
+                ? gold.withValues(alpha: 0.3)
+                : Colors.white.withValues(alpha: 0.06),
             width: 1,
           ),
         ),
@@ -1040,8 +1055,8 @@ class SettingsScreen extends ConsumerWidget {
             Icon(
               isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
               color: isSelected
-                  ? Colors.white
-                  : Colors.white.withValues(alpha: 0.4),
+                  ? gold
+                  : Colors.white.withValues(alpha: 0.3),
               size: 20,
             ),
             const SizedBox(width: 12),
@@ -1050,9 +1065,8 @@ class SettingsScreen extends ConsumerWidget {
               style: TextStyle(
                 color: isSelected
                     ? Colors.white
-                    : Colors.white.withValues(alpha: 0.7),
-                fontSize: 15,
-                letterSpacing: 0.5,
+                    : Colors.white.withValues(alpha: 0.6),
+                fontSize: 14,
               ),
             ),
           ],
@@ -1062,11 +1076,10 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Widget _buildPremiumBanner(BuildContext context, AppThemeColor currentTheme) {
-    const greenAccent = Color(0xFFC2A366);
+    const gold = Color(0xFFC2A366);
     
     return InkWell(
       onTap: () {
-        // Use new psychology-optimized paywall
         Navigator.of(context).push(
           PageRouteBuilder(
             opaque: false,
@@ -1077,91 +1090,57 @@ class SettingsScreen extends ConsumerWidget {
           ),
         );
       },
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              greenAccent.withValues(alpha: 0.15),
-              greenAccent.withValues(alpha: 0.05),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: gold.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: greenAccent.withValues(alpha: 0.4)),
+          border: Border.all(
+            color: gold.withValues(alpha: 0.18),
+            width: 1,
+          ),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFC2A366), Color(0xFFA67B5B)],
-                ),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: greenAccent.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                  ),
-                ],
+                color: gold.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.workspace_premium, color: Colors.white, size: 24),
+              child: const Icon(Icons.workspace_premium_rounded, color: gold, size: 22),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Go Premium',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.95),
-                          fontSize: 17,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          '75% OFF',
-                          style: TextStyle(
-                            color: Colors.amber,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
+                  const Text(
+                    'Upgrade to Premium',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 3),
                   Text(
                     'Unlock all themes, Deen Mode & more',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: Colors.white.withValues(alpha: 0.4),
                       fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '10K+ Muslims already upgraded ⭐',
-                    style: TextStyle(
-                      color: greenAccent.withValues(alpha: 0.7),
-                      fontSize: 11,
                     ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: greenAccent, size: 24),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: gold.withValues(alpha: 0.5),
+              size: 16,
+            ),
           ],
         ),
       ),

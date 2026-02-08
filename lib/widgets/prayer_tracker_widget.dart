@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/prayer_provider.dart';
 import '../providers/theme_provider.dart';
-import '../screens/prayer_history_dashboard.dart';
+import '../screens/prayer_history_dashboard_redesigned.dart';
 
 /// Prayer Tracker Widget - Professional Minimalist Design
 /// 
@@ -29,10 +29,10 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
   // Track which day we're viewing: 0 = today, 1 = yesterday
   int _selectedDayOffset = 0;
 
-  // 🐪 Camel-brand design tokens
-  static const Color _bgDark = Color(0xFF0D1117);
-  static const Color _cardBg = Color(0xFF161B22);
-  static const Color _borderColor = Color(0xFF21262D);
+  // 🐪 Camel-brand design tokens — aligned with app theme
+  static const Color _bgDark = Color(0xFF0A0A0A);
+  static const Color _cardBg = Color(0xFF111111);
+  static const Color _borderColor = Color(0xFF1E1E1E);
   static const Color _greenPrimary = Color(0xFF7BAE6E);   // Oasis green
   static const Color _greenLight = Color(0xFFA8D5A0);     // Soft oasis
   static const Color _greenDark = Color(0xFF5A8F50);      // Deep oasis

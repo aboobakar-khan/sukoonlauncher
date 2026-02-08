@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/tasbih_provider.dart';
 import '../providers/theme_provider.dart';
-import '../screens/dhikr_history_pro_dashboard.dart';
+import '../screens/dhikr_history_pro_dashboard_redesigned.dart';
 
 /// Dhikr Counter Widget - Professional Minimalist Design
 /// 

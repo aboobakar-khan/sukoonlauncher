@@ -9,6 +9,7 @@ import '../providers/installed_apps_provider.dart';
 import '../models/installed_app.dart';
 import '../providers/premium_provider.dart';
 import '../models/productivity_models.dart';
+import '../providers/ambient_sound_provider.dart';
 import 'premium_paywall_screen.dart';
 
 // ─── Camel Design Tokens ────────────────────────────────────────────────────
@@ -63,34 +64,23 @@ class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen>
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
-        child: Column(
+        child: TabBarView(
+          controller: _tabController,
+          physics: const NeverScrollableScrollPhysics(),
           children: [
-            // ── Tab Bar ──
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-              child: _buildTabBar(themeColor.color),
-            ),
-            // ── Tab Content ──
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _TodoTab(),
-                  _PomodoroTab(),
-                  _DoubtsTab(),
-                  _EventsTab(),
-                  _BlockerTab(),
-                ],
-              ),
-            ),
+            _TodoTab(),
+            _PomodoroTab(),
+            _DoubtsTab(),
+            _EventsTab(),
+            _BlockerTab(),
           ],
         ),
       ),
+      bottomNavigationBar: _buildBottomTabBar(themeColor.color),
     );
   }
 
-  Widget _buildTabBar(Color accent) {
+  Widget _buildBottomTabBar(Color accent) {
     final icons = [
       Icons.check_circle_outline,
       Icons.timer_outlined,
@@ -103,55 +93,63 @@ class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen>
     return AnimatedBuilder(
       animation: _tabController,
       builder: (ctx, _) {
-        return Row(
-          children: List.generate(5, (i) {
-            final selected = _tabController.index == i;
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => _tabController.animateTo(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? accent.withValues(alpha: 0.12)
-                        : Colors.white.withValues(alpha: 0.03),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: selected
-                          ? accent.withValues(alpha: 0.3)
-                          : Colors.white.withValues(alpha: 0.06),
+        return Container(
+          padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.85),
+            border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Row(
+              children: List.generate(5, (i) {
+                final selected = _tabController.index == i;
+                return Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      _tabController.animateTo(i);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? accent.withValues(alpha: 0.12)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            icons[i],
+                            size: 22,
+                            color: selected
+                                ? accent
+                                : Colors.white.withValues(alpha: 0.35),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            labels[i],
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                              color: selected
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.35),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        icons[i],
-                        size: 18,
-                        color: selected
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.4),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        labels[i],
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight:
-                              selected ? FontWeight.w600 : FontWeight.w400,
-                          color: selected
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.4),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
+                );
+              }),
+            ),
+          ),
         );
       },
     );
@@ -829,6 +827,7 @@ class _PomodoroTab extends ConsumerWidget {
       backgroundColor: const Color(0xFF1A1A1A),
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setBS) => Padding(
           padding: const EdgeInsets.all(24),
@@ -878,6 +877,94 @@ class _PomodoroTab extends ConsumerWidget {
                 color: _camelBrown,
                 onChanged: (v) => setBS(() => sessions = v),
               ),
+              const SizedBox(height: 20),
+              // ── Ambient Sounds Section ──
+              Text('Soothing Sounds',
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text('Plays automatically when focus starts',
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      fontSize: 11)),
+              const SizedBox(height: 12),
+              Consumer(
+                builder: (ctx, sRef, _) {
+                  final soundState = sRef.watch(ambientSoundProvider);
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      // None / off option
+                      _buildSoundChip(
+                        emoji: '🔇',
+                        label: 'None',
+                        isSelected: soundState.currentSoundId == null && !soundState.isPlaying,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          sRef.read(ambientSoundProvider.notifier).stop();
+                        },
+                      ),
+                      ...ambientSounds.map((sound) {
+                        final isSelected = soundState.currentSoundId == sound.id;
+                        return _buildSoundChip(
+                          emoji: sound.emoji,
+                          label: sound.name,
+                          isSelected: isSelected && soundState.isPlaying,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            if (isSelected && soundState.isPlaying) {
+                              sRef.read(ambientSoundProvider.notifier).stop();
+                            } else {
+                              sRef.read(ambientSoundProvider.notifier).selectAndPlay(sound.id);
+                            }
+                          },
+                        );
+                      }),
+                    ],
+                  );
+                },
+              ),
+              // Volume slider
+              Consumer(
+                builder: (ctx, sRef, _) {
+                  final soundState = sRef.watch(ambientSoundProvider);
+                  if (!soundState.isPlaying) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.volume_down_rounded, 
+                            size: 16, color: Colors.white.withValues(alpha: 0.4)),
+                        Expanded(
+                          child: SliderTheme(
+                            data: SliderThemeData(
+                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                              trackHeight: 3,
+                              activeTrackColor: _sandGold.withValues(alpha: 0.7),
+                              inactiveTrackColor: Colors.white.withValues(alpha: 0.08),
+                              thumbColor: _sandGold,
+                            ),
+                            child: Slider(
+                              value: soundState.volume,
+                              min: 0.0,
+                              max: 1.0,
+                              onChanged: (v) {
+                                sRef.read(ambientSoundProvider.notifier).setVolume(v);
+                              },
+                            ),
+                          ),
+                        ),
+                        Icon(Icons.volume_up_rounded,
+                            size: 16, color: Colors.white.withValues(alpha: 0.4)),
+                      ],
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -903,6 +990,47 @@ class _PomodoroTab extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSoundChip({
+    required String emoji,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? _sandGold.withValues(alpha: 0.15)
+              : Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected 
+                ? _sandGold.withValues(alpha: 0.5)
+                : Colors.white.withValues(alpha: 0.08),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 16)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected ? _sandGold : Colors.white.withValues(alpha: 0.5),
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2180,7 +2308,9 @@ class _BlockerTab extends ConsumerWidget {
   }
 
   Widget _ruleCard(BuildContext context, WidgetRef ref, AppBlockRule rule) {
-    return Container(
+    return GestureDetector(
+      onTap: () => _showRuleInfoSheet(context, ref, rule),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -2339,6 +2469,7 @@ class _BlockerTab extends ConsumerWidget {
             ),
         ],
       ),
+    ),
     );
   }
 
@@ -2588,6 +2719,363 @@ class _BlockerTab extends ConsumerWidget {
     );
   }
 
+  // ── Rule Info Sheet (shown after creation) ──
+  void _showRuleInfoSheet(BuildContext context, WidgetRef ref, AppBlockRule rule) {
+    final allApps = ref.read(installedAppsProvider);
+    final dayLabels = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.75),
+        decoration: const BoxDecoration(
+          color: Color(0xFF141414),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Success indicator
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _oasisGreen.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.check_circle_rounded,
+                        color: _oasisGreen.withValues(alpha: 0.8), size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Rule Created',
+                            style: TextStyle(
+                                color: _oasisGreen.withValues(alpha: 0.9),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 2),
+                        Text(rule.name,
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 17,
+                                fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                  if (rule.isHardBlock)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _desertSunset.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.lock, size: 10, color: _desertSunset.withValues(alpha: 0.8)),
+                          const SizedBox(width: 4),
+                          Text('HARD',
+                              style: TextStyle(
+                                  color: _desertSunset.withValues(alpha: 0.8),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // ── Schedule / Timer info ──
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.schedule_rounded, size: 14,
+                            color: _sandGold.withValues(alpha: 0.7)),
+                        const SizedBox(width: 6),
+                        Text('Schedule',
+                            style: TextStyle(
+                                color: _sandGold.withValues(alpha: 0.8),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _infoChip(
+                            Icons.play_arrow_rounded,
+                            'Start',
+                            _formatHour(rule.startHour, rule.startMinute),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.arrow_forward, size: 12,
+                            color: Colors.white.withValues(alpha: 0.15)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _infoChip(
+                            Icons.stop_rounded,
+                            'End',
+                            _formatHour(rule.endHour, rule.endMinute),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (rule.activeDays.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 6,
+                        children: rule.activeDays.map((d) {
+                          final label = d >= 1 && d <= 7 ? dayLabels[d] : '?';
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _sandGold.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(label,
+                                style: TextStyle(
+                                    color: _sandGold.withValues(alpha: 0.7),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500)),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── Blocked Apps ──
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.block_rounded, size: 14,
+                            color: _desertSunset.withValues(alpha: 0.7)),
+                        const SizedBox(width: 6),
+                        Text('Blocked Apps',
+                            style: TextStyle(
+                                color: _desertSunset.withValues(alpha: 0.8),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600)),
+                        const Spacer(),
+                        Text('${rule.blockedPackages.length}',
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.3),
+                                fontSize: 11)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: rule.blockedPackages.map((pkg) {
+                        final appName = allApps
+                            .where((a) => a.packageName == pkg)
+                            .map((a) => a.appName)
+                            .firstOrNull ?? pkg.split('.').last;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _desertSunset.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: _desertSunset.withValues(alpha: 0.15)),
+                          ),
+                          child: Text(appName,
+                              style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  fontSize: 11)),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── Settings info ──
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                ),
+                child: Row(
+                  children: [
+                    _settingPill(Icons.shield, rule.isHardBlock ? 'Hard Block' : 'Easy Block',
+                        rule.isHardBlock ? _desertSunset : _oasisGreen),
+                    const SizedBox(width: 8),
+                    if (rule.allowBreaks)
+                      _settingPill(Icons.free_breakfast_outlined, 'Breaks On', _sandGold),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── Delete button ──
+              if (!rule.isHardBlock)
+                SizedBox(
+                  width: double.infinity,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => _DeleteRuleConfirmScreen(
+                            ruleId: rule.id,
+                            ruleName: rule.name,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.red.withValues(alpha: 0.15)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.delete_outline, size: 16,
+                              color: Colors.red.withValues(alpha: 0.6)),
+                          const SizedBox(width: 8),
+                          Text('Delete Rule',
+                              style: TextStyle(
+                                  color: Colors.red.withValues(alpha: 0.6),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+              // ── Done button ──
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(ctx),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: _sandGold.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text('Done',
+                          style: TextStyle(
+                              color: _sandGold,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _infoChip(IconData icon, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 11, color: Colors.white.withValues(alpha: 0.3)),
+              const SizedBox(width: 4),
+              Text(label, style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.35), fontSize: 10)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(value, style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8), fontSize: 13,
+              fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  Widget _settingPill(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color.withValues(alpha: 0.7)),
+          const SizedBox(width: 4),
+          Text(label, style: TextStyle(
+              color: color.withValues(alpha: 0.8), fontSize: 11,
+              fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
   // ── Task 6: Show block type chooser first ──
   void _showAddRule(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
@@ -2747,7 +3235,7 @@ class _BlockerTab extends ConsumerWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       if (selectedApps.isEmpty) {
                         ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
                           content: const Text('Please add at least one app to block'),
@@ -2759,7 +3247,7 @@ class _BlockerTab extends ConsumerWidget {
                       }
                       final now = DateTime.now();
                       final endTime = now.add(Duration(minutes: durationMinutes));
-                      ref.read(appBlockRuleProvider.notifier).addRule(
+                      final newRule = await ref.read(appBlockRuleProvider.notifier).addRule(
                             name: nameCtrl.text.trim().isEmpty
                                 ? 'Quick Focus'
                                 : nameCtrl.text.trim(),
@@ -2775,6 +3263,9 @@ class _BlockerTab extends ConsumerWidget {
                           );
                       Navigator.pop(ctx);
                       HapticFeedback.lightImpact();
+                      if (context.mounted) {
+                        _showRuleInfoSheet(context, ref, newRule);
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _desertSunset.withValues(alpha: 0.2),
@@ -2969,7 +3460,7 @@ class _BlockerTab extends ConsumerWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       if (nameCtrl.text.trim().isEmpty) return;
                       if (selectedApps.isEmpty) {
                         ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
@@ -2980,7 +3471,7 @@ class _BlockerTab extends ConsumerWidget {
                         ));
                         return;
                       }
-                      ref.read(appBlockRuleProvider.notifier).addRule(
+                      final newRule = await ref.read(appBlockRuleProvider.notifier).addRule(
                             name: nameCtrl.text.trim(),
                             blockedPackages: selectedApps.toList(),
                             isTimeBased: true,
@@ -2994,6 +3485,9 @@ class _BlockerTab extends ConsumerWidget {
                           );
                       Navigator.pop(ctx);
                       HapticFeedback.lightImpact();
+                      if (context.mounted) {
+                        _showRuleInfoSheet(context, ref, newRule);
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _sandGold.withValues(alpha: 0.2),
@@ -3312,6 +3806,209 @@ class _BlockTypeOption extends StatelessWidget {
             ),
             Icon(Icons.arrow_forward_ios,
                 size: 14, color: Colors.white.withValues(alpha: 0.15)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── 100-Tap Delete Confirmation ────────────────────────────────────────────
+
+class _DeleteRuleConfirmScreen extends ConsumerStatefulWidget {
+  final String ruleId;
+  final String ruleName;
+  const _DeleteRuleConfirmScreen({required this.ruleId, required this.ruleName});
+
+  @override
+  ConsumerState<_DeleteRuleConfirmScreen> createState() => _DeleteRuleConfirmScreenState();
+}
+
+class _DeleteRuleConfirmScreenState extends ConsumerState<_DeleteRuleConfirmScreen> {
+  int _tapCount = 0;
+  static const int _requiredTaps = 100;
+
+  void _handleTap() {
+    HapticFeedback.selectionClick();
+    setState(() => _tapCount++);
+    if (_tapCount >= _requiredTaps) {
+      HapticFeedback.heavyImpact();
+      ref.read(appBlockRuleProvider.notifier).deleteRule(widget.ruleId);
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Rule "${widget.ruleName}" deleted'),
+          backgroundColor: Colors.red.withValues(alpha: 0.8),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = _tapCount / _requiredTaps;
+    final remaining = _requiredTaps - _tapCount;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.arrow_back_ios_new,
+                          color: Colors.white.withValues(alpha: 0.4), size: 16),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('Delete Rule',
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ),
+
+            // Content
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Warning icon
+                      Container(
+                        width: 80, height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.warning_amber_rounded, size: 40,
+                            color: Colors.red.withValues(alpha: 0.6)),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Are you absolutely sure?',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Deleting "${widget.ruleName}" means removing\nyour focus protection.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.4),
+                          fontSize: 13,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Progress bar
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 8,
+                          backgroundColor: Colors.white.withValues(alpha: 0.06),
+                          color: Color.lerp(
+                            Colors.red.withValues(alpha: 0.3),
+                            Colors.red.withValues(alpha: 0.8),
+                            progress,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        '$remaining taps remaining',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Tap target
+                      GestureDetector(
+                        onTap: _handleTap,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 100),
+                          width: 140,
+                          height: 140,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color.lerp(
+                              Colors.red.withValues(alpha: 0.06),
+                              Colors.red.withValues(alpha: 0.25),
+                              progress,
+                            ),
+                            border: Border.all(
+                              color: Color.lerp(
+                                Colors.red.withValues(alpha: 0.15),
+                                Colors.red.withValues(alpha: 0.5),
+                                progress,
+                              )!,
+                              width: 2,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '$_tapCount',
+                                style: TextStyle(
+                                  color: Colors.red.withValues(alpha: 0.5 + progress * 0.4),
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Tap to\nconfirm',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.red.withValues(alpha: 0.35),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Tap the button $_requiredTaps times to delete',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
