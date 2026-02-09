@@ -88,15 +88,8 @@ class _HomeClockScreenState extends ConsumerState<HomeClockScreen> {
     // Check app blocker
     final blocker = ref.read(appBlockRuleProvider.notifier);
     if (blocker.isAppBlocked(packageName)) {
-      final msg = blocker.getBlockMessage(packageName) ?? 'Stay focused! 🐪';
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
-            backgroundColor: const Color(0xFFE8915A).withValues(alpha: 0.9),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        _showBlockedAppScreen(packageName);
       }
       return;
     }
@@ -116,6 +109,29 @@ class _HomeClockScreenState extends ConsumerState<HomeClockScreen> {
         ).showSnackBar(SnackBar(content: Text('Cannot open app: $e')));
       }
     }
+  }
+
+  void _showBlockedAppScreen(String packageName) {
+    final allApps = ref.read(installedAppsProvider);
+    final appName = allApps
+        .where((a) => a.packageName == packageName)
+        .map((a) => a.appName)
+        .firstOrNull ?? packageName.split('.').last;
+    
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Blocked',
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      transitionDuration: const Duration(milliseconds: 350),
+      transitionBuilder: (ctx, anim, _, child) {
+        return ScaleTransition(
+          scale: CurvedAnimation(parent: anim, curve: Curves.easeOutBack),
+          child: FadeTransition(opacity: anim, child: child),
+        );
+      },
+      pageBuilder: (ctx, _, __) => _BlockedAppHomeDialog(appName: appName),
+    );
   }
 
   @override
@@ -511,6 +527,124 @@ class _HomeClockScreenState extends ConsumerState<HomeClockScreen> {
                 },
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🛡️ BLOCKED APP — MOTIVATIONAL SCREEN (Home)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _BlockedAppHomeDialog extends StatefulWidget {
+  final String appName;
+  const _BlockedAppHomeDialog({required this.appName});
+
+  @override
+  State<_BlockedAppHomeDialog> createState() => _BlockedAppHomeDialogState();
+}
+
+class _BlockedAppHomeDialogState extends State<_BlockedAppHomeDialog>
+    with SingleTickerProviderStateMixin {
+  static const _gold = Color(0xFFC2A366);
+  static const _green = Color(0xFF7BAE6E);
+
+  late AnimationController _breatheCtrl;
+  late Animation<double> _breatheAnim;
+
+  static const _quotes = [
+    {'text': 'Your future self is watching you through memories.\nMake them proud.', 'icon': Icons.visibility_outlined},
+    {'text': 'Every time you resist distraction,\nyou rewire your brain for success.', 'icon': Icons.psychology_outlined},
+    {'text': 'The dopamine hit fades in seconds.\nThe discipline you build lasts forever.', 'icon': Icons.trending_up_outlined},
+    {'text': "You're not missing out.\nYou're opting in to something greater.", 'icon': Icons.arrow_upward_outlined},
+    {'text': 'A focused mind is the most\npowerful tool on earth.', 'icon': Icons.bolt_outlined},
+    {'text': "This urge will pass in 10 minutes.\nYour goals won't wait forever.", 'icon': Icons.timer_outlined},
+  ];
+
+  late Map<String, dynamic> _currentQuote;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentQuote = _quotes[DateTime.now().millisecond % _quotes.length];
+    _breatheCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2500))..repeat(reverse: true);
+    _breatheAnim = Tween<double>(begin: 0.6, end: 1.0).animate(CurvedAnimation(parent: _breatheCtrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() { _breatheCtrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 36),
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D1117),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: _gold.withValues(alpha: 0.15)),
+              boxShadow: [BoxShadow(color: _gold.withValues(alpha: 0.08), blurRadius: 40, spreadRadius: 2)],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedBuilder(
+                  animation: _breatheAnim,
+                  builder: (_, __) => Container(
+                    width: 72, height: 72,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _gold.withValues(alpha: 0.08 * _breatheAnim.value),
+                      border: Border.all(color: _gold.withValues(alpha: 0.2 * _breatheAnim.value), width: 2),
+                      boxShadow: [BoxShadow(color: _gold.withValues(alpha: 0.1 * _breatheAnim.value), blurRadius: 20, spreadRadius: 4)],
+                    ),
+                    child: Icon(Icons.shield_outlined, color: _gold.withValues(alpha: 0.5 + 0.5 * _breatheAnim.value), size: 32),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text('${widget.appName} is blocked',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13, fontWeight: FontWeight.w500, letterSpacing: 0.5)),
+                const SizedBox(height: 20),
+                Icon(_currentQuote['icon'] as IconData, color: _gold.withValues(alpha: 0.6), size: 28),
+                const SizedBox(height: 16),
+                Text(_currentQuote['text'] as String,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 16, fontWeight: FontWeight.w500, height: 1.5, letterSpacing: 0.2)),
+                const SizedBox(height: 28),
+                Container(width: 40, height: 2, decoration: BoxDecoration(color: _gold.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(1))),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.local_fire_department_outlined, color: _green.withValues(alpha: 0.7), size: 16),
+                    const SizedBox(width: 6),
+                    Text("Stay focused. You're doing great.", style: TextStyle(color: _green.withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                GestureDetector(
+                  onTap: () { HapticFeedback.lightImpact(); Navigator.of(context).pop(); },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: _gold.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _gold.withValues(alpha: 0.2)),
+                    ),
+                    child: const Center(
+                      child: Text('Go Back  🐪', style: TextStyle(color: _gold, fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

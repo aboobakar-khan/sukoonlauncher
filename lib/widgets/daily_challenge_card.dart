@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../providers/camel_coin_provider.dart';
 import '../screens/daily_challenges_analytics_screen.dart';
 import '../screens/dhikr_history_pro_dashboard_redesigned.dart';
 import '../screens/productivity_hub_screen.dart';
@@ -117,12 +118,8 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
       // Update total points
       if (newValue) {
         final challenge = _dailyChallenges.firstWhere((c) => c['id'] == id);
-        final currentTotal = box.get('total_points', defaultValue: 0);
-        await box.put('total_points', currentTotal + (challenge['points'] as int));
       } else {
         final challenge = _dailyChallenges.firstWhere((c) => c['id'] == id);
-        final currentTotal = box.get('total_points', defaultValue: 0);
-        await box.put('total_points', currentTotal - (challenge['points'] as int));
       }
       
       setState(() {});
@@ -144,6 +141,9 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
         
         await box.put('challenge_streak', newStreak);
         setState(() => _challengeStreak = newStreak);
+        
+        // 🪙 Award Camel Coins for completing all challenges
+        ref.read(camelCoinProvider.notifier).awardDailyChallenge();
         
         _showCompletionReward();
       }
@@ -224,10 +224,10 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
                 'All Complete!',
                 style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
-                'You earned ${_calculateTotalPoints()} points today',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+                '🪙 +15 Camel Coins earned!',
+                style: TextStyle(color: _gold.withValues(alpha: 0.9), fontSize: 14, fontWeight: FontWeight.w600),
               ),
               if (_challengeStreak > 0) ...[
                 const SizedBox(height: 14),
@@ -258,14 +258,6 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
     );
   }
 
-  int _calculateTotalPoints() {
-    int total = 0;
-    for (final c in _dailyChallenges) {
-      if (_todayChallenges[c['id']] == true) total += c['points'] as int;
-    }
-    return total;
-  }
-
   @override
   Widget build(BuildContext context) {
     final completedCount = _todayChallenges.values.where((v) => v).length;
@@ -273,94 +265,61 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
     final progress = totalCount > 0 ? completedCount / totalCount : 0.0;
     final allComplete = completedCount == totalCount && totalCount > 0;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF141414),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: allComplete ? _gold.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.06),
-        ),
-      ),
-      child: Column(
-        children: [
-          // ── Header ──
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const DailyChallengesAnalyticsScreen()),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
-              child: Row(
-                children: [
-                  Text(
-                    'Daily Challenges',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+    return Column(
+      children: [
+        // ── Header ──
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const DailyChallengesAnalyticsScreen()),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+            child: Row(
+              children: [
+                Text(
+                  'CHALLENGES',
+                  style: TextStyle(
+                    color: _gold.withValues(alpha: 0.7),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.8,
                   ),
+                ),
+                if (_challengeStreak > 0) ...[
                   const SizedBox(width: 8),
-                  // Streak badge
-                  if (_challengeStreak > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: _gold.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '🔥 $_challengeStreak',
-                        style: TextStyle(color: _gold.withValues(alpha: 0.8), fontSize: 11, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  const Spacer(),
-                  // Points earned
                   Text(
-                    '+${_calculateTotalPoints()} pts',
-                    style: TextStyle(
-                      color: _gold.withValues(alpha: 0.7),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    '🔥 $_challengeStreak',
+                    style: TextStyle(color: _gold.withValues(alpha: 0.6), fontSize: 10, fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(width: 6),
-                  Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.25), size: 18),
                 ],
-              ),
+                const Spacer(),
+                Text(
+                  '$completedCount/$totalCount',
+                  style: TextStyle(
+                    color: allComplete ? _gold.withValues(alpha: 0.8) : Colors.white.withValues(alpha: 0.3),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.2), size: 16),
+              ],
             ),
           ),
+        ),
 
-          // ── Progress bar ──
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(2),
-              child: LinearProgressIndicator(
-                value: progress,
-                backgroundColor: Colors.white.withValues(alpha: 0.06),
-                valueColor: AlwaysStoppedAnimation(allComplete ? _gold : _gold.withValues(alpha: 0.6)),
-                minHeight: 3,
-              ),
-            ),
-          ),
+        // ── Challenge rows ──
+        ...List.generate(_dailyChallenges.length, (i) {
+          final challenge = _dailyChallenges[i];
+          final isComplete = _todayChallenges[challenge['id']] == true;
+          return _buildChallengeRow(challenge, isComplete);
+        }),
 
-          const SizedBox(height: 6),
-
-          // ── Challenge rows ──
-          ...List.generate(_dailyChallenges.length, (i) {
-            final challenge = _dailyChallenges[i];
-            final isComplete = _todayChallenges[challenge['id']] == true;
-            return _buildChallengeRow(challenge, isComplete);
-          }),
-
-          const SizedBox(height: 8),
-        ],
-      ),
+        const SizedBox(height: 4),
+      ],
     );
   }
 
@@ -369,76 +328,58 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
     final hasAction = action != 'none';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-      child: Row(
-        children: [
-          // Checkbox
-          GestureDetector(
-            onTap: () => _toggleChallenge(challenge['id'] as String),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 22, height: 22,
-              decoration: BoxDecoration(
-                color: isComplete ? _gold : Colors.transparent,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: isComplete ? _gold : Colors.white.withValues(alpha: 0.15),
-                  width: 1.5,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: GestureDetector(
+        onTap: () {
+          if (hasAction && !isComplete) {
+            _navigateToAction(action);
+          } else {
+            _toggleChallenge(challenge['id'] as String);
+          }
+        },
+        behavior: HitTestBehavior.opaque,
+        child: Row(
+          children: [
+            // Checkbox
+            GestureDetector(
+              onTap: () => _toggleChallenge(challenge['id'] as String),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 20, height: 20,
+                decoration: BoxDecoration(
+                  color: isComplete ? _gold : Colors.transparent,
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(
+                    color: isComplete ? _gold : Colors.white.withValues(alpha: 0.12),
+                    width: 1.5,
+                  ),
                 ),
+                child: isComplete ? const Icon(Icons.check_rounded, color: Color(0xFF0D0D0D), size: 13) : null,
               ),
-              child: isComplete ? const Icon(Icons.check_rounded, color: Color(0xFF0D0D0D), size: 14) : null,
             ),
-          ),
-          const SizedBox(width: 10),
+            const SizedBox(width: 10),
 
-          // Title — tappable if actionable
-          Expanded(
-            child: GestureDetector(
-              onTap: hasAction && !isComplete ? () => _navigateToAction(action) : () => _toggleChallenge(challenge['id'] as String),
+            // Title
+            Expanded(
               child: Text(
                 challenge['title'] as String,
                 style: TextStyle(
                   color: isComplete
-                      ? Colors.white.withValues(alpha: 0.35)
-                      : Colors.white.withValues(alpha: 0.8),
+                      ? Colors.white.withValues(alpha: 0.25)
+                      : Colors.white.withValues(alpha: 0.7),
                   fontSize: 13,
                   fontWeight: FontWeight.w400,
                   decoration: isComplete ? TextDecoration.lineThrough : null,
-                  decorationColor: Colors.white.withValues(alpha: 0.2),
+                  decorationColor: Colors.white.withValues(alpha: 0.15),
                 ),
               ),
             ),
-          ),
 
-          // Points
-          Text(
-            '+${challenge['points']}',
-            style: TextStyle(
-              color: isComplete ? _gold.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.25),
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-
-          // "Go" button for actionable + uncompleted
-          if (hasAction && !isComplete) ...[
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () => _navigateToAction(action),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: _gold.withValues(alpha: 0.35), width: 1),
-                ),
-                child: Text(
-                  'Go',
-                  style: TextStyle(color: _gold.withValues(alpha: 0.8), fontSize: 11, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
+            // Subtle arrow for actionable items
+            if (hasAction && !isComplete)
+              Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.12), size: 16),
           ],
-        ],
+        ),
       ),
     );
   }

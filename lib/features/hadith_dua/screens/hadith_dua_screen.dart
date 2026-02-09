@@ -22,16 +22,11 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         ref.read(hadithDuaTabProvider.notifier).state = _tabController.index;
       }
-    });
-    
-    // Load initial hadiths for Today tab
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(loadMoreHadithsProvider.notifier).loadMore(count: 3);
     });
   }
 
@@ -154,7 +149,6 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
             splashFactory: NoSplash.splashFactory,
             overlayColor: WidgetStateProperty.all(Colors.transparent),
             tabs: const [
-              Tab(text: 'Today', height: 40),
               Tab(text: 'Hadith', height: 40),
               Tab(text: 'Dua', height: 40),
             ],
@@ -169,7 +163,6 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
             controller: _tabController,
             physics: const NeverScrollableScrollPhysics(), // Disable swipe - tap to switch tabs
             children: [
-              _buildTodayTab(),
               _buildHadithTab(),
               _buildDuaTab(),
             ],
@@ -179,157 +172,12 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
     );
   }
 
-  Widget _buildTodayTab() {
-    final dailyHadith = ref.watch(refreshableDailyHadithProvider);
-    final dailyDua = ref.watch(refreshableDailyDuaProvider);
-    final loadMoreState = ref.watch(loadMoreHadithsProvider);
+  /* REMOVED: Old "Today" tab with Daily Inspiration UI
+   * This tab has been removed. Users can access Hadith and Dua directly
+   * from the daily challenges card which navigates to the proper tabs.
+   */
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      physics: const BouncingScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with refresh
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Daily Inspiration',
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  ref.read(refreshTriggerProvider.notifier).state++;
-                  ref.read(loadMoreHadithsProvider.notifier).clear();
-                  ref.read(loadMoreHadithsProvider.notifier).loadMore(count: 3);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF21262D),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.refresh, color: Colors.grey[500], size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Refresh',
-                        style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Daily Hadith
-          _buildSectionHeader('Daily Hadith', Icons.menu_book),
-          const SizedBox(height: 8),
-          dailyHadith.when(
-            data: (hadith) => hadith != null
-                ? EnhancedHadithCard(hadith: hadith, isDaily: true)
-                : _buildLoadingCard('Loading hadith...'),
-            loading: () => _buildLoadingCard('Loading hadith...'),
-            error: (_, __) => _buildErrorCard('Failed to load hadith'),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Daily Dua
-          _buildSectionHeader('Daily Dua', Icons.favorite_outline),
-          const SizedBox(height: 8),
-          _buildDuaCard(dailyDua, isDaily: true),
-
-          const SizedBox(height: 20),
-
-          // More Hadiths
-          _buildSectionHeader('More Hadiths', Icons.library_books),
-          const SizedBox(height: 8),
-          
-          // Load more hadiths list
-          ...loadMoreState.hadiths.map((hadith) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: EnhancedHadithCard(hadith: hadith),
-          )),
-
-          // Load More Button
-          _buildLoadMoreButton(loadMoreState),
-
-          const SizedBox(height: 20),
-
-          // Bookmarks preview
-          _buildBookmarksPreview(),
-
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoadMoreButton(LoadMoreHadithsState state) {
-    return GestureDetector(
-      onTap: state.isLoading
-          ? null
-          : () {
-              HapticFeedback.lightImpact();
-              ref.read(loadMoreHadithsProvider.notifier).loadMore(count: 5);
-            },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFF21262D),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: const Color(0xFFC2A366).withValues(alpha: 0.3),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (state.isLoading) ...[
-              const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation(Color(0xFFC2A366)),
-                  strokeWidth: 2,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Loading...',
-                style: TextStyle(color: Colors.grey[400], fontSize: 13),
-              ),
-            ] else ...[
-              const Icon(Icons.add, color: Color(0xFFC2A366), size: 18),
-              const SizedBox(width: 6),
-              const Text(
-                'Load More Hadiths',
-                style: TextStyle(
-                  color: Color(0xFFC2A366),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
+  // Helper methods still used by Dua tab and search results
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
@@ -519,67 +367,6 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildBookmarksPreview() {
-    final bookmarks = ref.watch(bookmarksProvider);
-    final totalBookmarks = bookmarks.bookmarkedHadiths.length + bookmarks.bookmarkedDuas.length;
-
-    if (totalBookmarks == 0) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader('Bookmarks ($totalBookmarks)', Icons.bookmark),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF161B22),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          ),
-          child: Column(
-            children: [
-              for (final collection in bookmarks.collections) ...[
-                _buildBookmarkCollectionRow(collection, bookmarks),
-                if (collection != bookmarks.collections.last)
-                  Divider(color: Colors.white.withValues(alpha: 0.05), height: 16),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBookmarkCollectionRow(String collection, BookmarksState bookmarks) {
-    final hadithCount = bookmarks.getHadithsInCollection(collection).length;
-    final duaCount = bookmarks.getDuasInCollection(collection).length;
-    final total = hadithCount + duaCount;
-
-    if (total == 0) return const SizedBox.shrink();
-
-    return Row(
-      children: [
-        Icon(Icons.folder_outlined, color: const Color(0xFFC2A366), size: 18),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            collection,
-            style: TextStyle(color: Colors.grey[300], fontSize: 13),
-          ),
-        ),
-        Text(
-          '$total items',
-          style: TextStyle(color: Colors.grey[500], fontSize: 11),
-        ),
-        const SizedBox(width: 8),
-        Icon(Icons.chevron_right, color: Colors.grey[600], size: 18),
-      ],
     );
   }
 

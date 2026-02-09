@@ -80,9 +80,13 @@ class PomodoroNotifier extends StateNotifier<PomodoroState> {
       totalSeconds: state.remainingSeconds,
     );
 
-    // Auto-play ambient sound if one is selected
-    if (state.ambientSoundId != null && _ambientSound != null) {
-      _ambientSound.selectAndPlay(state.ambientSoundId!);
+    // Auto-play ambient sound — pick default 'rain' if none selected
+    if (_ambientSound != null) {
+      final soundId = state.ambientSoundId ?? 'rain';
+      _ambientSound.selectAndPlay(soundId);
+      if (state.ambientSoundId == null) {
+        state = state.copyWith(ambientSoundId: soundId);
+      }
     }
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {

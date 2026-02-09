@@ -1,12 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/wallpaper_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/amoled_provider.dart';
 import '../services/offline_content_manager.dart';
-import '../widgets/edge_swipe_wrapper.dart';
 import 'home_clock_screen.dart';
 import 'widget_dashboard_screen.dart';
 import 'app_list_screen.dart';
@@ -14,6 +14,32 @@ import 'productivity_hub_screen.dart';
 import '../features/quran/screens/surah_list_screen.dart';
 import '../features/hadith_dua/screens/minimalist_hadith_screen.dart';
 import '../features/hadith_dua/screens/minimalist_dua_screen.dart';
+
+/// Professional spring-based page scroll physics (like Samsung/Pixel launchers)
+class _LauncherPagePhysics extends ScrollPhysics {
+  const _LauncherPagePhysics({super.parent});
+
+  @override
+  _LauncherPagePhysics applyTo(ScrollPhysics? ancestor) {
+    return _LauncherPagePhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  SpringDescription get spring => const SpringDescription(
+    mass: 0.8,       // Light mass = fast response
+    stiffness: 150,  // High stiffness = snappy settle
+    damping: 18,     // Good damping = no overshoot, smooth stop
+  );
+
+  @override
+  double get dragStartDistanceMotionThreshold => 3.5; // Respond to very slight drags
+
+  @override
+  double get minFlingVelocity => 50; // Easy to trigger fling (low threshold)
+
+  @override
+  double get maxFlingVelocity => 8000; // Allow fast flings
+}
 
 /// Main launcher shell with swipeable pages
 /// Layout: [Islamic Hub] ← [Dashboard] ← [HOME] → [App List] → [Productivity]
@@ -28,44 +54,28 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
     with SingleTickerProviderStateMixin {
   late PageController _pageController;
   late AnimationController _animController;
+  double _currentPage = 2.0; // Track current page for dots
 
   // Home is at index 2 (middle)
   static const int _homeIndex = 2;
+  static const int _totalPages = 5;
   
-  // Gesture tracking for smooth Samsung-like navigation
-  double _dragStartX = 0;
-  double _dragStartY = 0;
-  double _dragStartPage = 0;
-  bool _isDragging = false;
-  bool _isHorizontalDrag = false;
-  bool _gestureDecided = false;
-  bool _isAnimating = false;
-  
-  // Thresholds - tuned for smooth, responsive navigation
-  static const double _decisionThreshold = 10.0; // Lower for quicker response
-  static const double _horizontalBias = 1.0; // Equal bias for natural feel
-
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: _homeIndex);
+    _pageController = PageController(initialPage: _homeIndex, viewportFraction: 1.0);
+    _pageController.addListener(_onPageChanged);
     _animController = AnimationController(
       duration: const Duration(seconds: 10),
       vsync: this,
     )..repeat(reverse: true);
-    
-    // Listen for page changes to reset animation state
-    _pageController.addListener(_onPageChanged);
   }
-  
+
   void _onPageChanged() {
-    // Reset animation flag when page settles
     if (_pageController.page != null) {
-      final page = _pageController.page!;
-      final isSettled = (page - page.round()).abs() < 0.001;
-      if (isSettled && !_isDragging) {
-        _isAnimating = false;
-      }
+      setState(() {
+        _currentPage = _pageController.page!;
+      });
     }
   }
 
@@ -75,84 +85,6 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
     _pageController.dispose();
     _animController.dispose();
     super.dispose();
-  }
-
-  // ── Horizontal-only drag handlers (don't compete with vertical scroll) ──
-
-  void _onHDragStart(DragStartDetails details) {
-    if (_isAnimating) return;
-    _dragStartX = details.globalPosition.dx;
-    _dragStartPage = _pageController.page ?? _homeIndex.toDouble();
-    _isDragging = true;
-    _isHorizontalDrag = true;
-  }
-  
-  void _onHDragUpdate(DragUpdateDetails details) {
-    if (!_isDragging || _isAnimating) return;
-    
-    final dx = details.globalPosition.dx - _dragStartX;
-    
-    // Require minimum 8px horizontal movement before shifting pages
-    // This prevents accidental page shift during vertical swipe attempts
-    if (dx.abs() < 8) return;
-    
-    final screenWidth = MediaQuery.of(context).size.width;
-    final pageDelta = -dx / screenWidth;
-    final newPage = (_dragStartPage + pageDelta).clamp(0.0, 4.0);
-    
-    if (_pageController.hasClients) {
-      _pageController.jumpTo(newPage * screenWidth);
-    }
-  }
-  
-  void _onHDragEnd(DragEndDetails details) {
-    if (!_isDragging || _isAnimating) {
-      _isDragging = false;
-      return;
-    }
-    
-    final velocity = details.primaryVelocity ?? 0;
-    final currentPage = _pageController.page ?? _homeIndex.toDouble();
-    int targetPage;
-    
-    if (velocity.abs() > 500) {
-      // Fast swipe — snap to next page immediately
-      if (velocity < 0) {
-        targetPage = (currentPage + 0.1).ceil().clamp(0, 4);
-      } else {
-        targetPage = (currentPage - 0.1).floor().clamp(0, 4);
-      }
-    } else if (velocity.abs() > 150) {
-      // Medium swipe — snap with lower threshold
-      final fraction = currentPage - currentPage.floor();
-      if (velocity < 0 && fraction > 0.08) {
-        targetPage = currentPage.ceil().clamp(0, 4);
-      } else if (velocity > 0 && fraction < 0.92) {
-        targetPage = currentPage.floor().clamp(0, 4);
-      } else {
-        targetPage = currentPage.round().clamp(0, 4);
-      }
-    } else {
-      // Slow drag — position-based with lower threshold
-      final fraction = currentPage - currentPage.floor();
-      if (fraction > 0.25) {
-        targetPage = currentPage.ceil().clamp(0, 4);
-      } else {
-        targetPage = currentPage.floor().clamp(0, 4);
-      }
-    }
-    
-    _isDragging = false;
-    _isAnimating = true;
-    _pageController.animateToPage(
-      targetPage,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
-    ).then((_) {
-      _isAnimating = false;
-    }).catchError((_) {
-      _isAnimating = false;
-    });
   }
 
   @override
@@ -175,130 +107,60 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
             // Background
             _buildBackground(effectiveWallpaper),
 
-            // LEFT edge - swipe right to go to previous page
+            // PageView with professional spring-based physics
+            PageView(
+              controller: _pageController,
+              physics: const _LauncherPagePhysics(),
+              clipBehavior: Clip.hardEdge,
+              children: [
+                IslamicHubScreen(pageController: _pageController),  // Index 0
+                const WidgetDashboardScreen(),  // Index 1
+                const HomeClockScreen(),        // Index 2 (HOME)
+                const AppListScreen(),          // Index 3
+                const ProductivityHubScreen(),  // Index 4
+              ],
+            ),
+
+            // ── Page indicator dots ──
             Positioned(
               left: 0,
-              top: 0,
-              bottom: 0,
-              width: 40,
-              child: GestureDetector(
-                onHorizontalDragEnd: (details) {
-                  final velocity = details.primaryVelocity ?? 0;
-                  if (velocity > 100) {
-                    // Swipe right - go to previous page
-                    final currentPage = (_pageController.page ?? _homeIndex).round();
-                    if (currentPage > 0) {
-                      _pageController.animateToPage(
-                        currentPage - 1,
-                        duration: const Duration(milliseconds: 350),
-                        curve: Curves.easeOutCubic,
-                      );
-                    }
-                  }
-                },
-                behavior: HitTestBehavior.opaque,
-                child: Container(color: Colors.transparent),
-              ),
-            ),
-            // RIGHT edge - swipe left to go to next page
-            Positioned(
               right: 0,
-              top: 0,
-              bottom: 0,
-              width: 40,
-              child: GestureDetector(
-                onHorizontalDragEnd: (details) {
-                  final velocity = details.primaryVelocity ?? 0;
-                  if (velocity < -100) {
-                    // Swipe left - go to next page
-                    final currentPage = (_pageController.page ?? _homeIndex).round();
-                    if (currentPage < 4) {
-                      _pageController.animateToPage(
-                        currentPage + 1,
-                        duration: const Duration(milliseconds: 350),
-                        curve: Curves.easeOutCubic,
-                      );
-                    }
-                  }
-                },
-                behavior: HitTestBehavior.opaque,
-                child: Container(color: Colors.transparent),
-              ),
-            ),
-
-            // Custom gesture handler for smooth Samsung-like navigation
-            // Uses horizontal drag (not pan) so vertical scroll in children works
-            GestureDetector(
-              onHorizontalDragStart: _onHDragStart,
-              onHorizontalDragUpdate: _onHDragUpdate,
-              onHorizontalDragEnd: _onHDragEnd,
-              behavior: HitTestBehavior.translucent,
-              child: PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                clipBehavior: Clip.hardEdge,
-                children: [
-                  IslamicHubScreen(pageController: _pageController),  // Index 0
-                  const WidgetDashboardScreen(),  // Index 1
-                  const HomeClockScreen(),        // Index 2 (HOME)
-                  const AppListScreen(),          // Index 3
-                  const ProductivityHubScreen(),  // Index 4
-                ],
-              ),
-            ),
-
-            // ── Bottom-center swipe up → go Home (for launcher pages only) ──
-            // System Android gesture works for apps, but on our launcher pages
-            // we need our own "swipe up to go home" since we ARE the home app.
-            AnimatedBuilder(
-              animation: _pageController,
-              builder: (context, _) {
-                final currentPage = (_pageController.page ?? _homeIndex.toDouble()).round();
-                // Only show on non-home pages (Dashboard, Islamic Hub, App List, Productivity)
-                final showIndicator = currentPage != _homeIndex;
-                return Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: 44,
-                  child: IgnorePointer(
-                    ignoring: !showIndicator,
-                    child: GestureDetector(
-                      onVerticalDragEnd: (details) {
-                        final velocity = details.primaryVelocity ?? 0;
-                        if (velocity < -200 && showIndicator) {
-                          HapticFeedback.lightImpact();
-                          _pageController.animateToPage(
-                            _homeIndex,
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeOutCubic,
-                          );
-                        }
-                      },
-                      behavior: HitTestBehavior.opaque,
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 250),
-                        opacity: showIndicator ? 1.0 : 0.0,
-                        child: Center(
-                          child: Container(
-                            width: 40,
-                            height: 4,
-                            margin: const EdgeInsets.only(bottom: 10),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
+              bottom: 8 + MediaQuery.of(context).padding.bottom,
+              child: _buildPageDots(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// Subtle page indicator dots
+  Widget _buildPageDots() {
+    const labels = ['Islam', 'Dashboard', 'Home', 'Apps', 'Focus'];
+    final int activePage = _currentPage.round().clamp(0, _totalPages - 1);
+    
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(_totalPages, (i) {
+        final isActive = i == activePage;
+        // Calculate proximity for smooth animation
+        final distance = (_currentPage - i).abs().clamp(0.0, 1.0);
+        final dotOpacity = isActive ? 0.9 : (0.2 + (1.0 - distance) * 0.15).clamp(0.15, 0.35);
+        
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+            width: isActive ? 18 : 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: dotOpacity),
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+        );
+      }),
     );
   }
 
@@ -406,7 +268,7 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
   }
 }
 
-/// Islamic Hub - Quran, Hadith, Dua with clean tabs
+/// Islamic Hub - Clean card-based entry to Quran, Hadith, Dua
 class IslamicHubScreen extends ConsumerStatefulWidget {
   final PageController pageController;
   
@@ -416,75 +278,189 @@ class IslamicHubScreen extends ConsumerStatefulWidget {
   ConsumerState<IslamicHubScreen> createState() => _IslamicHubScreenState();
 }
 
-class _IslamicHubScreenState extends ConsumerState<IslamicHubScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _IslamicHubScreenState extends ConsumerState<IslamicHubScreen> {
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+  static const _gold = Color(0xFFC2A366);
+  static const _green = Color(0xFF7BAE6E);
 
   @override
   Widget build(BuildContext context) {
     final themeColor = ref.watch(themeColorProvider);
-
-    void navigateToDashboard() {
-      widget.pageController.animateToPage(
-        1, // Dashboard is at index 1
-        duration: const Duration(milliseconds: 450),
-        curve: Curves.easeOutCubic,
-      );
-    }
+    final accent = themeColor.color;
+    final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: screenHeight * 0.04),
+
+              // Header
+              Text(
+                'Islamic Hub',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Bismillah — start your journey',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+
+              SizedBox(height: screenHeight * 0.04),
+
+              // 3 large cards — 2 columns top, 1 full width bottom
+              Expanded(
+                child: Column(
+                  children: [
+                    // Row: Quran + Hadith
+                    Expanded(
+                      flex: 3,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _buildHubCard(
+                              context,
+                              icon: Icons.menu_book_rounded,
+                              title: 'Quran',
+                              subtitle: '114 Surahs',
+                              color: _gold,
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => const _IslamicSubScreen(title: 'Quran', child: SurahListScreen())));
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildHubCard(
+                              context,
+                              icon: Icons.library_books_rounded,
+                              title: 'Hadith',
+                              subtitle: '9 Collections',
+                              color: _green,
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => _IslamicSubScreen(title: 'Hadith', child: MinimalistHadithScreen())));
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Full width: Dua
+                    Expanded(
+                      flex: 2,
+                      child: _buildHubCard(
+                        context,
+                        icon: Icons.front_hand_rounded,
+                        title: 'Dua & Adhkar',
+                        subtitle: '14 categories · Morning & Evening adhkar',
+                        color: accent,
+                        isWide: true,
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const _IslamicSubScreen(title: 'Dua & Adhkar', child: MinimalistDuaScreen())));
+                        },
+                      ),
+                    ),
+
+                    // Swipe hint
+                    Padding(
+                      padding: const EdgeInsets.only(top: 20, bottom: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.swipe_right_rounded, size: 14, color: Colors.white.withValues(alpha: 0.15)),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Swipe right for Dashboard →',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHubCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+    bool isWide = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(isWide ? 22 : 20),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: color.withValues(alpha: 0.12),
+          ),
+        ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Header with 3 tabs
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                children: [
-                  // Quran tab
-                  _buildTabButton(0, 'Quran', themeColor.color),
-                  const SizedBox(width: 8),
-                  // Hadith tab
-                  _buildTabButton(1, 'Hadith', themeColor.color),
-                  const SizedBox(width: 8),
-                  // Dua tab
-                  _buildTabButton(2, 'Dua', themeColor.color),
-                ],
+            // Icon
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Center(
+                child: Icon(icon, color: color.withValues(alpha: 0.8), size: 24),
               ),
             ),
-
-            // Content with edge swipe
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  EdgeSwipeWrapper(
-                    onSwipeRight: navigateToDashboard,
-                    child: const SurahListScreen(),
-                  ),
-                  EdgeSwipeWrapper(
-                    onSwipeRight: navigateToDashboard,
-                    child: MinimalistHadithScreen(),
-                  ),
-                  EdgeSwipeWrapper(
-                    onSwipeRight: navigateToDashboard,
-                    child: const MinimalistDuaScreen(),
-                  ),
-                ],
+            const Spacer(),
+            // Title + Subtitle
+            Text(
+              title,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: isWide ? 20 : 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.35),
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
               ),
             ),
           ],
@@ -492,41 +468,60 @@ class _IslamicHubScreenState extends ConsumerState<IslamicHubScreen>
       ),
     );
   }
+}
 
-  Widget _buildTabButton(int index, String label, Color themeColor) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => _tabController.animateTo(index),
-        child: AnimatedBuilder(
-          animation: _tabController,
-          builder: (context, _) {
-            final isSelected = _tabController.index == index;
-            return Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: isSelected 
-                    ? themeColor.withValues(alpha: 0.12)
-                    : Colors.white.withValues(alpha: 0.04),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isSelected 
-                      ? themeColor.withValues(alpha: 0.3)
-                      : Colors.white.withValues(alpha: 0.08),
+/// Wrapper screen for Islamic sub-screens (Quran, Hadith, Dua)
+/// Provides proper background, SafeArea, and back navigation
+class _IslamicSubScreen extends StatelessWidget {
+  final String title;
+  final Widget child;
+  const _IslamicSubScreen({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    const creamBg = Color(0xFFFDF6EC);
+    const richBrown = Color(0xFF2C1810);
+    const warmBrown = Color(0xFF5C4033);
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: creamBg,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: creamBg,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: creamBg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Minimal back header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(
+                        Icons.arrow_back_rounded,
+                        color: richBrown.withOpacity(0.6),
+                        size: 22,
+                      ),
+                    ),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: richBrown.withOpacity(0.85),
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isSelected 
-                      ? Colors.white 
-                      : Colors.white.withValues(alpha: 0.5),
-                  fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                ),
-              ),
-            );
-          },
+              // Child screen
+              Expanded(child: child),
+            ],
+          ),
         ),
       ),
     );

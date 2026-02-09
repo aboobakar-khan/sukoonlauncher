@@ -2,13 +2,16 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+// ── Warm Reading Palette ──
+const Color _creamBg = Color(0xFFFDF6EC);
+const Color _warmSand = Color(0xFFF5E6C8);
+const Color _richBrown = Color(0xFF2C1810);
+const Color _warmBrown = Color(0xFF5C4033);
+const Color _goldAccent = Color(0xFFC2A366);
+const Color _islamicGreen = Color(0xFF2E7D32);
+
 /// Minimalist Duas Screen - 40 Essential Duas
-/// 
-/// Psychology principles applied:
-/// - Generous whitespace (reduces cognitive load)
-/// - Large, readable Arabic (focus on content)
-/// - Subtle animations (calming effect)
-/// - Progressive disclosure (tap to expand)
+/// Warm cream reading experience with generous typography
 class MinimalistDuasScreen extends StatefulWidget {
   const MinimalistDuasScreen({super.key});
 
@@ -93,23 +96,29 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            _buildHeader(),
-            
-            // Duas List
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-                itemCount: _duas.length,
-                itemBuilder: (context, index) => _buildDuaCard(index),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: _creamBg,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: _creamBg,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: _creamBg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _duas.length,
+                  itemBuilder: (context, index) => _buildDuaCard(index),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -117,69 +126,32 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(12, 12, 20, 8),
       child: Row(
         children: [
-          // Close button
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.close,
-                color: Colors.white.withValues(alpha: 0.5),
-                size: 20,
-              ),
-            ),
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: Icon(Icons.arrow_back, color: _richBrown.withOpacity(0.6), size: 22),
           ),
-          
-          const SizedBox(width: 16),
-          
-          // Title
+          const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '40 Duas',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  fontSize: 20,
-                  fontWeight: FontWeight.w400,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Essential supplications',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.35),
-                  fontSize: 12,
-                ),
-              ),
+              Text('40 Duas',
+                style: TextStyle(color: _richBrown.withOpacity(0.85), fontSize: 20, fontWeight: FontWeight.w500)),
+              Text('Essential supplications',
+                style: TextStyle(color: _warmBrown.withOpacity(0.4), fontSize: 12)),
             ],
           ),
-          
           const Spacer(),
-          
-          // Count badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFC2A366).withValues(alpha: 0.15),
+              color: _islamicGreen.withOpacity(0.08),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Text(
-              '${_duas.length}',
-              style: TextStyle(
-                color: const Color(0xFFC2A366).withValues(alpha: 0.9),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            child: Text('${_duas.length}',
+              style: TextStyle(color: _islamicGreen.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -193,93 +165,83 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
-        setState(() {
-          _expandedIndex = isExpanded ? null : index;
-        });
+        setState(() => _expandedIndex = isExpanded ? null : index);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(20),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: isExpanded 
-              ? Colors.white.withValues(alpha: 0.04)
-              : Colors.white.withValues(alpha: 0.02),
-          borderRadius: BorderRadius.circular(16),
+          color: isExpanded ? _warmSand.withOpacity(0.5) : _warmSand.withOpacity(0.25),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isExpanded 
-                ? const Color(0xFFC2A366).withValues(alpha: 0.15)
-                : Colors.white.withValues(alpha: 0.04),
+            color: isExpanded ? _goldAccent.withOpacity(0.2) : _warmSand.withOpacity(0.3),
           ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Category tag
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    dua['category']!.toUpperCase(),
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.35),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
+            // Category + number row
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _islamicGreen.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                const Spacer(),
-                Text(
-                  '#${index + 1}',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
+                child: Text(dua['category']!.toUpperCase(),
+                  style: TextStyle(color: _islamicGreen.withOpacity(0.5), fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.8)),
+              ),
+              const Spacer(),
+              Text('#${index + 1}',
+                style: TextStyle(color: _warmBrown.withOpacity(0.2), fontSize: 11)),
+            ]),
             
             const SizedBox(height: 16),
             
-            // Arabic
-            Text(
-              dua['arabic']!,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.85),
-                fontSize: isExpanded ? 24 : 20,
-                height: 1.8,
+            // Arabic in warm container
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: isExpanded ? 20 : 14),
+              decoration: BoxDecoration(
+                color: isExpanded ? Colors.white.withOpacity(0.6) : Colors.white.withOpacity(0.35),
+                borderRadius: BorderRadius.circular(10),
               ),
-              textDirection: ui.TextDirection.rtl,
-              textAlign: TextAlign.center,
+              child: Text(
+                dua['arabic']!,
+                style: TextStyle(
+                  color: _richBrown,
+                  fontSize: isExpanded ? 26 : 21,
+                  height: 1.9,
+                  fontFamily: 'Amiri',
+                ),
+                textDirection: ui.TextDirection.rtl,
+                textAlign: TextAlign.center,
+              ),
             ),
             
             // Expanded content
             if (isExpanded) ...[
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
               
-              // Divider
-              Container(
-                height: 1,
-                color: Colors.white.withValues(alpha: 0.05),
-              ),
+              // Ornamental divider
+              Center(child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Container(width: 30, height: 0.5, color: _goldAccent.withOpacity(0.2)),
+                const SizedBox(width: 8),
+                Text('✦', style: TextStyle(fontSize: 8, color: _goldAccent.withOpacity(0.3))),
+                const SizedBox(width: 8),
+                Container(width: 30, height: 0.5, color: _goldAccent.withOpacity(0.2)),
+              ])),
               
               const SizedBox(height: 16),
               
               // Transliteration
-              Text(
-                dua['transliteration']!,
+              Text(dua['transliteration']!,
                 style: TextStyle(
-                  color: const Color(0xFFC2A366).withValues(alpha: 0.7),
+                  color: _warmBrown.withOpacity(0.55),
                   fontSize: 14,
                   fontStyle: FontStyle.italic,
-                  height: 1.5,
+                  height: 1.6,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -287,74 +249,45 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
               const SizedBox(height: 12),
               
               // Translation
-              Text(
-                dua['translation']!,
+              Text(dua['translation']!,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 13,
-                  height: 1.6,
+                  color: _richBrown.withOpacity(0.7),
+                  fontSize: 14,
+                  height: 1.7,
                 ),
                 textAlign: TextAlign.center,
               ),
               
               const SizedBox(height: 16),
               
-              // Actions
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildActionButton(Icons.copy, 'Copy', () {
-                    Clipboard.setData(ClipboardData(text: '${dua['arabic']}\n\n${dua['transliteration']}\n\n${dua['translation']}'));
+              // Copy action — minimal
+              Center(
+                child: GestureDetector(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(
+                      text: '${dua['arabic']}\n\n${dua['transliteration']}\n\n${dua['translation']}'));
                     HapticFeedback.lightImpact();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Dua copied'),
-                        backgroundColor: const Color(0xFFC2A366).withValues(alpha: 0.9),
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
-                  }),
-                ],
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: const Text('Dua copied', style: TextStyle(color: Colors.white)),
+                      backgroundColor: _goldAccent,
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ));
+                  },
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.copy_rounded, color: _warmBrown.withOpacity(0.3), size: 14),
+                    const SizedBox(width: 6),
+                    Text('Copy', style: TextStyle(color: _warmBrown.withOpacity(0.4), fontSize: 12)),
+                  ]),
+                ),
               ),
             ] else ...[
               const SizedBox(height: 8),
-              
-              // Hint
-              Text(
-                'tap to read',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  fontSize: 10,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              Text('tap to read',
+                style: TextStyle(color: _warmBrown.withOpacity(0.15), fontSize: 10),
+                textAlign: TextAlign.center),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton(IconData icon, String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: Colors.white.withValues(alpha: 0.4), size: 14),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
-                fontSize: 11,
-              ),
-            ),
           ],
         ),
       ),

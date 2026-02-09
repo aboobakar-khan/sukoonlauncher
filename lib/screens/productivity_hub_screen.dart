@@ -8,8 +8,10 @@ import '../providers/theme_provider.dart';
 import '../providers/installed_apps_provider.dart';
 import '../models/installed_app.dart';
 import '../providers/premium_provider.dart';
+import '../providers/camel_coin_provider.dart';
 import '../models/productivity_models.dart';
 import '../providers/ambient_sound_provider.dart';
+import '../services/native_app_blocker_service.dart';
 import 'premium_paywall_screen.dart';
 
 // ─── Camel Design Tokens ────────────────────────────────────────────────────
@@ -37,17 +39,51 @@ class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _startPomodoroTicker();
   }
 
   void _startPomodoroTicker() {
     _pomodoroTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       final pomo = ref.read(pomodoroProvider);
-      if (pomo.state != PomodoroState.idle) {
+      if (pomo.state != PomodoroState.idle && pomo.state != PomodoroState.paused) {
         ref.read(pomodoroProvider.notifier).tick();
       }
+      // Issue 7: Auto-manage ambient sound based on timer state
+      _syncAmbientSound(pomo.state);
     });
+  }
+
+  PomodoroState? _lastPomodoroState;
+
+  /// Sync ambient sound with pomodoro timer state
+  void _syncAmbientSound(PomodoroState currentState) {
+    if (_lastPomodoroState == currentState) return;
+    final prev = _lastPomodoroState;
+    _lastPomodoroState = currentState;
+
+    final ambient = ref.read(ambientSoundProvider);
+    final ambientNotifier = ref.read(ambientSoundProvider.notifier);
+
+    // Timer started running → auto-play sound (even first time with default)
+    if ((currentState == PomodoroState.focusing ||
+         currentState == PomodoroState.shortBreak ||
+         currentState == PomodoroState.longBreak) &&
+        (prev == PomodoroState.paused || prev == PomodoroState.idle)) {
+      if (!ambient.isPlaying) {
+        // If user has a sound selected, play it; otherwise auto-pick 'rain' as default
+        final soundId = ambient.currentSoundId ?? 'rain';
+        ambientNotifier.selectAndPlay(soundId);
+      }
+    }
+    // Timer paused → pause sound
+    else if (currentState == PomodoroState.paused && ambient.isPlaying) {
+      ambientNotifier.togglePlayPause();
+    }
+    // Timer stopped/reset → stop sound completely
+    else if (currentState == PomodoroState.idle && prev != null && prev != PomodoroState.idle) {
+      ambientNotifier.stop();
+    }
   }
 
   @override
@@ -64,16 +100,18 @@ class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen>
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
-        child: TabBarView(
-          controller: _tabController,
-          physics: const NeverScrollableScrollPhysics(),
-          children: [
-            _TodoTab(),
-            _PomodoroTab(),
-            _DoubtsTab(),
-            _EventsTab(),
-            _BlockerTab(),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: TabBarView(
+            controller: _tabController,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _PomodoroTab(),
+              _TodoTab(),
+              _DoubtsTab(),
+              _BlockerTab(),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: _buildBottomTabBar(themeColor.color),
@@ -82,27 +120,26 @@ class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen>
 
   Widget _buildBottomTabBar(Color accent) {
     final icons = [
-      Icons.check_circle_outline,
       Icons.timer_outlined,
+      Icons.check_circle_outline,
       Icons.help_outline,
-      Icons.event_outlined,
       Icons.shield_outlined,
     ];
-    final labels = ['Todo', 'Focus', 'Doubts', 'Events', 'Block'];
+    final labels = ['Focus', 'Tasks', 'Doubts', 'Block'];
 
     return AnimatedBuilder(
       animation: _tabController,
       builder: (ctx, _) {
         return Container(
-          padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+          padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.85),
-            border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+            color: Colors.black.withValues(alpha: 0.9),
+            border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
           ),
           child: SafeArea(
             top: false,
             child: Row(
-              children: List.generate(5, (i) {
+              children: List.generate(4, (i) {
                 final selected = _tabController.index == i;
                 return Expanded(
                   child: GestureDetector(
@@ -113,34 +150,36 @@ class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen>
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? accent.withValues(alpha: 0.12)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            icons[i],
-                            size: 22,
-                            color: selected
-                                ? accent
-                                : Colors.white.withValues(alpha: 0.35),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            labels[i],
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              icons[i],
+                              size: selected ? 26 : 22,
                               color: selected
-                                  ? Colors.white
-                                  : Colors.white.withValues(alpha: 0.35),
+                                  ? _sandGold
+                                  : Colors.white.withValues(alpha: 0.30),
                             ),
+                          ),
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 200),
+                            child: selected
+                                ? Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text(
+                                      labels[i],
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: _sandGold,
+                                      ),
+                                    ),
+                                  )
+                                : const SizedBox(height: 4),
                           ),
                         ],
                       ),
@@ -171,12 +210,35 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
   @override
   Widget build(BuildContext context) {
     final todos = ref.watch(todoProvider);
+    final events = ref.watch(productivityEventProvider);
     final filtered = _filter == 'all'
         ? todos
         : _filter == 'active'
             ? todos.where((t) => !t.isCompleted).toList()
             : todos.where((t) => t.isCompleted).toList();
     final pending = todos.where((t) => !t.isCompleted).length;
+
+    // Events: show today's + upcoming (only in 'all' or 'active' filter)
+    final now = DateTime.now();
+    final todayEvents = (_filter != 'done')
+        ? events.where((e) {
+            final d = e.startTime;
+            return d.year == now.year && d.month == now.month && d.day == now.day;
+          }).toList()
+        : <ProductivityEvent>[];
+    final upcomingEvents = (_filter != 'done')
+        ? events
+            .where((e) => e.startTime.isAfter(now) &&
+                !(e.startTime.year == now.year &&
+                    e.startTime.month == now.month &&
+                    e.startTime.day == now.day))
+            .take(3)
+            .toList()
+        : <ProductivityEvent>[];
+
+    // Build a unified list: today events → todos → upcoming events
+    final hasEvents = todayEvents.isNotEmpty || upcomingEvents.isNotEmpty;
+    final isEmpty = filtered.isEmpty && !hasEvents;
 
     return Column(
       children: [
@@ -201,9 +263,9 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
             ],
           ),
         ),
-        // Todo list
+        // Unified list
         Expanded(
-          child: filtered.isEmpty
+          child: isEmpty
               ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -222,24 +284,211 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                     ],
                   ),
                 )
-              : ListView.builder(
+              : ListView(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  itemCount: filtered.length,
-                  itemBuilder: (ctx, i) => _todoTile(filtered[i]),
+                  children: [
+                    // Today's events
+                    if (todayEvents.isNotEmpty) ...[
+                      _sectionLabel('Today\'s Events'),
+                      ...todayEvents.map((e) => _inlineEventTile(e)),
+                      const SizedBox(height: 8),
+                    ],
+                    // Todos
+                    ...filtered.map((t) => _todoTile(t)),
+                    // Upcoming events
+                    if (upcomingEvents.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _sectionLabel('Upcoming'),
+                      ...upcomingEvents.map((e) => _inlineEventTile(e)),
+                    ],
+                  ],
                 ),
         ),
-        // Add button
+        // Add buttons row — task + event
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: _AddButton(
-            label: 'Add Task',
-            icon: Icons.add,
-            onTap: () => _showAddTodo(context),
+          child: Row(
+            children: [
+              Expanded(
+                child: _AddButton(
+                  label: 'Add Task',
+                  icon: Icons.add,
+                  onTap: () => _showAddTodo(context),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => _showAddEvent(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: _sandGold.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _sandGold.withValues(alpha: 0.15)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.event_outlined,
+                          size: 16, color: _sandGold.withValues(alpha: 0.7)),
+                      const SizedBox(width: 6),
+                      Text('Event',
+                          style: TextStyle(
+                            color: _sandGold.withValues(alpha: 0.7),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          )),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
     );
+  }
+
+  Widget _sectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6, top: 2),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.35),
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+
+  Widget _inlineEventTile(ProductivityEvent event) {
+    final color = Color(int.parse('FF${event.color}', radix: 16));
+    String timeText;
+    if (event.isAllDay) {
+      timeText = 'All day';
+    } else if (event.endTime != null) {
+      timeText = '${DateFormat('h:mm a').format(event.startTime)} — ${DateFormat('h:mm a').format(event.endTime!)}';
+    } else if (event.startTime.hour == 9 && event.startTime.minute == 0) {
+      timeText = DateFormat('MMM d').format(event.startTime);
+    } else {
+      timeText = DateFormat('h:mm a').format(event.startTime);
+    }
+
+    return GestureDetector(
+      onLongPress: () => _showEventOptions(event),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.12)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 3, height: 28,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(event.title,
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 13, fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 2),
+                  Text(timeText,
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          fontSize: 11)),
+                ],
+              ),
+            ),
+            Icon(Icons.event_outlined, size: 14,
+                color: color.withValues(alpha: 0.4)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEventOptions(ProductivityEvent event) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.add_task, color: _sandGold),
+              title: const Text('Create Todo from Event',
+                  style: TextStyle(color: Colors.white)),
+              onTap: () {
+                ref.read(todoProvider.notifier).addTodo(
+                      title: event.title,
+                      dueDate: event.startTime,
+                      linkedEventId: event.id,
+                    );
+                Navigator.pop(ctx);
+                HapticFeedback.lightImpact();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.shield_outlined,
+                  color: _desertSunset),
+              title: const Text('Block apps during event',
+                  style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _createBlockRuleForEvent(event);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_outline,
+                  color: Colors.red.withValues(alpha: 0.6)),
+              title: Text('Delete',
+                  style: TextStyle(
+                      color: Colors.red.withValues(alpha: 0.7))),
+              onTap: () {
+                ref
+                    .read(productivityEventProvider.notifier)
+                    .deleteEvent(event.id);
+                Navigator.pop(ctx);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _createBlockRuleForEvent(ProductivityEvent event) {
+    final endHour = event.endTime?.hour ?? (event.startTime.hour + 1);
+    final endMinute = event.endTime?.minute ?? event.startTime.minute;
+    ref.read(appBlockRuleProvider.notifier).addRule(
+          name: '${event.title} block',
+          isTimeBased: true,
+          startHour: event.startTime.hour,
+          startMinute: event.startTime.minute,
+          endHour: endHour,
+          endMinute: endMinute,
+          activeDays: [event.startTime.weekday],
+          linkedEventId: event.id,
+        );
   }
 
   Widget _filterChip(String label) {
@@ -619,23 +868,234 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
       ),
     );
   }
+
+  void _showAddEvent(BuildContext context) {
+    final titleCtrl = TextEditingController();
+    DateTime selectedDate = DateTime.now().add(const Duration(hours: 1));
+    TimeOfDay? selectedStartTime;
+    TimeOfDay? selectedEndTime;
+    bool isAllDay = false;
+    bool hasSpecificTime = false;
+    String selectedColor = 'C2A366';
+
+    final colorOptions = {
+      'C2A366': _sandGold,
+      'A67B5B': _camelBrown,
+      '7BAE6E': _oasisGreen,
+      'E8915A': _desertSunset,
+    };
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setBS) => Container(
+          padding: EdgeInsets.fromLTRB(
+              20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('New Event',
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: titleCtrl,
+                  autofocus: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Event title',
+                    hintStyle:
+                        TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.06),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Date picker
+                GestureDetector(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: ctx,
+                      initialDate: selectedDate,
+                      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (date != null) setBS(() => selectedDate = date);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_today, size: 16, color: _sandGold.withValues(alpha: 0.7)),
+                        const SizedBox(width: 10),
+                        Text(DateFormat('EEE, MMM d').format(selectedDate),
+                            style: const TextStyle(color: Colors.white, fontSize: 13)),
+                        const Spacer(),
+                        Icon(Icons.chevron_right, size: 16, color: Colors.white.withValues(alpha: 0.3)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // All day
+                Row(
+                  children: [
+                    Text('All day', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                    const Spacer(),
+                    Switch(value: isAllDay, onChanged: (v) => setBS(() { isAllDay = v; if (v) hasSpecificTime = false; }), activeColor: _sandGold),
+                  ],
+                ),
+                if (!isAllDay) ...[
+                  Row(
+                    children: [
+                      Text('Set time', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                      const Spacer(),
+                      Switch(value: hasSpecificTime, onChanged: (v) => setBS(() { hasSpecificTime = v; if (v && selectedStartTime == null) selectedStartTime = TimeOfDay.fromDateTime(DateTime.now().add(const Duration(hours: 1))); }), activeColor: _sandGold),
+                    ],
+                  ),
+                  if (hasSpecificTime) ...[
+                    GestureDetector(
+                      onTap: () async {
+                        final time = await showTimePicker(context: ctx, initialTime: selectedStartTime ?? TimeOfDay.now());
+                        if (time != null) setBS(() => selectedStartTime = time);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
+                        child: Row(children: [
+                          Text('Start', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+                          const Spacer(),
+                          Text(selectedStartTime?.format(ctx) ?? 'Set', style: const TextStyle(color: Colors.white, fontSize: 13)),
+                        ]),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () async {
+                        final time = await showTimePicker(context: ctx, initialTime: selectedEndTime ?? TimeOfDay(hour: (selectedStartTime?.hour ?? TimeOfDay.now().hour) + 1, minute: selectedStartTime?.minute ?? 0));
+                        if (time != null) setBS(() => selectedEndTime = time);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(10)),
+                        child: Row(children: [
+                          Text('End (optional)', style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 12)),
+                          const Spacer(),
+                          Text(selectedEndTime?.format(ctx) ?? '—', style: TextStyle(color: selectedEndTime != null ? Colors.white : Colors.white.withValues(alpha: 0.3), fontSize: 13)),
+                        ]),
+                      ),
+                    ),
+                  ],
+                ],
+                const SizedBox(height: 8),
+                // Color
+                Row(
+                  children: [
+                    Text('Color', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+                    const SizedBox(width: 12),
+                    ...colorOptions.entries.map((e) => GestureDetector(
+                          onTap: () => setBS(() => selectedColor = e.key),
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 8), width: 24, height: 24,
+                            decoration: BoxDecoration(color: e.value, shape: BoxShape.circle,
+                              border: selectedColor == e.key ? Border.all(color: Colors.white, width: 2) : null),
+                          ),
+                        )),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (titleCtrl.text.trim().isEmpty) return;
+                      DateTime finalStart;
+                      DateTime? finalEnd;
+                      if (isAllDay) {
+                        finalStart = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+                      } else if (hasSpecificTime && selectedStartTime != null) {
+                        finalStart = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, selectedStartTime!.hour, selectedStartTime!.minute);
+                        if (selectedEndTime != null) {
+                          finalEnd = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, selectedEndTime!.hour, selectedEndTime!.minute);
+                        }
+                      } else {
+                        finalStart = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 9, 0);
+                      }
+                      ref.read(productivityEventProvider.notifier).addEvent(
+                            title: titleCtrl.text.trim(),
+                            startTime: finalStart,
+                            endTime: finalEnd,
+                            color: selectedColor,
+                            isAllDay: isAllDay,
+                          );
+                      Navigator.pop(ctx);
+                      HapticFeedback.lightImpact();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _sandGold.withValues(alpha: 0.2),
+                      foregroundColor: _sandGold,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Create Event'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🍅 POMODORO TAB
 // ═══════════════════════════════════════════════════════════════════════════════
 
-class _PomodoroTab extends ConsumerWidget {
+class _PomodoroTab extends ConsumerStatefulWidget {
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_PomodoroTab> createState() => _PomodoroTabState();
+}
+
+class _PomodoroTabState extends ConsumerState<_PomodoroTab> {
+  int _prevSessionCount = 0;
+
+  @override
+  Widget build(BuildContext context) {
     final pomo = ref.watch(pomodoroProvider);
     final todos = ref.watch(todoProvider).where((t) => !t.isCompleted).toList();
+
+    // 🪙 Award Camel Coins when a focus session completes (session count increases)
+    if (pomo.completedSessions > _prevSessionCount) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(camelCoinProvider.notifier).awardPomodoroComplete();
+        setState(() => _prevSessionCount = pomo.completedSessions);
+      });
+    }
 
     final stateColors = {
       PomodoroState.idle: Colors.white.withValues(alpha: 0.5),
       PomodoroState.focusing: _desertSunset,
       PomodoroState.shortBreak: _oasisGreen,
       PomodoroState.longBreak: _sandGold,
+      PomodoroState.paused: Colors.white.withValues(alpha: 0.4),
     };
 
     final stateLabels = {
@@ -643,6 +1103,7 @@ class _PomodoroTab extends ConsumerWidget {
       PomodoroState.focusing: 'Stay Focused 🐪',
       PomodoroState.shortBreak: 'Short Break',
       PomodoroState.longBreak: 'Long Break',
+      PomodoroState.paused: 'Paused',
     };
 
     final accent = stateColors[pomo.state]!;
@@ -651,8 +1112,68 @@ class _PomodoroTab extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
-          const Spacer(flex: 2),
-          // Timer Ring
+          const Spacer(flex: 1),
+
+          // ── Preset chips (only when idle) ──
+          if (pomo.state == PomodoroState.idle) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _PresetChip(
+                  label: '25 / 5',
+                  subtitle: 'Classic',
+                  isSelected: pomo.settings.focusMinutes == 25 && pomo.settings.shortBreakMinutes == 5,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    ref.read(pomodoroProvider.notifier).updateSettings(
+                      PomodoroSettings(focusMinutes: 25, shortBreakMinutes: 5, longBreakMinutes: 15, sessionsBeforeLongBreak: pomo.settings.sessionsBeforeLongBreak),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+                _PresetChip(
+                  label: '50 / 10',
+                  subtitle: 'Extended',
+                  isSelected: pomo.settings.focusMinutes == 50 && pomo.settings.shortBreakMinutes == 10,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    ref.read(pomodoroProvider.notifier).updateSettings(
+                      PomodoroSettings(focusMinutes: 50, shortBreakMinutes: 10, longBreakMinutes: 20, sessionsBeforeLongBreak: pomo.settings.sessionsBeforeLongBreak),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+                _PresetChip(
+                  label: '90',
+                  subtitle: 'Deep',
+                  isSelected: pomo.settings.focusMinutes == 90,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    ref.read(pomodoroProvider.notifier).updateSettings(
+                      PomodoroSettings(focusMinutes: 90, shortBreakMinutes: 15, longBreakMinutes: 30, sessionsBeforeLongBreak: 2),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+                // Custom — opens settings
+                GestureDetector(
+                  onTap: () => _showPomodoroSettings(context, ref, pomo.settings),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                    ),
+                    child: Icon(Icons.tune_rounded, size: 16, color: Colors.white.withValues(alpha: 0.35)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // ── Timer Ring ──
           SizedBox(
             width: 220,
             height: 220,
@@ -739,37 +1260,18 @@ class _PomodoroTab extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (pomo.state != PomodoroState.idle) ...[
+              // When paused: show Resume + Break
+              if (pomo.state == PomodoroState.paused) ...[
                 _CircleButton(
-                  icon: Icons.stop_rounded,
-                  color: Colors.white.withValues(alpha: 0.2),
+                  icon: Icons.play_arrow_rounded,
+                  color: _desertSunset.withValues(alpha: 0.2),
+                  size: 64,
+                  iconSize: 32,
                   onTap: () {
                     HapticFeedback.mediumImpact();
-                    ref.read(pomodoroProvider.notifier).reset();
+                    ref.read(pomodoroProvider.notifier).resume();
                   },
                 ),
-                const SizedBox(width: 24),
-              ],
-              _CircleButton(
-                icon: pomo.state == PomodoroState.idle
-                    ? Icons.play_arrow_rounded
-                    : Icons.pause_rounded,
-                color: accent.withValues(alpha: 0.2),
-                size: 64,
-                iconSize: 32,
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  if (pomo.state == PomodoroState.idle) {
-                    ref
-                        .read(pomodoroProvider.notifier)
-                        .startFocus(todoId: pomo.activeTodoId);
-                  } else {
-                    ref.read(pomodoroProvider.notifier).pause();
-                  }
-                },
-              ),
-              if (pomo.state == PomodoroState.idle &&
-                  pomo.completedSessions > 0) ...[
                 const SizedBox(width: 24),
                 _CircleButton(
                   icon: Icons.coffee_rounded,
@@ -779,6 +1281,53 @@ class _PomodoroTab extends ConsumerWidget {
                     ref.read(pomodoroProvider.notifier).startBreak();
                   },
                 ),
+              ]
+              // When running: show Stop + Pause
+              else if (pomo.state != PomodoroState.idle) ...[
+                _CircleButton(
+                  icon: Icons.stop_rounded,
+                  color: Colors.white.withValues(alpha: 0.2),
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    ref.read(pomodoroProvider.notifier).reset();
+                  },
+                ),
+                const SizedBox(width: 24),
+                _CircleButton(
+                  icon: Icons.pause_rounded,
+                  color: accent.withValues(alpha: 0.2),
+                  size: 64,
+                  iconSize: 32,
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    ref.read(pomodoroProvider.notifier).pause();
+                  },
+                ),
+              ]
+              // When idle: show Play (+ Break if sessions > 0)
+              else ...[
+                _CircleButton(
+                  icon: Icons.play_arrow_rounded,
+                  color: accent.withValues(alpha: 0.2),
+                  size: 64,
+                  iconSize: 32,
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    ref.read(pomodoroProvider.notifier)
+                        .startFocus(todoId: pomo.activeTodoId);
+                  },
+                ),
+                if (pomo.completedSessions > 0) ...[
+                  const SizedBox(width: 24),
+                  _CircleButton(
+                    icon: Icons.coffee_rounded,
+                    color: _oasisGreen.withValues(alpha: 0.2),
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      ref.read(pomodoroProvider.notifier).startBreak();
+                    },
+                  ),
+                ],
               ],
             ],
           ),
@@ -792,23 +1341,33 @@ class _PomodoroTab extends ConsumerWidget {
                 ref.read(pomodoroProvider.notifier).startFocus(todoId: id);
               },
             ),
-          const SizedBox(height: 8),
-          // Settings
-          GestureDetector(
-            onTap: () => _showPomodoroSettings(context, ref, pomo.settings),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.tune, size: 14,
-                    color: Colors.white.withValues(alpha: 0.3)),
-                const SizedBox(width: 4),
-                Text('Settings',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.3))),
-              ],
+          // Sound quick-toggle (only when idle or focusing)
+          if (pomo.state == PomodoroState.idle || pomo.state == PomodoroState.focusing || pomo.state == PomodoroState.paused)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Consumer(
+                builder: (ctx, sRef, _) {
+                  final sound = sRef.watch(ambientSoundProvider);
+                  final currentSound = sound.currentSoundId != null
+                      ? ambientSounds.firstWhere((s) => s.id == sound.currentSoundId, orElse: () => ambientSounds.first)
+                      : null;
+                  return GestureDetector(
+                    onTap: () => _showPomodoroSettings(context, ref, pomo.settings),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          sound.isPlaying ? '${currentSound?.emoji ?? '🎵'} ${currentSound?.name ?? 'Sound'}' : '🔇 No sound',
+                          style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.3)),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.chevron_right_rounded, size: 14, color: Colors.white.withValues(alpha: 0.2)),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
           const SizedBox(height: 16),
         ],
       ),
@@ -830,8 +1389,14 @@ class _PomodoroTab extends ConsumerWidget {
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setBS) => Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -989,6 +1554,7 @@ class _PomodoroTab extends ConsumerWidget {
                 ),
               ),
             ],
+          ),
           ),
         ),
       ),
@@ -1372,9 +1938,62 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                         );
                     Navigator.pop(ctx);
                     HapticFeedback.lightImpact();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Todo created from doubt')),
-                    );
+                    // Brief non-blocking overlay instead of sticky snackbar
+                    if (context.mounted) {
+                      final overlay = Overlay.of(context);
+                      final entry = OverlayEntry(
+                        builder: (context) => Positioned(
+                          top: MediaQuery.of(context).padding.top + 60,
+                          left: 40,
+                          right: 40,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: TweenAnimationBuilder<double>(
+                              tween: Tween(begin: 0.0, end: 1.0),
+                              duration: const Duration(milliseconds: 300),
+                              builder: (context, value, child) => Opacity(
+                                opacity: value,
+                                child: Transform.translate(
+                                  offset: Offset(0, -10 * (1 - value)),
+                                  child: child,
+                                ),
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1A2332),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: _sandGold.withValues(alpha: 0.2)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.3),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.check_circle_outline,
+                                        color: _oasisGreen, size: 18),
+                                    const SizedBox(width: 8),
+                                    const Text('Todo created ✓',
+                                        style: TextStyle(color: Colors.white,
+                                            fontSize: 13, fontWeight: FontWeight.w500)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                      overlay.insert(entry);
+                      Future.delayed(const Duration(milliseconds: 1500), () {
+                        entry.remove();
+                      });
+                    }
                   },
                   child: Container(
                     padding: const EdgeInsets.all(12),
@@ -2592,14 +3211,22 @@ class _BlockerTab extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 10),
-            // Confirm deactivate button (subtle)
+            // Confirm deactivate button → 100-tap confirmation
             SizedBox(
               width: double.infinity,
               child: GestureDetector(
                 onTap: () {
                   HapticFeedback.mediumImpact();
-                  ref.read(appBlockRuleProvider.notifier).toggleRule(rule.id);
                   Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => _DeactivateRuleConfirmScreen(
+                        ruleId: rule.id,
+                        ruleName: rule.name,
+                      ),
+                    ),
+                  );
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -3076,8 +3703,35 @@ class _BlockerTab extends ConsumerWidget {
     );
   }
 
-  // ── Task 6: Show block type chooser first ──
-  void _showAddRule(BuildContext context, WidgetRef ref) {
+  // ── Task 6: Show block type chooser — checks permissions first ──
+  void _showAddRule(BuildContext context, WidgetRef ref) async {
+    // Check if all required permissions are granted
+    final hasUsage = await NativeAppBlockerService.hasUsageStatsPermission();
+    final hasNotif = await NativeAppBlockerService.hasNotificationPermission();
+
+    if (!hasUsage || !hasNotif) {
+      // Show permission setup flow
+      if (context.mounted) {
+        final granted = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => _BlockerPermissionScreen(
+              hasUsageStats: hasUsage,
+              hasNotification: hasNotif,
+            ),
+          ),
+        );
+        if (granted != true) return; // User cancelled
+      } else {
+        return;
+      }
+    }
+
+    if (!context.mounted) return;
+    _showAddRuleChooser(context, ref);
+  }
+
+  void _showAddRuleChooser(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -3097,32 +3751,32 @@ class _BlockerTab extends ConsumerWidget {
                     fontSize: 18,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
-            Text('Choose block type',
+            Text('Choose how to set up your blocker',
                 style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.35),
                     fontSize: 13)),
             const SizedBox(height: 20),
-            // Option A: Block Now
+            // Option A: Custom Block (unified)
             _BlockTypeOption(
-              icon: Icons.flash_on_rounded,
+              icon: Icons.tune_rounded,
               color: _desertSunset,
-              title: 'Block Now',
-              subtitle: 'Instantly block apps for a set duration',
+              title: 'Custom Block',
+              subtitle: 'Pick apps and choose your schedule',
               onTap: () {
                 Navigator.pop(ctx);
-                _showQuickBlockSheet(context, ref);
+                _showUnifiedBlockSheet(context, ref);
               },
             ),
             const SizedBox(height: 10),
-            // Option B: Scheduled Block
+            // Option B: Smart Packs
             _BlockTypeOption(
-              icon: Icons.schedule_rounded,
-              color: _sandGold,
-              title: 'Scheduled Block',
-              subtitle: 'Block apps during specific time windows',
+              icon: Icons.inventory_2_rounded,
+              color: _oasisGreen,
+              title: 'Smart Packs',
+              subtitle: 'Pre-built packs — social media, games & more',
               onTap: () {
                 Navigator.pop(ctx);
-                _showScheduledBlockSheet(context, ref);
+                _showSmartPackSheet(context, ref);
               },
             ),
             const SizedBox(height: 8),
@@ -3132,12 +3786,15 @@ class _BlockerTab extends ConsumerWidget {
     );
   }
 
-  // ── Quick Block (Block Now for X minutes) ──
-  void _showQuickBlockSheet(BuildContext context, WidgetRef ref) {
-    final nameCtrl = TextEditingController(text: 'Quick Focus');
-    int durationMinutes = 30;
-    int breakDifficulty = 0; // 0 = Easy, 1 = Hard
+  // ── Unified Block Sheet (replaces Block Now + Scheduled Block) ──
+  void _showUnifiedBlockSheet(BuildContext context, WidgetRef ref) {
+    final nameCtrl = TextEditingController();
     Set<String> selectedApps = {};
+    int scheduleMode = 0; // 0=Always, 1=Duration, 2=Time Window
+    int durationMinutes = 30;
+    int startH = 9, startM = 0, endH = 17, endM = 0;
+    Set<int> activeDays = {1, 2, 3, 4, 5};
+    int breakDifficulty = 0;
     final durations = [15, 30, 45, 60, 90, 120];
 
     showModalBottomSheet(
@@ -3149,7 +3806,7 @@ class _BlockerTab extends ConsumerWidget {
           padding: EdgeInsets.fromLTRB(
               20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
           constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+              maxHeight: MediaQuery.of(ctx).size.height * 0.88),
           decoration: const BoxDecoration(
             color: Color(0xFF1A1A1A),
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -3160,172 +3817,19 @@ class _BlockerTab extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(children: [
-                  Icon(Icons.flash_on_rounded,
+                  Icon(Icons.tune_rounded,
                       color: _desertSunset.withValues(alpha: 0.7), size: 20),
                   const SizedBox(width: 8),
-                  Text('Block Now',
+                  Text('Custom Block',
                       style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.9),
                           fontSize: 18,
                           fontWeight: FontWeight.w600)),
                 ]),
                 const SizedBox(height: 16),
+                // Rule name
                 TextField(
                   controller: nameCtrl,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Rule name',
-                    hintStyle:
-                        TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-                    filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.06),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Duration selector
-                Text('Duration',
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
-                        fontSize: 13)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: durations.map((d) {
-                    final isSelected = durationMinutes == d;
-                    final label =
-                        d >= 60 ? '${d ~/ 60}h${d % 60 > 0 ? " ${d % 60}m" : ""}' : '${d}m';
-                    return GestureDetector(
-                      onTap: () => setBS(() => durationMinutes = d),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? _desertSunset.withValues(alpha: 0.15)
-                              : Colors.white.withValues(alpha: 0.04),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: isSelected
-                                  ? _desertSunset.withValues(alpha: 0.4)
-                                  : Colors.white.withValues(alpha: 0.06)),
-                        ),
-                        child: Text(label,
-                            style: TextStyle(
-                                color: isSelected
-                                    ? _desertSunset
-                                    : Colors.white.withValues(alpha: 0.5),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500)),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 16),
-                // Add Apps button
-                _buildAddAppsButton(ctx, ref, selectedApps, setBS),
-                const SizedBox(height: 16),
-                // Break difficulty
-                _buildBreakDifficultySelector(ref, breakDifficulty, (v) => setBS(() => breakDifficulty = v), ctx),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      if (selectedApps.isEmpty) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                          content: const Text('Please add at least one app to block'),
-                          backgroundColor: Colors.red.withValues(alpha: 0.8),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ));
-                        return;
-                      }
-                      final now = DateTime.now();
-                      final endTime = now.add(Duration(minutes: durationMinutes));
-                      final newRule = await ref.read(appBlockRuleProvider.notifier).addRule(
-                            name: nameCtrl.text.trim().isEmpty
-                                ? 'Quick Focus'
-                                : nameCtrl.text.trim(),
-                            blockedPackages: selectedApps.toList(),
-                            isTimeBased: true,
-                            startHour: now.hour,
-                            startMinute: now.minute,
-                            endHour: endTime.hour,
-                            endMinute: endTime.minute,
-                            activeDays: [now.weekday],
-                            isHardBlock: breakDifficulty == 1,
-                            allowBreaks: breakDifficulty == 0,
-                          );
-                      Navigator.pop(ctx);
-                      HapticFeedback.lightImpact();
-                      if (context.mounted) {
-                        _showRuleInfoSheet(context, ref, newRule);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _desertSunset.withValues(alpha: 0.2),
-                      foregroundColor: _desertSunset,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: Text('Start Blocking · ${durationMinutes}min'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Scheduled Block (time-duration based) ──
-  void _showScheduledBlockSheet(BuildContext context, WidgetRef ref) {
-    final nameCtrl = TextEditingController();
-    int startH = 9, startM = 0, endH = 17, endM = 0;
-    Set<int> activeDays = {1, 2, 3, 4, 5}; // Mon-Fri
-    Set<String> selectedApps = {};
-    int breakDifficulty = 0; // 0 = Easy, 1 = Hard
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setBS) => Container(
-          padding: EdgeInsets.fromLTRB(
-              20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
-          constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(ctx).size.height * 0.85),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Icon(Icons.schedule_rounded,
-                      color: _sandGold.withValues(alpha: 0.7), size: 20),
-                  const SizedBox(width: 8),
-                  Text('Scheduled Block',
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600)),
-                ]),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: nameCtrl,
-                  autofocus: true,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'Rule name (e.g. Study Focus)',
@@ -3339,28 +3843,71 @@ class _BlockerTab extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Time picker row
+                // Add Apps
+                _buildAddAppsButton(ctx, ref, selectedApps, setBS),
+                const SizedBox(height: 16),
+
+                // Schedule mode selector
                 Text('Schedule',
                     style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 13)),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
+                Row(children: [
+                  _buildScheduleChip("Always On", 0, scheduleMode, _desertSunset, (v) => setBS(() => scheduleMode = v)),
+                  const SizedBox(width: 8),
+                  _buildScheduleChip("Duration", 1, scheduleMode, _desertSunset, (v) => setBS(() => scheduleMode = v)),
+                  const SizedBox(width: 8),
+                  _buildScheduleChip("Time Window", 2, scheduleMode, _desertSunset, (v) => setBS(() => scheduleMode = v)),
+                ]),
+
+                // Duration picker (mode 1)
+                if (scheduleMode == 1) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: durations.map((d) {
+                      final isSelected = durationMinutes == d;
+                      final label = d >= 60 ? '${d ~/ 60}h${d % 60 > 0 ? " ${d % 60}m" : ""}' : '${d}m';
+                      return GestureDetector(
+                        onTap: () => setBS(() => durationMinutes = d),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? _desertSunset.withValues(alpha: 0.15)
+                                : Colors.white.withValues(alpha: 0.04),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: isSelected
+                                    ? _desertSunset.withValues(alpha: 0.4)
+                                    : Colors.white.withValues(alpha: 0.06)),
+                          ),
+                          child: Text(label,
+                              style: TextStyle(
+                                  color: isSelected
+                                      ? _desertSunset
+                                      : Colors.white.withValues(alpha: 0.5),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500)),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+
+                // Time window picker (mode 2)
+                if (scheduleMode == 2) ...[
+                  const SizedBox(height: 12),
+                  Row(children: [
                     Expanded(
                       child: GestureDetector(
                         onTap: () async {
                           final time = await showTimePicker(
-                            context: ctx,
-                            initialTime:
-                                TimeOfDay(hour: startH, minute: startM),
-                          );
-                          if (time != null) {
-                            setBS(() {
-                              startH = time.hour;
-                              startM = time.minute;
-                            });
-                          }
+                              context: ctx, initialTime: TimeOfDay(hour: startH, minute: startM));
+                          if (time != null) setBS(() { startH = time.hour; startM = time.minute; });
                         },
                         child: Container(
                           padding: const EdgeInsets.all(12),
@@ -3368,12 +3915,9 @@ class _BlockerTab extends ConsumerWidget {
                             color: Colors.white.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Text(
-                            'Start: ${_formatHour(startH, startM)}',
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 13),
-                            textAlign: TextAlign.center,
-                          ),
+                          child: Text('Start: ${_formatHour(startH, startM)}',
+                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                              textAlign: TextAlign.center),
                         ),
                       ),
                     ),
@@ -3382,16 +3926,8 @@ class _BlockerTab extends ConsumerWidget {
                       child: GestureDetector(
                         onTap: () async {
                           final time = await showTimePicker(
-                            context: ctx,
-                            initialTime:
-                                TimeOfDay(hour: endH, minute: endM),
-                          );
-                          if (time != null) {
-                            setBS(() {
-                              endH = time.hour;
-                              endM = time.minute;
-                            });
-                          }
+                              context: ctx, initialTime: TimeOfDay(hour: endH, minute: endM));
+                          if (time != null) setBS(() { endH = time.hour; endM = time.minute; });
                         },
                         child: Container(
                           padding: const EdgeInsets.all(12),
@@ -3399,69 +3935,62 @@ class _BlockerTab extends ConsumerWidget {
                             color: Colors.white.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Text(
-                            'End: ${_formatHour(endH, endM)}',
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 13),
-                            textAlign: TextAlign.center,
-                          ),
+                          child: Text('End: ${_formatHour(endH, endM)}',
+                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                              textAlign: TextAlign.center),
                         ),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Day selector
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: List.generate(7, (i) {
-                    final day = i + 1;
-                    final labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-                    final active = activeDays.contains(day);
-                    return GestureDetector(
-                      onTap: () => setBS(() {
-                        if (active) {
-                          activeDays.remove(day);
-                        } else {
-                          activeDays.add(day);
-                        }
-                      }),
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: active
-                              ? _sandGold.withValues(alpha: 0.2)
-                              : Colors.white.withValues(alpha: 0.04),
-                        ),
-                        child: Center(
-                          child: Text(
-                            labels[i],
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: active
-                                  ? _sandGold
-                                  : Colors.white.withValues(alpha: 0.3),
-                            ),
+                  ]),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: List.generate(7, (i) {
+                      final day = i + 1;
+                      final labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                      final active = activeDays.contains(day);
+                      return GestureDetector(
+                        onTap: () => setBS(() {
+                          if (active) activeDays.remove(day); else activeDays.add(day);
+                        }),
+                        child: Container(
+                          width: 36, height: 36,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: active
+                                ? _desertSunset.withValues(alpha: 0.2)
+                                : Colors.white.withValues(alpha: 0.04),
+                          ),
+                          child: Center(
+                            child: Text(labels[i],
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: active ? _desertSunset : Colors.white.withValues(alpha: 0.3))),
                           ),
                         ),
-                      ),
-                    );
-                  }),
-                ),
-                const SizedBox(height: 16),
-                // Add Apps button
-                _buildAddAppsButton(ctx, ref, selectedApps, setBS),
+                      );
+                    }),
+                  ),
+                ],
+
                 const SizedBox(height: 16),
                 // Break difficulty
                 _buildBreakDifficultySelector(ref, breakDifficulty, (v) => setBS(() => breakDifficulty = v), ctx),
                 const SizedBox(height: 20),
+                // Create button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () async {
-                      if (nameCtrl.text.trim().isEmpty) return;
+                      if (nameCtrl.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                          content: const Text('Please enter a rule name'),
+                          backgroundColor: Colors.red.withValues(alpha: 0.8),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ));
+                        return;
+                      }
                       if (selectedApps.isEmpty) {
                         ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
                           content: const Text('Please add at least one app to block'),
@@ -3471,18 +4000,37 @@ class _BlockerTab extends ConsumerWidget {
                         ));
                         return;
                       }
+
+                      int sH = 0, sM = 0, eH = 23, eM = 59;
+                      List<int> days = List.generate(7, (i) => i + 1);
+                      bool isTimeBased = true;
+
+                      if (scheduleMode == 1) {
+                        final now = DateTime.now();
+                        final end = now.add(Duration(minutes: durationMinutes));
+                        sH = now.hour; sM = now.minute;
+                        eH = end.hour; eM = end.minute;
+                        days = [now.weekday];
+                      } else if (scheduleMode == 2) {
+                        sH = startH; sM = startM;
+                        eH = endH; eM = endM;
+                        days = activeDays.toList();
+                      } else {
+                        isTimeBased = false;
+                      }
+
                       final newRule = await ref.read(appBlockRuleProvider.notifier).addRule(
-                            name: nameCtrl.text.trim(),
-                            blockedPackages: selectedApps.toList(),
-                            isTimeBased: true,
-                            startHour: startH,
-                            startMinute: startM,
-                            endHour: endH,
-                            endMinute: endM,
-                            activeDays: activeDays.toList(),
-                            isHardBlock: breakDifficulty == 1,
-                            allowBreaks: breakDifficulty == 0,
-                          );
+                        name: nameCtrl.text.trim(),
+                        blockedPackages: selectedApps.toList(),
+                        isTimeBased: isTimeBased,
+                        startHour: sH,
+                        startMinute: sM,
+                        endHour: eH,
+                        endMinute: eM,
+                        activeDays: days,
+                        isHardBlock: breakDifficulty == 1,
+                        allowBreaks: breakDifficulty == 0,
+                      );
                       Navigator.pop(ctx);
                       HapticFeedback.lightImpact();
                       if (context.mounted) {
@@ -3490,19 +4038,846 @@ class _BlockerTab extends ConsumerWidget {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _sandGold.withValues(alpha: 0.2),
-                      foregroundColor: _sandGold,
+                      backgroundColor: _desertSunset.withValues(alpha: 0.2),
+                      foregroundColor: _desertSunset,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: const Text('Create Rule'),
+                    child: Text(scheduleMode == 1
+                        ? 'Start Blocking \u00b7 ${durationMinutes}min'
+                        : 'Create Rule'),
                   ),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // ── Smart Packs (pre-built app packs) ──
+  static const _smartPacks = <Map<String, dynamic>>[
+    {
+      'id': 'social_media',
+      'name': 'Social Media',
+      'icon': Icons.people_alt_rounded,
+      'color': Color(0xFFE8915A), // desertSunset
+      'desc': 'Instagram, TikTok, Facebook, Twitter & more',
+      'apps': <Map<String, String>>[
+        {'pkg': 'com.instagram.android', 'name': 'Instagram'},
+        {'pkg': 'com.facebook.katana', 'name': 'Facebook'},
+        {'pkg': 'com.twitter.android', 'name': 'X (Twitter)'},
+        {'pkg': 'com.snapchat.android', 'name': 'Snapchat'},
+        {'pkg': 'com.tiktok.android', 'name': 'TikTok'},
+        {'pkg': 'com.zhiliaoapp.musically', 'name': 'TikTok Lite'},
+        {'pkg': 'com.pinterest', 'name': 'Pinterest'},
+        {'pkg': 'com.reddit.frontpage', 'name': 'Reddit'},
+        {'pkg': 'com.linkedin.android', 'name': 'LinkedIn'},
+        {'pkg': 'org.telegram.messenger', 'name': 'Telegram'},
+        {'pkg': 'com.whatsapp', 'name': 'WhatsApp'},
+        {'pkg': 'com.discord', 'name': 'Discord'},
+        {'pkg': 'com.Slack', 'name': 'Slack'},
+      ],
+    },
+    {
+      'id': 'entertainment',
+      'name': 'Entertainment',
+      'icon': Icons.movie_rounded,
+      'color': Color(0xFFC2A366), // sandGold
+      'desc': 'YouTube, Netflix, Spotify, Twitch & more',
+      'apps': <Map<String, String>>[
+        {'pkg': 'com.google.android.youtube', 'name': 'YouTube'},
+        {'pkg': 'com.netflix.mediaclient', 'name': 'Netflix'},
+        {'pkg': 'com.spotify.music', 'name': 'Spotify'},
+        {'pkg': 'tv.twitch.android.app', 'name': 'Twitch'},
+        {'pkg': 'com.amazon.avod.thirdpartyclient', 'name': 'Prime Video'},
+        {'pkg': 'com.disney.disneyplus', 'name': 'Disney+'},
+        {'pkg': 'com.hulu.livingroomplus', 'name': 'Hulu'},
+      ],
+    },
+    {
+      'id': 'gaming',
+      'name': 'Gaming',
+      'icon': Icons.sports_esports_rounded,
+      'color': Color(0xFF7BAE6E), // oasisGreen
+      'desc': 'Popular games & game stores',
+      'apps': <Map<String, String>>[
+        {'pkg': 'com.supercell.clashofclans', 'name': 'Clash of Clans'},
+        {'pkg': 'com.supercell.clashroyale', 'name': 'Clash Royale'},
+        {'pkg': 'com.supercell.brawlstars', 'name': 'Brawl Stars'},
+        {'pkg': 'com.kiloo.subwaysurf', 'name': 'Subway Surfers'},
+        {'pkg': 'com.epicgames.fortnite', 'name': 'Fortnite'},
+        {'pkg': 'com.mojang.minecraftpe', 'name': 'Minecraft'},
+        {'pkg': 'com.activision.callofduty.shooter', 'name': 'COD Mobile'},
+        {'pkg': 'com.tencent.ig', 'name': 'PUBG Mobile'},
+        {'pkg': 'com.riotgames.league.wildrift', 'name': 'Wild Rift'},
+        {'pkg': 'com.mobile.legends', 'name': 'Mobile Legends'},
+      ],
+    },
+  ];
+
+  // Check if a smart pack is already active (has a matching rule)
+  Map<String, dynamic>? _getActivePackRule(WidgetRef ref, Map<String, dynamic> pack) {
+    final rules = ref.read(appBlockRuleProvider);
+    final packName = pack['name'] as String;
+    final packApps = (pack['apps'] as List<Map<String, String>>).map((a) => a['pkg']!).toSet();
+
+    for (final rule in rules) {
+      // Match by name containing pack name, OR by significant overlap in blocked apps
+      final rulePackages = rule.blockedPackages.toSet();
+      final overlap = rulePackages.intersection(packApps);
+      if (rule.name.toLowerCase().contains(packName.toLowerCase()) ||
+          (overlap.length >= 3 && overlap.length >= rulePackages.length * 0.5)) {
+        return {'rule': rule, 'isEnabled': rule.isEnabled};
+      }
+    }
+    return null;
+  }
+
+  void _showSmartPackSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(Icons.inventory_2_rounded, color: _oasisGreen.withValues(alpha: 0.7), size: 20),
+              const SizedBox(width: 8),
+              Text("Smart Packs",
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600)),
+            ]),
+            const SizedBox(height: 4),
+            Text("One-tap block packs — review & customize apps",
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.35), fontSize: 13)),
+            const SizedBox(height: 20),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _smartPacks.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (_, i) {
+                  final pack = _smartPacks[i];
+                  final packColor = pack['color'] as Color;
+                  final apps = pack['apps'] as List<Map<String, String>>;
+                  final activeInfo = _getActivePackRule(ref, pack);
+                  final isActive = activeInfo != null && activeInfo['isEnabled'] == true;
+                  final isInactive = activeInfo != null && activeInfo['isEnabled'] == false;
+
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.pop(ctx);
+                      if (isActive || isInactive) {
+                        // Edit existing rule — pass the active rule
+                        final existingRule = activeInfo!['rule'] as AppBlockRule;
+                        _showPackEditSheet(context, ref, pack, existingRule);
+                      } else {
+                        _showPackCustomizeSheet(context, ref, pack);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? packColor.withValues(alpha: 0.1)
+                            : packColor.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isActive
+                              ? packColor.withValues(alpha: 0.4)
+                              : packColor.withValues(alpha: 0.15),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: packColor.withValues(alpha: isActive ? 0.18 : 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(pack['icon'] as IconData, color: packColor.withValues(alpha: 0.8), size: 22),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(pack['name'] as String,
+                                          style: TextStyle(
+                                              color: Colors.white.withValues(alpha: 0.9),
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w600)),
+                                    ),
+                                    if (isActive) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: _oasisGreen.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.shield_rounded, size: 10, color: _oasisGreen.withValues(alpha: 0.9)),
+                                            const SizedBox(width: 3),
+                                            Text("ACTIVE",
+                                                style: TextStyle(
+                                                    color: _oasisGreen.withValues(alpha: 0.9),
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w700,
+                                                    letterSpacing: 0.5)),
+                                          ],
+                                        ),
+                                      ),
+                                    ] else if (isInactive) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.06),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text("PAUSED",
+                                            style: TextStyle(
+                                                color: Colors.white.withValues(alpha: 0.3),
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w700,
+                                                letterSpacing: 0.5)),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(pack['desc'] as String,
+                                    style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.35),
+                                        fontSize: 12)),
+                                const SizedBox(height: 6),
+                                Text(isActive
+                                    ? "${apps.length} apps \u00b7 Blocking"
+                                    : "${apps.length} apps included",
+                                    style: TextStyle(
+                                        color: isActive
+                                            ? _oasisGreen.withValues(alpha: 0.6)
+                                            : packColor.withValues(alpha: 0.6),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                          ),
+                          Icon(isActive ? Icons.edit_rounded : Icons.arrow_forward_ios,
+                              size: 14, color: Colors.white.withValues(alpha: isActive ? 0.3 : 0.15)),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Pack customizer: review apps, pick schedule, create rule ──
+  void _showPackCustomizeSheet(BuildContext context, WidgetRef ref, Map<String, dynamic> pack) {
+    final packApps = (pack['apps'] as List<Map<String, String>>);
+    final packColor = pack['color'] as Color;
+    final packName = pack['name'] as String;
+    final allInstalledApps = ref.read(installedAppsProvider);
+    final installedPkgs = allInstalledApps.map((a) => a.packageName).toSet();
+
+    // Pre-select only apps that are installed on the device
+    Set<String> selectedApps = {};
+    Map<String, String> appLabels = {};
+    for (final app in packApps) {
+      final pkg = app['pkg']!;
+      appLabels[pkg] = app['name']!;
+      if (installedPkgs.contains(pkg)) {
+        selectedApps.add(pkg);
+      }
+    }
+
+    int scheduleMode = 0; // 0=Always, 1=Block Now (duration), 2=Scheduled
+    int durationMinutes = 60;
+    int startH = 9, startM = 0, endH = 17, endM = 0;
+    Set<int> activeDays = {1, 2, 3, 4, 5};
+    int breakDifficulty = 1; // Default Hard for packs
+    final durations = [15, 30, 45, 60, 90, 120];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setBS) => Container(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.88),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(children: [
+                  Icon(pack['icon'] as IconData, color: packColor.withValues(alpha: 0.7), size: 20),
+                  const SizedBox(width: 8),
+                  Text("$packName Pack",
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: packColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text("${selectedApps.length} apps",
+                        style: TextStyle(color: packColor, fontSize: 11, fontWeight: FontWeight.w600)),
+                  ),
+                ]),
+                const SizedBox(height: 16),
+
+                // Apps list with toggles
+                Text("Apps to Block",
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                const SizedBox(height: 4),
+                Text("Remove any apps you want to keep accessible",
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 11)),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: packApps.map((app) {
+                    final pkg = app['pkg']!;
+                    final name = app['name']!;
+                    final isSelected = selectedApps.contains(pkg);
+                    final isInstalled = installedPkgs.contains(pkg);
+                    return GestureDetector(
+                      onTap: isInstalled ? () {
+                        HapticFeedback.selectionClick();
+                        setBS(() {
+                          if (isSelected) {
+                            selectedApps.remove(pkg);
+                          } else {
+                            selectedApps.add(pkg);
+                          }
+                        });
+                      } : null,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: !isInstalled
+                              ? Colors.white.withValues(alpha: 0.02)
+                              : isSelected
+                                  ? packColor.withValues(alpha: 0.12)
+                                  : Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: !isInstalled
+                                ? Colors.white.withValues(alpha: 0.04)
+                                : isSelected
+                                    ? packColor.withValues(alpha: 0.3)
+                                    : Colors.white.withValues(alpha: 0.06),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isSelected && isInstalled)
+                              Icon(Icons.check_circle_rounded, size: 15, color: packColor.withValues(alpha: 0.8))
+                            else if (!isInstalled)
+                              Icon(Icons.block_rounded, size: 15, color: Colors.white.withValues(alpha: 0.15))
+                            else
+                              Icon(Icons.circle_outlined, size: 15, color: Colors.white.withValues(alpha: 0.2)),
+                            const SizedBox(width: 6),
+                            Text(name,
+                                style: TextStyle(
+                                    color: !isInstalled
+                                        ? Colors.white.withValues(alpha: 0.2)
+                                        : isSelected
+                                            ? Colors.white.withValues(alpha: 0.8)
+                                            : Colors.white.withValues(alpha: 0.4),
+                                    fontSize: 12,
+                                    fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400)),
+                            if (!isInstalled) ...[
+                              const SizedBox(width: 4),
+                              Text("not installed",
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.15), fontSize: 9)),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Schedule mode selector
+                Text("Schedule",
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                const SizedBox(height: 8),
+                Row(children: [
+                  _buildScheduleChip("Always On", 0, scheduleMode, packColor, (v) => setBS(() => scheduleMode = v)),
+                  const SizedBox(width: 8),
+                  _buildScheduleChip("Duration", 1, scheduleMode, packColor, (v) => setBS(() => scheduleMode = v)),
+                  const SizedBox(width: 8),
+                  _buildScheduleChip("Time Window", 2, scheduleMode, packColor, (v) => setBS(() => scheduleMode = v)),
+                ]),
+
+                // Duration picker (mode 1)
+                if (scheduleMode == 1) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: durations.map((d) {
+                      final isSelected = durationMinutes == d;
+                      final label = d >= 60 ? '${d ~/ 60}h${d % 60 > 0 ? " ${d % 60}m" : ""}' : '${d}m';
+                      return GestureDetector(
+                        onTap: () => setBS(() => durationMinutes = d),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? packColor.withValues(alpha: 0.15)
+                                : Colors.white.withValues(alpha: 0.04),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: isSelected
+                                    ? packColor.withValues(alpha: 0.4)
+                                    : Colors.white.withValues(alpha: 0.06)),
+                          ),
+                          child: Text(label,
+                              style: TextStyle(
+                                  color: isSelected
+                                      ? packColor
+                                      : Colors.white.withValues(alpha: 0.5),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500)),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+
+                // Time window picker (mode 2)
+                if (scheduleMode == 2) ...[
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final time = await showTimePicker(
+                              context: ctx, initialTime: TimeOfDay(hour: startH, minute: startM));
+                          if (time != null) setBS(() { startH = time.hour; startM = time.minute; });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text("Start: ${_formatHour(startH, startM)}",
+                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                              textAlign: TextAlign.center),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final time = await showTimePicker(
+                              context: ctx, initialTime: TimeOfDay(hour: endH, minute: endM));
+                          if (time != null) setBS(() { endH = time.hour; endM = time.minute; });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text("End: ${_formatHour(endH, endM)}",
+                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                              textAlign: TextAlign.center),
+                        ),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: List.generate(7, (i) {
+                      final day = i + 1;
+                      final labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                      final active = activeDays.contains(day);
+                      return GestureDetector(
+                        onTap: () => setBS(() {
+                          if (active) activeDays.remove(day); else activeDays.add(day);
+                        }),
+                        child: Container(
+                          width: 36, height: 36,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: active
+                                ? packColor.withValues(alpha: 0.2)
+                                : Colors.white.withValues(alpha: 0.04),
+                          ),
+                          child: Center(
+                            child: Text(labels[i],
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: active ? packColor : Colors.white.withValues(alpha: 0.3))),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+                // Break difficulty
+                _buildBreakDifficultySelector(ref, breakDifficulty, (v) => setBS(() => breakDifficulty = v), ctx),
+
+                const SizedBox(height: 20),
+                // Create button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      if (selectedApps.isEmpty) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                          content: const Text("Select at least one app to block"),
+                          backgroundColor: Colors.red.withValues(alpha: 0.8),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ));
+                        return;
+                      }
+
+                      int sH = 0, sM = 0, eH = 23, eM = 59;
+                      List<int> days = List.generate(7, (i) => i + 1);
+                      bool isTimeBased = true;
+
+                      if (scheduleMode == 1) {
+                        // Duration-based: start now, end after X minutes
+                        final now = DateTime.now();
+                        final end = now.add(Duration(minutes: durationMinutes));
+                        sH = now.hour; sM = now.minute;
+                        eH = end.hour; eM = end.minute;
+                        days = [now.weekday];
+                      } else if (scheduleMode == 2) {
+                        // Scheduled time window
+                        sH = startH; sM = startM;
+                        eH = endH; eM = endM;
+                        days = activeDays.toList();
+                      } else {
+                        // Always on = not time-based
+                        isTimeBased = false;
+                      }
+
+                      final newRule = await ref.read(appBlockRuleProvider.notifier).addRule(
+                        name: "$packName Block",
+                        blockedPackages: selectedApps.toList(),
+                        isTimeBased: isTimeBased,
+                        startHour: sH,
+                        startMinute: sM,
+                        endHour: eH,
+                        endMinute: eM,
+                        activeDays: days,
+                        isHardBlock: breakDifficulty == 1,
+                        allowBreaks: breakDifficulty == 0,
+                      );
+                      Navigator.pop(ctx);
+                      HapticFeedback.lightImpact();
+                      if (context.mounted) {
+                        _showRuleInfoSheet(context, ref, newRule);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: packColor.withValues(alpha: 0.2),
+                      foregroundColor: packColor,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: Text("Activate $packName Block"),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Pack EDIT sheet: edit apps on an existing active smart pack rule ──
+  void _showPackEditSheet(BuildContext context, WidgetRef ref, Map<String, dynamic> pack, AppBlockRule existingRule) {
+    final packApps = (pack['apps'] as List<Map<String, String>>);
+    final packColor = pack['color'] as Color;
+    final packName = pack['name'] as String;
+    final allInstalledApps = ref.read(installedAppsProvider);
+    final installedPkgs = allInstalledApps.map((a) => a.packageName).toSet();
+
+    // These are LOCKED — already blocked, cannot be removed
+    final lockedApps = Set<String>.from(existingRule.blockedPackages);
+
+    // Selected starts with locked apps; user can only ADD more
+    Set<String> selectedApps = Set<String>.from(lockedApps);
+    Map<String, String> appLabels = {};
+    for (final app in packApps) {
+      appLabels[app['pkg']!] = app['name']!;
+    }
+    // Also add labels for any apps in rule that aren't in pack definition
+    for (final pkg in existingRule.blockedPackages) {
+      if (!appLabels.containsKey(pkg)) {
+        final appName = allInstalledApps
+            .where((a) => a.packageName == pkg)
+            .map((a) => a.appName)
+            .firstOrNull ?? pkg.split('.').last;
+        appLabels[pkg] = appName;
+      }
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setBS) => Container(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.75),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(children: [
+                  Icon(pack['icon'] as IconData, color: packColor.withValues(alpha: 0.7), size: 20),
+                  const SizedBox(width: 8),
+                  Text("Edit $packName",
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: _oasisGreen.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.shield_rounded, size: 10, color: _oasisGreen.withValues(alpha: 0.9)),
+                        const SizedBox(width: 4),
+                        Text("${selectedApps.length} blocked",
+                            style: TextStyle(color: _oasisGreen, fontSize: 11, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 16),
+
+                Text("🔒 Existing apps are locked · Tap to add new apps",
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 12)),
+                const SizedBox(height: 12),
+
+                // Pack apps with toggle
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: packApps.map((app) {
+                    final pkg = app['pkg']!;
+                    final name = app['name']!;
+                    final isSelected = selectedApps.contains(pkg);
+                    final isInstalled = installedPkgs.contains(pkg);
+                    final isLocked = lockedApps.contains(pkg);
+                    return GestureDetector(
+                      onTap: (isInstalled && !isLocked) ? () {
+                        HapticFeedback.selectionClick();
+                        setBS(() {
+                          if (isSelected) {
+                            selectedApps.remove(pkg);
+                          } else {
+                            selectedApps.add(pkg);
+                          }
+                        });
+                      } : isLocked ? () {
+                        HapticFeedback.heavyImpact();
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                          content: const Text("🔒 Active blocked apps can't be removed"),
+                          backgroundColor: Colors.white.withValues(alpha: 0.1),
+                          behavior: SnackBarBehavior.floating,
+                          duration: const Duration(seconds: 1),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ));
+                      } : null,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: !isInstalled
+                              ? Colors.white.withValues(alpha: 0.02)
+                              : isLocked
+                                  ? packColor.withValues(alpha: 0.18)
+                                  : isSelected
+                                      ? packColor.withValues(alpha: 0.12)
+                                      : Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: !isInstalled
+                                ? Colors.white.withValues(alpha: 0.04)
+                                : isLocked
+                                    ? packColor.withValues(alpha: 0.5)
+                                    : isSelected
+                                        ? packColor.withValues(alpha: 0.3)
+                                        : Colors.white.withValues(alpha: 0.06),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isLocked)
+                              Icon(Icons.lock_rounded, size: 15, color: packColor.withValues(alpha: 0.9))
+                            else if (isSelected && isInstalled)
+                              Icon(Icons.check_circle_rounded, size: 15, color: packColor.withValues(alpha: 0.8))
+                            else if (!isInstalled)
+                              Icon(Icons.block_rounded, size: 15, color: Colors.white.withValues(alpha: 0.15))
+                            else
+                              Icon(Icons.circle_outlined, size: 15, color: Colors.white.withValues(alpha: 0.2)),
+                            const SizedBox(width: 6),
+                            Text(name,
+                                style: TextStyle(
+                                    color: !isInstalled
+                                        ? Colors.white.withValues(alpha: 0.2)
+                                        : isLocked
+                                            ? Colors.white.withValues(alpha: 0.9)
+                                            : isSelected
+                                                ? Colors.white.withValues(alpha: 0.8)
+                                                : Colors.white.withValues(alpha: 0.4),
+                                    fontSize: 12,
+                                    fontWeight: isLocked ? FontWeight.w600 : isSelected ? FontWeight.w500 : FontWeight.w400)),
+                            if (isLocked) ...[
+                              const SizedBox(width: 4),
+                              Text("locked",
+                                  style: TextStyle(color: packColor.withValues(alpha: 0.6), fontSize: 9, fontWeight: FontWeight.w600)),
+                            ],
+                            if (!isInstalled) ...[
+                              const SizedBox(width: 4),
+                              Text("not installed",
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.15), fontSize: 9)),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Save button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (selectedApps.isEmpty) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                          content: const Text("At least 1 app must be blocked"),
+                          backgroundColor: Colors.red.withValues(alpha: 0.8),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ));
+                        return;
+                      }
+                      ref.read(appBlockRuleProvider.notifier).updateRule(
+                        existingRule.id,
+                        blockedPackages: selectedApps.toList(),
+                      );
+                      Navigator.pop(ctx);
+                      HapticFeedback.lightImpact();
+                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                        content: Text('$packName updated · ${selectedApps.length} apps blocked'),
+                        backgroundColor: _oasisGreen,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ));
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: packColor.withValues(alpha: 0.2),
+                      foregroundColor: packColor,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text("Save Changes"),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScheduleChip(String label, int value, int selected, Color color, ValueChanged<int> onTap) {
+    final isActive = selected == value;
+    return GestureDetector(
+      onTap: () { HapticFeedback.selectionClick(); onTap(value); },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: isActive ? color.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isActive ? color.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.06),
+          ),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                color: isActive ? color : Colors.white.withValues(alpha: 0.4),
+                fontSize: 12,
+                fontWeight: FontWeight.w500)),
       ),
     );
   }
@@ -3806,6 +5181,209 @@ class _BlockTypeOption extends StatelessWidget {
             ),
             Icon(Icons.arrow_forward_ios,
                 size: 14, color: Colors.white.withValues(alpha: 0.15)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── 100-Tap Deactivate Confirmation ────────────────────────────────────────
+
+class _DeactivateRuleConfirmScreen extends ConsumerStatefulWidget {
+  final String ruleId;
+  final String ruleName;
+  const _DeactivateRuleConfirmScreen({required this.ruleId, required this.ruleName});
+
+  @override
+  ConsumerState<_DeactivateRuleConfirmScreen> createState() => _DeactivateRuleConfirmScreenState();
+}
+
+class _DeactivateRuleConfirmScreenState extends ConsumerState<_DeactivateRuleConfirmScreen> {
+  int _tapCount = 0;
+  static const int _requiredTaps = 100;
+
+  void _handleTap() {
+    HapticFeedback.selectionClick();
+    setState(() => _tapCount++);
+    if (_tapCount >= _requiredTaps) {
+      HapticFeedback.heavyImpact();
+      ref.read(appBlockRuleProvider.notifier).toggleRule(widget.ruleId);
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Rule "${widget.ruleName}" deactivated'),
+          backgroundColor: _desertSunset.withValues(alpha: 0.8),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = _tapCount / _requiredTaps;
+    final remaining = _requiredTaps - _tapCount;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.arrow_back_ios_new,
+                          color: Colors.white.withValues(alpha: 0.4), size: 16),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('Deactivate Blocker',
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ),
+
+            // Content
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Warning icon
+                      Container(
+                        width: 80, height: 80,
+                        decoration: BoxDecoration(
+                          color: _desertSunset.withValues(alpha: 0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.shield_outlined, size: 40,
+                            color: _desertSunset.withValues(alpha: 0.6)),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Stay focused?',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Deactivating "${widget.ruleName}" removes\nyour focus protection.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.4),
+                          fontSize: 13,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Progress bar
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 8,
+                          backgroundColor: Colors.white.withValues(alpha: 0.06),
+                          color: Color.lerp(
+                            _desertSunset.withValues(alpha: 0.3),
+                            _desertSunset.withValues(alpha: 0.8),
+                            progress,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        '$remaining taps remaining',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Tap target
+                      GestureDetector(
+                        onTap: _handleTap,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 100),
+                          width: 140,
+                          height: 140,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color.lerp(
+                              _desertSunset.withValues(alpha: 0.06),
+                              _desertSunset.withValues(alpha: 0.25),
+                              progress,
+                            ),
+                            border: Border.all(
+                              color: Color.lerp(
+                                _desertSunset.withValues(alpha: 0.15),
+                                _desertSunset.withValues(alpha: 0.5),
+                                progress,
+                              )!,
+                              width: 2,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '$_tapCount',
+                                style: TextStyle(
+                                  color: _desertSunset.withValues(alpha: 0.5 + progress * 0.4),
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Tap to\ndeactivate',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: _desertSunset.withValues(alpha: 0.35),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Tap the button $_requiredTaps times to deactivate',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -4261,6 +5839,66 @@ class _AddButton extends StatelessWidget {
   }
 }
 
+class _PresetChip extends StatelessWidget {
+  final String label;
+  final String subtitle;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _PresetChip({
+    required this.label,
+    required this.subtitle,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? _sandGold.withValues(alpha: 0.12)
+              : Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected
+                ? _sandGold.withValues(alpha: 0.35)
+                : Colors.white.withValues(alpha: 0.06),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? _sandGold : Colors.white.withValues(alpha: 0.5),
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 9,
+                color: isSelected
+                    ? _sandGold.withValues(alpha: 0.6)
+                    : Colors.white.withValues(alpha: 0.25),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CircleButton extends StatelessWidget {
   final IconData icon;
   final Color color;
@@ -4430,7 +6068,7 @@ class _SliderRow extends StatelessWidget {
   }
 }
 
-class _WeekStrip extends StatelessWidget {
+class _WeekStrip extends StatefulWidget {
   final DateTime selected;
   final Set<DateTime> eventDates;
   final void Function(DateTime) onSelect;
@@ -4442,33 +6080,84 @@ class _WeekStrip extends StatelessWidget {
   });
 
   @override
+  State<_WeekStrip> createState() => _WeekStripState();
+}
+
+class _WeekStripState extends State<_WeekStrip> {
+  late ScrollController _scrollController;
+  static const int _totalDays = 21; // 10 past + today + 10 future
+  static const int _pastDays = 10;
+  static const double _itemWidth = 44;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToSelected();
+    });
+  }
+
+  @override
+  void didUpdateWidget(_WeekStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selected != widget.selected) {
+      _scrollToSelected();
+    }
+  }
+
+  void _scrollToSelected() {
+    final today = DateTime.now();
+    final todayNorm = DateTime(today.year, today.month, today.day);
+    final selectedNorm = DateTime(widget.selected.year, widget.selected.month, widget.selected.day);
+    final diffDays = selectedNorm.difference(todayNorm).inDays;
+    final index = _pastDays + diffDays;
+    final offset = (index * _itemWidth) - (MediaQuery.of(context).size.width / 2) + (_itemWidth / 2);
+    _scrollController.animateTo(
+      offset.clamp(0.0, _scrollController.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final today = DateTime.now();
-    // Show 7 days centered around selected
-    final startOfWeek = selected.subtract(Duration(days: selected.weekday - 1));
+    final startDate = DateTime(today.year, today.month, today.day)
+        .subtract(Duration(days: _pastDays));
+    final dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
     return SizedBox(
       height: 60,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: List.generate(7, (i) {
-          final day = startOfWeek.add(Duration(days: i));
-          final isSelected = day.year == selected.year &&
-              day.month == selected.month &&
-              day.day == selected.day;
+      child: ListView.builder(
+        controller: _scrollController,
+        scrollDirection: Axis.horizontal,
+        itemCount: _totalDays,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        itemBuilder: (context, i) {
+          final day = startDate.add(Duration(days: i));
+          final isSelected = day.year == widget.selected.year &&
+              day.month == widget.selected.month &&
+              day.day == widget.selected.day;
           final isToday = day.year == today.year &&
               day.month == today.month &&
               day.day == today.day;
-          final hasEvent = eventDates.contains(
+          final hasEvent = widget.eventDates.contains(
               DateTime(day.year, day.month, day.day));
-          final dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
           return GestureDetector(
-            onTap: () => onSelect(day),
+            onTap: () => widget.onSelect(day),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: 40,
+              width: _itemWidth,
               padding: const EdgeInsets.symmetric(vertical: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 1),
               decoration: BoxDecoration(
                 color: isSelected
                     ? _sandGold.withValues(alpha: 0.15)
@@ -4483,7 +6172,7 @@ class _WeekStrip extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    dayLabels[i],
+                    dayLabels[day.weekday - 1],
                     style: TextStyle(
                       fontSize: 10,
                       color: isSelected
@@ -4520,7 +6209,7 @@ class _WeekStrip extends StatelessWidget {
               ),
             ),
           );
-        }),
+        },
       ),
     );
   }
@@ -4566,6 +6255,415 @@ class _TimePickerRow extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.3)),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🛡️ BLOCKER PERMISSION SETUP SCREEN
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _BlockerPermissionScreen extends StatefulWidget {
+  final bool hasUsageStats;
+  final bool hasNotification;
+
+  const _BlockerPermissionScreen({
+    required this.hasUsageStats,
+    required this.hasNotification,
+  });
+
+  @override
+  State<_BlockerPermissionScreen> createState() => _BlockerPermissionScreenState();
+}
+
+class _BlockerPermissionScreenState extends State<_BlockerPermissionScreen>
+    with WidgetsBindingObserver {
+  late bool _usageGranted;
+  late bool _notifGranted;
+  bool _checking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _usageGranted = widget.hasUsageStats;
+    _notifGranted = widget.hasNotification;
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Re-check permissions when user comes back from system settings
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _recheckPermissions();
+    }
+  }
+
+  Future<void> _recheckPermissions() async {
+    if (_checking) return;
+    _checking = true;
+    final u = await NativeAppBlockerService.hasUsageStatsPermission();
+    final n = await NativeAppBlockerService.hasNotificationPermission();
+    if (mounted) {
+      setState(() {
+        _usageGranted = u;
+        _notifGranted = n;
+      });
+
+      // All permissions granted → auto-proceed
+      if (_usageGranted && _notifGranted) {
+        await Future.delayed(const Duration(milliseconds: 400));
+        if (mounted) Navigator.pop(context, true);
+      }
+    }
+    _checking = false;
+  }
+
+  bool get _allGranted => _usageGranted && _notifGranted;
+
+  @override
+  Widget build(BuildContext context) {
+    final grantedCount = (_usageGranted ? 1 : 0) + (_notifGranted ? 1 : 0);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              // ── Back button ──
+              GestureDetector(
+                onTap: () => Navigator.pop(context, false),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.arrow_back_rounded,
+                      color: Colors.white.withValues(alpha: 0.6), size: 20),
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // ── Shield icon ──
+              Center(
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: _desertSunset.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.shield_rounded,
+                      color: _desertSunset.withValues(alpha: 0.8), size: 40),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── Title ──
+              Center(
+                child: Text(
+                  'Setup App Blocker',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.95),
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Center(
+                child: Text(
+                  'To block apps from all entry points —\nnotifications, recent apps & more',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // ── Progress ──
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _oasisGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$grantedCount / 2 permissions granted',
+                    style: TextStyle(
+                      color: _oasisGreen.withValues(alpha: 0.8),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // ── Permission 1: Usage Stats ──
+              _PermissionCard(
+                step: 1,
+                icon: Icons.bar_chart_rounded,
+                title: 'Usage Access',
+                description:
+                    'Required to detect which app is in the foreground.\nThis is how the blocker knows when a blocked app opens.',
+                isGranted: _usageGranted,
+                onGrant: () async {
+                  HapticFeedback.mediumImpact();
+                  await NativeAppBlockerService.requestUsageStatsPermission();
+                },
+              ),
+
+              const SizedBox(height: 14),
+
+              // ── Permission 2: Notifications ──
+              _PermissionCard(
+                step: 2,
+                icon: Icons.notifications_active_rounded,
+                title: 'Notifications',
+                description:
+                    'Required to keep the blocker running in the background.\nShows a small "Focus Mode Active" notification.',
+                isGranted: _notifGranted,
+                onGrant: () async {
+                  HapticFeedback.mediumImpact();
+                  await NativeAppBlockerService.requestNotificationPermission();
+                  // Small delay then re-check (Android dialog is quick)
+                  await Future.delayed(const Duration(milliseconds: 800));
+                  _recheckPermissions();
+                },
+              ),
+
+              const Spacer(),
+
+              // ── Continue button ──
+              SizedBox(
+                width: double.infinity,
+                child: GestureDetector(
+                  onTap: () {
+                    if (_allGranted) {
+                      HapticFeedback.lightImpact();
+                      Navigator.pop(context, true);
+                    } else {
+                      HapticFeedback.heavyImpact();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Please grant all permissions to continue'),
+                          backgroundColor: _desertSunset.withValues(alpha: 0.9),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      );
+                    }
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: _allGranted
+                          ? _oasisGreen.withValues(alpha: 0.2)
+                          : Colors.white.withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: _allGranted
+                            ? _oasisGreen.withValues(alpha: 0.4)
+                            : Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _allGranted
+                              ? Icons.check_circle_rounded
+                              : Icons.lock_rounded,
+                          color: _allGranted
+                              ? _oasisGreen
+                              : Colors.white.withValues(alpha: 0.3),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          _allGranted
+                              ? 'Continue to Create Rule'
+                              : 'Grant All Permissions to Continue',
+                          style: TextStyle(
+                            color: _allGranted
+                                ? _oasisGreen
+                                : Colors.white.withValues(alpha: 0.3),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Individual Permission Card ──
+class _PermissionCard extends StatelessWidget {
+  final int step;
+  final IconData icon;
+  final String title;
+  final String description;
+  final bool isGranted;
+  final VoidCallback onGrant;
+
+  const _PermissionCard({
+    required this.step,
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.isGranted,
+    required this.onGrant,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: isGranted ? null : onGrant,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: isGranted
+              ? _oasisGreen.withValues(alpha: 0.06)
+              : _desertSunset.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isGranted
+                ? _oasisGreen.withValues(alpha: 0.25)
+                : _desertSunset.withValues(alpha: 0.15),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Step number / check icon
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: isGranted
+                    ? _oasisGreen.withValues(alpha: 0.15)
+                    : _desertSunset.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: isGranted
+                    ? Icon(Icons.check_rounded,
+                        color: _oasisGreen, size: 20)
+                    : Text(
+                        '$step',
+                        style: TextStyle(
+                          color: _desertSunset.withValues(alpha: 0.8),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(icon,
+                          size: 16,
+                          color: isGranted
+                              ? _oasisGreen.withValues(alpha: 0.7)
+                              : _desertSunset.withValues(alpha: 0.7)),
+                      const SizedBox(width: 6),
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (isGranted)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _oasisGreen.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text('GRANTED',
+                              style: TextStyle(
+                                  color: _oasisGreen,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5)),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _desertSunset.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text('GRANT',
+                              style: TextStyle(
+                                  color: _desertSunset,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5)),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.35),
+                      fontSize: 12,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

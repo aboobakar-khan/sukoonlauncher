@@ -8,6 +8,7 @@ import '../providers/installed_apps_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/favorite_apps_provider.dart';
 import '../providers/recent_apps_provider.dart';
+import '../providers/productivity_provider.dart';
 
 /// Quick Search Overlay - Samsung-style pull-down search
 /// 
@@ -87,6 +88,10 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
     
     // Auto-launch when exactly 1 result
     if (filteredApps.length == 1) {
+      // 🛡️ Don't auto-launch blocked apps
+      final blocker = ref.read(appBlockRuleProvider.notifier);
+      if (blocker.isAppBlocked(filteredApps.first.packageName)) return;
+
       _hasAutoLaunched = true;
       HapticFeedback.lightImpact();
       
@@ -101,6 +106,17 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
   Future<void> _launchApp(InstalledApp app) async {
     _searchFocus.unfocus();
 
+    // 🛡️ Check app blocker — block ALL channels
+    final blocker = ref.read(appBlockRuleProvider.notifier);
+    if (blocker.isAppBlocked(app.packageName)) {
+      HapticFeedback.heavyImpact();
+      widget.onDismiss();
+      if (mounted) {
+        _showBlockedMessage(app.appName);
+      }
+      return;
+    }
+
     // Track as recent app
     ref.read(recentAppsProvider.notifier).addRecent(app.packageName);
 
@@ -111,6 +127,18 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
     } catch (e) {
       // Silent fail
     }
+  }
+
+  void _showBlockedMessage(String appName) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (context) => _BlockedAppOverlay(
+        appName: appName,
+        onDismiss: () => entry.remove(),
+      ),
+    );
+    overlay.insert(entry);
   }
 
   void _dismiss() {
@@ -343,6 +371,8 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
   }
 
   Widget _buildAppTile(InstalledApp app, AppThemeColor themeColor) {
+    final isBlocked = ref.read(appBlockRuleProvider.notifier).isAppBlocked(app.packageName);
+    
     return GestureDetector(
       onTap: () => _launchApp(app),
       child: Container(
@@ -361,18 +391,44 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
               child: Text(
                 app.appName,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: isBlocked 
+                      ? Colors.white.withValues(alpha: 0.25) 
+                      : Colors.white.withValues(alpha: 0.8),
                   fontSize: 15,
                   fontWeight: FontWeight.w300,
-                  decoration: TextDecoration.none, // Remove yellow underline
+                  decoration: TextDecoration.none,
                 ),
               ),
             ),
-            Icon(
-              Icons.chevron_right,
-              color: Colors.white.withValues(alpha: 0.2),
-              size: 18,
-            ),
+            if (isBlocked)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8915A).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.shield_rounded, 
+                        color: const Color(0xFFE8915A).withValues(alpha: 0.6), size: 10),
+                    const SizedBox(width: 3),
+                    Text('BLOCKED', style: TextStyle(
+                      color: const Color(0xFFE8915A).withValues(alpha: 0.7),
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                      decoration: TextDecoration.none,
+                    )),
+                  ],
+                ),
+              )
+            else
+              Icon(
+                Icons.chevron_right,
+                color: Colors.white.withValues(alpha: 0.2),
+                size: 18,
+              ),
           ],
         ),
       ),
@@ -390,4 +446,146 @@ void showQuickSearchOverlay(BuildContext context) {
   );
   
   Overlay.of(context).insert(entry);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🛡️ BLOCKED APP OVERLAY — Shown when trying to open blocked app from search
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _BlockedAppOverlay extends StatefulWidget {
+  final String appName;
+  final VoidCallback onDismiss;
+
+  const _BlockedAppOverlay({required this.appName, required this.onDismiss});
+
+  @override
+  State<_BlockedAppOverlay> createState() => _BlockedAppOverlayState();
+}
+
+class _BlockedAppOverlayState extends State<_BlockedAppOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  static const _quotes = [
+    {'text': 'Verily, with hardship comes ease.', 'ref': 'Quran 94:6'},
+    {'text': 'And whoever fears Allah, He will make a way out for him.', 'ref': 'Quran 65:2'},
+    {'text': 'Indeed, Allah is with the patient.', 'ref': 'Quran 2:153'},
+    {'text': 'So remember Me; I will remember you.', 'ref': 'Quran 2:152'},
+  ];
+
+  late Map<String, String> _quote;
+
+  @override
+  void initState() {
+    super.initState();
+    _quote = _quotes[DateTime.now().millisecond % _quotes.length];
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    )..forward();
+
+    // Auto-dismiss after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) _dismiss();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _dismiss() {
+    _controller.reverse().then((_) => widget.onDismiss());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return GestureDetector(
+          onTap: _dismiss,
+          child: Material(
+            color: Colors.black.withValues(alpha: 0.85 * _controller.value),
+            child: Center(
+              child: Opacity(
+                opacity: _controller.value,
+                child: Transform.scale(
+                  scale: 0.8 + (0.2 * _controller.value),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 40),
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFFE8915A).withValues(alpha: 0.15),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Shield icon
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFFE8915A).withValues(alpha: 0.1),
+                            border: Border.all(
+                              color: const Color(0xFFE8915A).withValues(alpha: 0.2),
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.shield_rounded,
+                            color: const Color(0xFFE8915A).withValues(alpha: 0.7),
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '${widget.appName} is blocked',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Quote
+                        Text(
+                          '"${_quote['text']}"',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: const Color(0xFFC2A366).withValues(alpha: 0.7),
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                            height: 1.4,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '— ${_quote['ref']}',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            fontSize: 11,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

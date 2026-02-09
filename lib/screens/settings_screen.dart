@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../providers/theme_provider.dart';
 import '../providers/font_provider.dart';
 import '../providers/font_size_provider.dart';
@@ -12,6 +13,7 @@ import '../providers/arabic_font_provider.dart';
 import '../providers/premium_provider.dart';
 import '../providers/tafseer_edition_provider.dart';
 import '../providers/amoled_provider.dart';
+import '../providers/camel_coin_provider.dart';
 import 'theme_color_picker_screen.dart';
 import 'font_picker_screen.dart';
 import 'clock_style_picker_screen.dart';
@@ -20,6 +22,7 @@ import 'premium_paywall_screen.dart';
 import 'favorite_picker_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'credits_screen.dart';
+import 'camel_coin_store_screen.dart';
 import '../services/offline_content_manager.dart';
 import '../widgets/offline_download_indicator.dart';
 import '../widgets/swipe_back_wrapper.dart';
@@ -231,6 +234,8 @@ class SettingsScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 24),
+                  _buildCamelStoreSection(context, ref),
+                  const SizedBox(height: 24),
                   _buildSettingsSection(
                     title: 'PREMIUM',
                     items: [
@@ -284,6 +289,79 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 24),
+                  // ── DEV TESTING (remove before production) ──
+                  _buildSettingsSection(
+                    title: '🧪 TESTING',
+                    items: [
+                      _buildSettingsItem(
+                        icon: Icons.workspace_premium,
+                        title: 'Activate Premium (Test)',
+                        subtitle: 'Grant premium for testing features',
+                        onTap: () {
+                          ref.read(premiumProvider.notifier).activatePremium(
+                            type: 'lifetime',
+                          );
+                          HapticFeedback.heavyImpact();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('✅ Premium activated for testing'),
+                              backgroundColor: const Color(0xFF7BAE6E),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildSettingsItem(
+                        icon: Icons.cancel_outlined,
+                        title: 'Cancel Premium (Test)',
+                        subtitle: 'Remove premium to test free experience',
+                        onTap: () {
+                          ref.read(premiumProvider.notifier).activatePremium(
+                            type: 'cancelled',
+                          );
+                          // Force deactivation by setting isPremium false via Hive directly
+                          () async {
+                            final box = await Hive.openBox('premiumBox');
+                            await box.put('isPremium', false);
+                            await box.delete('expiryDate');
+                            await box.delete('subscriptionType');
+                            // Reload state
+                            ref.invalidate(premiumProvider);
+                          }();
+                          HapticFeedback.heavyImpact();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('❌ Premium cancelled'),
+                              backgroundColor: const Color(0xFFE8915A),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildSettingsItem(
+                        icon: Icons.monetization_on_rounded,
+                        title: 'Add 500 Camel Coins (Test)',
+                        subtitle: 'Give yourself coins to test the store',
+                        onTap: () async {
+                          await ref.read(camelCoinProvider.notifier).addTestCoins(500);
+                          HapticFeedback.heavyImpact();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('🪙 +500 Camel Coins added · Balance: ${ref.read(coinBalanceProvider)}'),
+                                backgroundColor: const Color(0xFFC2A366),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -291,6 +369,97 @@ class SettingsScreen extends ConsumerWidget {
         ),
       ),
     ),
+    );
+  }
+
+  Widget _buildCamelStoreSection(BuildContext context, WidgetRef ref) {
+    final coinState = ref.watch(camelCoinProvider);
+    const gold = Color(0xFFC2A366);
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const CamelCoinStoreScreen()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [gold.withValues(alpha: 0.08), gold.withValues(alpha: 0.03)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: gold.withValues(alpha: 0.18)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [gold.withValues(alpha: 0.2), gold.withValues(alpha: 0.08)],
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Center(
+                child: Text('🪙', style: TextStyle(fontSize: 20)),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Camel Store',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Earn coins through worship · Unlock rewards',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.4),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Coin balance badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: gold.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('🪙', style: TextStyle(fontSize: 13)),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${coinState.balance}',
+                    style: TextStyle(
+                      color: gold,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.25), size: 20),
+          ],
+        ),
+      ),
     );
   }
 

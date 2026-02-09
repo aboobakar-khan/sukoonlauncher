@@ -7,12 +7,9 @@ import 'package:hijri/hijri_calendar.dart';
 import '../providers/prayer_provider.dart';
 import '../models/prayer_record.dart';
 
-// ─── Design tokens (Camel brand) ──────────────────────────────────────────────
+// ─── Design tokens (Camel brand — disciplined palette) ─────────────────────
 const Color _sandGold = Color(0xFFC2A366);
-const Color _camelBrown = Color(0xFFA67B5B);
 const Color _oasisGreen = Color(0xFF7BAE6E);
-const Color _desertWarm = Color(0xFFD4A96A);
-const Color _desertSunset = Color(0xFFE8915A);
 
 /// ─── Islamic Occasions ───────────────────────────────────────────────────────
 const Map<String, Map<String, String>> _islamicOccasions = {
@@ -51,7 +48,7 @@ class CalendarWidget extends ConsumerStatefulWidget {
 class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  bool _isWeekView = false;
+  bool _isWeekView = true;
 
   @override
   void initState() {
@@ -81,10 +78,10 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: _sandGold.withValues(alpha: 0.15),
+          color: Colors.white.withValues(alpha: 0.05),
           width: 1,
         ),
       ),
@@ -161,7 +158,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
   // ─── Custom Header ────────────────────────────────────────────────────────
   Widget _buildHeader(HijriCalendar hijri) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 12, 4),
+      padding: const EdgeInsets.fromLTRB(14, 14, 10, 2),
       child: Row(
         children: [
           Expanded(
@@ -171,20 +168,19 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                 Text(
                   DateFormat.yMMMM().format(_focusedDay),
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 18,
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
                     letterSpacing: -0.3,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 Text(
-                  '${hijri.longMonthName} ${hijri.hYear} AH',
+                  '${hijri.longMonthName} ${hijri.hYear}',
                   style: TextStyle(
-                    color: _sandGold.withValues(alpha: 0.6),
-                    fontSize: 12,
+                    color: _sandGold.withValues(alpha: 0.5),
+                    fontSize: 11,
                     fontWeight: FontWeight.w400,
-                    letterSpacing: 0.3,
                   ),
                 ),
               ],
@@ -197,34 +193,32 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
               setState(() {
                 _focusedDay = DateTime.now();
                 _selectedDay = DateTime.now();
-                _isWeekView = false;
               });
             },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: _sandGold.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _sandGold.withValues(alpha: 0.2)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Text(
+                'Today',
+                style: TextStyle(
+                  color: _sandGold.withValues(alpha: 0.6),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.today_rounded,
-                    color: _sandGold.withValues(alpha: 0.7),
-                    size: 14,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Today',
-                    style: TextStyle(
-                      color: _sandGold.withValues(alpha: 0.7),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+            ),
+          ),
+          // Toggle week/month
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() => _isWeekView = !_isWeekView);
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: Icon(
+                _isWeekView ? Icons.calendar_month_rounded : Icons.view_week_rounded,
+                color: Colors.white.withValues(alpha: 0.3),
+                size: 16,
               ),
             ),
           ),
@@ -290,7 +284,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
     } else if (prayerCount >= 3) {
       prayerTextColor = _sandGold;
     } else if (prayerCount >= 1) {
-      prayerTextColor = _desertWarm;
+      prayerTextColor = _sandGold.withValues(alpha: 0.7);
     } else {
       prayerTextColor = Colors.white;
     }
@@ -311,7 +305,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                   : isToday
                       ? _sandGold.withValues(alpha: 0.1)
                       : hasOccasion
-                          ? _desertSunset.withValues(alpha: 0.08)
+                          ? _sandGold.withValues(alpha: 0.08)
                           : Colors.transparent,
               border: isToday && !isSelected
                   ? Border.all(color: _sandGold.withValues(alpha: 0.5), width: 1.5)
@@ -330,7 +324,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                       : isToday
                           ? _sandGold
                           : hasOccasion
-                              ? _desertSunset.withValues(alpha: 0.9)
+                              ? _sandGold.withValues(alpha: 0.9)
                               : isFriday
                                   ? _sandGold.withValues(alpha: 0.7)
                                   : Colors.white.withValues(alpha: 0.65),
@@ -362,7 +356,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                 width: 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: _desertSunset.withValues(alpha: 0.7),
+                  color: _sandGold.withValues(alpha: 0.7),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -386,17 +380,17 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
             DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day));
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(14),
+          color: Colors.white.withValues(alpha: 0.03),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: occasion != null
-                ? _desertSunset.withValues(alpha: 0.2)
-                : _sandGold.withValues(alpha: 0.08),
+                ? _sandGold.withValues(alpha: 0.15)
+                : Colors.white.withValues(alpha: 0.04),
           ),
         ),
         child: Column(
@@ -406,52 +400,29 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
             Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _selectedDay != null
-                            ? (isToday ? 'Today' : DateFormat('EEEE').format(_selectedDay!))
-                            : 'Today',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        DateFormat('d MMMM yyyy').format(_selectedDay ?? DateTime.now()),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.4),
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    _selectedDay != null
+                        ? (isToday ? 'Today' : DateFormat('EEE, d MMM').format(_selectedDay!))
+                        : 'Today',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-                // Hijri chip
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: _sandGold.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: _sandGold.withValues(alpha: 0.15)),
-                  ),
-                  child: Text(
-                    '${hijri.hDay} ${hijri.shortMonthName} ${hijri.hYear}',
-                    style: TextStyle(
-                      color: _sandGold.withValues(alpha: 0.8),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.3,
-                    ),
+                // Hijri
+                Text(
+                  '${hijri.hDay} ${hijri.shortMonthName} ${hijri.hYear}',
+                  style: TextStyle(
+                    color: _sandGold.withValues(alpha: 0.55),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
 
             // Activity chips row
             Wrap(
@@ -464,15 +435,13 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                     '$prayerCount/5',
                     prayerCount == 5
                         ? _oasisGreen
-                        : prayerCount >= 3
-                            ? _sandGold
-                            : _camelBrown,
+                        : _sandGold,
                     filled: prayerCount == 5,
                   ),
                 if (isJummah)
                   _buildChip(Icons.auto_awesome, 'Jummah', _sandGold),
                 if (isSunnahFast)
-                  _buildChip(Icons.restaurant_rounded, 'Sunnah Fast', _desertWarm),
+                  _buildChip(Icons.restaurant_rounded, 'Sunnah Fast', _sandGold),
               ],
             ),
 
@@ -484,11 +453,11 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(colors: [
-                    _desertSunset.withValues(alpha: 0.12),
-                    _sandGold.withValues(alpha: 0.08),
+                    _sandGold.withValues(alpha: 0.12),
+                    _sandGold.withValues(alpha: 0.06),
                   ]),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: _desertSunset.withValues(alpha: 0.2)),
+                  border: Border.all(color: _sandGold.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
@@ -509,7 +478,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                           Text(
                             'Islamic Occasion',
                             style: TextStyle(
-                              color: _desertSunset.withValues(alpha: 0.6),
+                              color: _sandGold.withValues(alpha: 0.6),
                               fontSize: 10,
                             ),
                           ),

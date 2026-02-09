@@ -90,61 +90,139 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
     final planKeys = ['monthly', 'yearly', 'lifetime'];
     final selectedKey = planKeys[_selectedPlan];
     
-    // TODO: Implement actual in-app purchase
-    // For now, simulate purchase
-    _showPurchaseSimulation(selectedKey);
+    _showCouponCodeDialog(selectedKey);
   }
 
-  void _showPurchaseSimulation(String planType) {
+  void _showCouponCodeDialog(String planType) {
+    final couponController = TextEditingController();
+    String? errorText;
+    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.shopping_cart, color: Color(0xFFC2A366)),
-            const SizedBox(width: 12),
-            const Text('Purchase', style: TextStyle(color: Colors.white)),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFC2A366).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.confirmation_number_outlined, 
+                    color: Color(0xFFC2A366), size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text('Coupon Code', 
+                    style: TextStyle(color: Colors.white, fontSize: 18)),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Have a coupon code? Enter it below to unlock ${planType[0].toUpperCase()}${planType.substring(1)} plan for free.',
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.6), fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: couponController,
+                autofocus: true,
+                textCapitalization: TextCapitalization.characters,
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600,
+                    letterSpacing: 2),
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  hintText: 'ENTER CODE',
+                  hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.2), 
+                      fontSize: 14, letterSpacing: 2),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.06),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                        color: errorText != null 
+                            ? Colors.red.withValues(alpha: 0.5) 
+                            : const Color(0xFFC2A366).withValues(alpha: 0.3)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                        color: errorText != null 
+                            ? Colors.red.withValues(alpha: 0.5) 
+                            : const Color(0xFFC2A366).withValues(alpha: 0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                        color: Color(0xFFC2A366), width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                  errorText: errorText,
+                  errorStyle: const TextStyle(fontSize: 12),
+                ),
+                onChanged: (_) {
+                  if (errorText != null) {
+                    setDialogState(() => errorText = null);
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('Cancel', 
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final code = couponController.text.trim().toUpperCase();
+                if (code == 'CAMEL') {
+                  Navigator.pop(dialogContext);
+                  
+                  // Activate premium with zero cost
+                  DateTime? expiry;
+                  if (planType == 'monthly') {
+                    expiry = DateTime.now().add(const Duration(days: 30));
+                  } else if (planType == 'yearly') {
+                    expiry = DateTime.now().add(const Duration(days: 365));
+                  }
+                  // lifetime = no expiry
+                  
+                  await ref.read(premiumProvider.notifier).activatePremium(
+                    type: planType,
+                    expiryDate: expiry,
+                  );
+                  
+                  if (mounted) {
+                    _showSuccessAnimation();
+                  }
+                } else {
+                  setDialogState(() => errorText = 'Invalid coupon code');
+                  HapticFeedback.heavyImpact();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFC2A366),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: const Text('Apply', 
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+            ),
           ],
         ),
-        content: Text(
-          'In production, this would open Google Play billing for the $planType plan.\n\nFor testing, tap "Simulate Purchase" to unlock premium.',
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              
-              // Simulate purchase
-              DateTime? expiry;
-              if (planType == 'monthly') {
-                expiry = DateTime.now().add(const Duration(days: 30));
-              } else if (planType == 'yearly') {
-                expiry = DateTime.now().add(const Duration(days: 365));
-              }
-              // lifetime = no expiry
-              
-              await ref.read(premiumProvider.notifier).activatePremium(
-                type: planType,
-                expiryDate: expiry,
-              );
-              
-              if (mounted) {
-                _showSuccessAnimation();
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFC2A366),
-            ),
-            child: const Text('Simulate Purchase', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }

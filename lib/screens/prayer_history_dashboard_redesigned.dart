@@ -249,9 +249,9 @@ class _OverviewTab extends StatelessWidget {
         const SizedBox(height: 12),
         _buildPrayerBreakdown(stats),
         const SizedBox(height: 24),
-        _buildSectionLabel('Recent Activity'),
+        _buildSectionLabel('Daily Namaz History'),
         const SizedBox(height: 12),
-        _buildRecentActivity(),
+        _buildNamazHistory(),
       ],
     );
   }
@@ -611,28 +611,26 @@ class _OverviewTab extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentActivity() {
-    final recent = records.take(5).toList();
-    
-    if (recent.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: _cardBg,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
-        ),
-        child: Center(
-          child: Text(
-            'No activity yet',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.3),
-              fontSize: 13,
-            ),
-          ),
-        ),
-      );
-    }
+  Widget _buildNamazHistory() {
+    final now = DateTime.now();
+    // Show last 7 days
+    final days = List.generate(7, (i) {
+      final d = now.subtract(Duration(days: i));
+      final key = _formatDate(d);
+      return {
+        'date': d,
+        'record': recordsMap[key],
+      };
+    });
+
+    final prayerNames = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+    final prayerIcons = [
+      Icons.wb_twilight_rounded,
+      Icons.wb_sunny_rounded,
+      Icons.wb_sunny_outlined,
+      Icons.nights_stay_outlined,
+      Icons.dark_mode_rounded,
+    ];
 
     return Container(
       decoration: BoxDecoration(
@@ -641,98 +639,127 @@ class _OverviewTab extends StatelessWidget {
         border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
       ),
       child: Column(
-        children: recent.asMap().entries.map((entry) {
+        children: days.asMap().entries.map((entry) {
           final i = entry.key;
-          final r = entry.value;
-          final isLast = i == recent.length - 1;
-          
+          final date = entry.value['date'] as DateTime;
+          final record = entry.value['record'] as PrayerRecord?;
+          final isLast = i == days.length - 1;
+          final isToday = i == 0;
+          final isYesterday = i == 1;
+          final completed = record?.completedCount ?? 0;
+          final prayed = [
+            record?.fajr ?? false,
+            record?.dhuhr ?? false,
+            record?.asr ?? false,
+            record?.maghrib ?? false,
+            record?.isha ?? false,
+          ];
+
+          String dayLabel;
+          if (isToday) {
+            dayLabel = 'Today';
+          } else if (isYesterday) {
+            dayLabel = 'Yesterday';
+          } else {
+            final weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            dayLabel = '${weekDays[date.weekday - 1]}, ${date.day} ${_monthAbbr(date.month)}';
+          }
+
           return Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              border: isLast 
-                  ? null 
+              color: isToday ? _gold.withValues(alpha: 0.03) : null,
+              border: isLast
+                  ? null
                   : Border(
                       bottom: BorderSide(
                         color: Colors.white.withValues(alpha: 0.04),
                       ),
                     ),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: r.completedCount == 5 
-                        ? _gold.withValues(alpha: 0.12)
-                        : Colors.white.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '${r.date.day}',
+                // Day label + count badge
+                Row(
+                  children: [
+                    Text(
+                      dayLabel,
+                      style: TextStyle(
+                        color: isToday ? _gold : Colors.white.withValues(alpha: 0.6),
+                        fontSize: 12,
+                        fontWeight: isToday ? FontWeight.w600 : FontWeight.w500,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: completed == 5
+                            ? _gold.withValues(alpha: 0.15)
+                            : completed > 0
+                                ? Colors.white.withValues(alpha: 0.05)
+                                : Colors.transparent,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        completed == 5 ? '✓ All' : '$completed/5',
                         style: TextStyle(
-                          color: r.completedCount == 5 
-                              ? _gold 
-                              : Colors.white.withValues(alpha: 0.7),
-                          fontSize: 14,
+                          color: completed == 5
+                              ? _gold
+                              : Colors.white.withValues(alpha: 0.3),
+                          fontSize: 10,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      Text(
-                        _monthAbbr(r.date.month),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.25),
-                          fontSize: 9,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // 5 prayer status pills
+                Row(
+                  children: List.generate(5, (pi) {
+                    final done = prayed[pi];
+                    return Expanded(
+                      child: Container(
+                        margin: EdgeInsets.only(right: pi < 4 ? 6 : 0),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        decoration: BoxDecoration(
+                          color: done
+                              ? _gold.withValues(alpha: 0.12)
+                              : Colors.white.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: done
+                                ? _gold.withValues(alpha: 0.25)
+                                : Colors.white.withValues(alpha: 0.06),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              done ? Icons.check_rounded : prayerIcons[pi],
+                              size: 14,
+                              color: done
+                                  ? _gold
+                                  : Colors.white.withValues(alpha: 0.2),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              prayerNames[pi],
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: done
+                                    ? _gold.withValues(alpha: 0.8)
+                                    : Colors.white.withValues(alpha: 0.25),
+                                fontWeight: done ? FontWeight.w600 : FontWeight.w400,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ...List.generate(5, (pi) {
-                  final done = [r.fajr, r.dhuhr, r.asr, r.maghrib, r.isha][pi];
-                  return Container(
-                    width: 28,
-                    height: 28,
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    decoration: BoxDecoration(
-                      color: done 
-                          ? _gold.withValues(alpha: 0.15)
-                          : Colors.white.withValues(alpha: 0.02),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: done 
-                            ? _gold.withValues(alpha: 0.4)
-                            : Colors.white.withValues(alpha: 0.06),
-                      ),
-                    ),
-                    child: done 
-                        ? Icon(Icons.check_rounded, size: 14, color: _gold)
-                        : null,
-                  );
-                }),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: r.completedCount == 5 
-                        ? _gold.withValues(alpha: 0.12)
-                        : Colors.white.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '${r.completedCount}/5',
-                    style: TextStyle(
-                      color: r.completedCount == 5 
-                          ? _gold 
-                          : Colors.white.withValues(alpha: 0.4),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                    );
+                  }),
                 ),
               ],
             ),

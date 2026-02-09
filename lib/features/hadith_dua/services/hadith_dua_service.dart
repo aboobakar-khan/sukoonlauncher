@@ -554,6 +554,24 @@ class HadithDuaService {
       category: 'Food & Drink',
       source: 'Abu Dawud, Tirmidhi',
     ),
+    Dua(
+      id: 'eating_3',
+      title: 'When Forgetting Bismillah',
+      arabicText: 'بِسْمِ اللَّهِ أَوَّلَهُ وَآخِرَهُ',
+      transliteration: "Bismillahi awwalahu wa akhirah",
+      translation: "In the name of Allah at the beginning and at the end of it.",
+      category: 'Food & Drink',
+      source: 'Abu Dawud, Tirmidhi',
+    ),
+    Dua(
+      id: 'drinking_1',
+      title: 'After Drinking Water',
+      arabicText: 'الْحَمْدُ لِلَّهِ الَّذِي سَقَانَا عَذْبًا فُرَاتًا بِرَحْمَتِهِ وَلَمْ يَجْعَلْهُ مِلْحًا أُجَاجًا بِذُنُوبِنَا',
+      transliteration: "Alhamdu lillahil-ladhi saqana 'adhban furatan bi rahmatih, wa lam yaj'alhu milhan ujajan bi dhunubina",
+      translation: "All praise is due to Allah who gave us sweet, fresh water by His mercy and did not make it salty and bitter due to our sins.",
+      category: 'Food & Drink',
+      source: 'Tabarani',
+    ),
     
     // Travel
     Dua(
@@ -564,6 +582,24 @@ class HadithDuaService {
       translation: "Glory be to Him who has subjected this for us, and we would not have been able to subdue it. And indeed, to our Lord we will return.",
       category: 'Travel',
       source: 'Muslim',
+    ),
+    Dua(
+      id: 'travel_2',
+      title: 'Returning from Travel',
+      arabicText: 'آيِبُونَ تَائِبُونَ عَابِدُونَ لِرَبِّنَا حَامِدُونَ',
+      transliteration: "Ayibuna, ta'ibuna, 'abiduna, li Rabbina hamidun",
+      translation: "We return, repenting, worshipping, and praising our Lord.",
+      category: 'Travel',
+      source: 'Muslim',
+    ),
+    Dua(
+      id: 'travel_3',
+      title: 'Entering a Town or City',
+      arabicText: 'اللَّهُمَّ رَبَّ السَّمَاوَاتِ السَّبْعِ وَمَا أَظْلَلْنَ، وَرَبَّ الْأَرَضِينَ السَّبْعِ وَمَا أَقْلَلْنَ، أَسْأَلُكَ خَيْرَ هَٰذِهِ الْقَرْيَةِ وَخَيْرَ أَهْلِهَا',
+      transliteration: "Allahumma Rabbas-samawatis-sab'i wa ma azlalna, wa Rabbal-aradinas-sab'i wa ma aqlalna, as'aluka khayra hadhihil-qaryati wa khayra ahliha",
+      translation: "O Allah, Lord of the seven heavens and all they shade, Lord of the seven earths and all they bear, I ask You for the good of this town and the good of its people.",
+      category: 'Travel',
+      source: 'Ibn Hibban',
     ),
     
     // Forgiveness
@@ -636,6 +672,24 @@ class HadithDuaService {
       category: 'Gratitude',
       source: 'Abu Dawud, Nasai',
     ),
+    Dua(
+      id: 'gratitude_2',
+      title: 'When Seeing Someone in Trial',
+      arabicText: 'الْحَمْدُ لِلَّهِ الَّذِي عَافَانِي مِمَّا ابْتَلَاكَ بِهِ، وَفَضَّلَنِي عَلَى كَثِيرٍ مِمَّنْ خَلَقَ تَفْضِيلًا',
+      transliteration: "Alhamdu lillahil-ladhi 'afani mimmabtilaka bihi, wa faddalani 'ala kathirin mimman khalaqa tafdila",
+      translation: "All praise is due to Allah who has saved me from what He has tested you with, and has favored me greatly over many of His creation.",
+      category: 'Gratitude',
+      source: 'Tirmidhi',
+    ),
+    Dua(
+      id: 'gratitude_3',
+      title: 'Upon Receiving Good News',
+      arabicText: 'الْحَمْدُ لِلَّهِ الَّذِي بِنِعْمَتِهِ تَتِمُّ الصَّالِحَاتُ',
+      transliteration: "Alhamdu lillahil-ladhi bi ni'matihi tatimmus-salihat",
+      translation: "All praise is due to Allah by whose blessing all good things are completed.",
+      category: 'Gratitude',
+      source: 'Ibn Majah',
+    ),
     
     // Health
     Dua(
@@ -646,6 +700,24 @@ class HadithDuaService {
       translation: "O Allah, grant me health in my body. O Allah, grant me health in my hearing. O Allah, grant me health in my sight.",
       category: 'Health',
       source: 'Abu Dawud',
+    ),
+    Dua(
+      id: 'health_2',
+      title: 'For Healing',
+      arabicText: 'اللَّهُمَّ رَبَّ النَّاسِ، أَذْهِبِ الْبَأْسَ، اشْفِ أَنْتَ الشَّافِي، لَا شِفَاءَ إِلَّا شِفَاؤُكَ، شِفَاءً لَا يُغَادِرُ سَقَمًا',
+      transliteration: "Allahumma Rabban-nas, adhibil-ba's, ishfi antash-Shafi, la shifa'a illa shifa'uka, shifa'an la yughadiru saqama",
+      translation: "O Allah, Lord of mankind, remove the illness. Cure it, for You are the Healer. There is no cure except Your cure — a cure that leaves no illness behind.",
+      category: 'Health',
+      source: 'Bukhari, Muslim',
+    ),
+    Dua(
+      id: 'health_3',
+      title: 'Visiting the Sick',
+      arabicText: 'لَا بَأْسَ طَهُورٌ إِنْ شَاءَ اللَّهُ',
+      transliteration: "La ba'sa, tahoorun in sha Allah",
+      translation: "No worry, it is a purification, if Allah wills.",
+      category: 'Health',
+      source: 'Bukhari',
     ),
     
     // Knowledge
@@ -658,6 +730,24 @@ class HadithDuaService {
       category: 'Knowledge',
       source: 'Ibn Majah',
     ),
+    Dua(
+      id: 'knowledge_2',
+      title: 'Increase in Knowledge',
+      arabicText: 'رَبِّ زِدْنِي عِلْمًا',
+      transliteration: "Rabbi zidni 'ilma",
+      translation: "My Lord, increase me in knowledge.",
+      category: 'Knowledge',
+      source: 'Quran 20:114',
+    ),
+    Dua(
+      id: 'knowledge_3',
+      title: 'Before Studying',
+      arabicText: 'اللَّهُمَّ انْفَعْنِي بِمَا عَلَّمْتَنِي، وَعَلِّمْنِي مَا يَنْفَعُنِي، وَزِدْنِي عِلْمًا',
+      transliteration: "Allahumma-nfa'ni bima 'allamtani, wa 'allimni ma yanfa'uni, wa zidni 'ilma",
+      translation: "O Allah, benefit me with what You have taught me, teach me that which will benefit me, and increase me in knowledge.",
+      category: 'Knowledge',
+      source: 'Tirmidhi',
+    ),
     
     // Parents
     Dua(
@@ -668,6 +758,24 @@ class HadithDuaService {
       translation: "My Lord, have mercy upon them as they brought me up when I was small.",
       category: 'Family',
       source: 'Quran 17:24',
+    ),
+    Dua(
+      id: 'family_2',
+      title: 'For Spouse and Children',
+      arabicText: 'رَبَّنَا هَبْ لَنَا مِنْ أَزْوَاجِنَا وَذُرِّيَّاتِنَا قُرَّةَ أَعْيُنٍ وَاجْعَلْنَا لِلْمُتَّقِينَ إِمَامًا',
+      transliteration: "Rabbana hab lana min azwajina wa dhurriyyatina qurrata a'yunin waj'alna lil-muttaqina imama",
+      translation: "Our Lord, grant us from our spouses and offspring comfort to our eyes, and make us leaders for the righteous.",
+      category: 'Family',
+      source: 'Quran 25:74',
+    ),
+    Dua(
+      id: 'family_3',
+      title: 'For Righteous Offspring',
+      arabicText: 'رَبِّ هَبْ لِي مِنَ الصَّالِحِينَ',
+      transliteration: "Rabbi hab li minas-salihin",
+      translation: "My Lord, grant me righteous offspring.",
+      category: 'Family',
+      source: 'Quran 37:100',
     ),
     
     // General
@@ -688,6 +796,33 @@ class HadithDuaService {
       translation: "O Allah, I ask You for all that is good, in this world and in the Hereafter, what I know and what I do not know.",
       category: 'General',
       source: 'Ibn Majah',
+    ),
+    Dua(
+      id: 'general_3',
+      title: 'For Steadfastness',
+      arabicText: 'يَا مُقَلِّبَ الْقُلُوبِ ثَبِّتْ قَلْبِي عَلَى دِينِكَ',
+      transliteration: "Ya Muqallibal-qulub, thabbit qalbi 'ala dinik",
+      translation: "O Turner of the hearts, make my heart firm upon Your religion.",
+      category: 'General',
+      source: 'Tirmidhi',
+    ),
+    Dua(
+      id: 'general_4',
+      title: 'Entering the Masjid',
+      arabicText: 'اللَّهُمَّ افْتَحْ لِي أَبْوَابَ رَحْمَتِكَ',
+      transliteration: "Allahumma-ftah li abwaba rahmatik",
+      translation: "O Allah, open for me the doors of Your mercy.",
+      category: 'General',
+      source: 'Muslim',
+    ),
+    Dua(
+      id: 'general_5',
+      title: 'Leaving the Masjid',
+      arabicText: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ مِنْ فَضْلِكَ',
+      transliteration: "Allahumma inni as'aluka min fadlik",
+      translation: "O Allah, I ask You from Your bounty.",
+      category: 'General',
+      source: 'Muslim',
     ),
   ];
 }

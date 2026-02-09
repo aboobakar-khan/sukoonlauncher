@@ -10,7 +10,10 @@ import '../screens/premium_paywall_screen.dart';
 class PrayerAnalyticsWidget extends ConsumerWidget {
   const PrayerAnalyticsWidget({super.key});
 
-  static const Color _green = Color(0xFF40C463);
+  static const Color _green = Color(0xFF7BAE6E);
+  static const Color _gold = Color(0xFFC2A366);
+  static const Color _cardBg = Color(0xFF111111);
+  static const Color _borderColor = Color(0xFF1E1E1E);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -45,170 +48,86 @@ class PrayerAnalyticsWidget extends ConsumerWidget {
         );
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isPremium
-                ? [
-                    _green.withValues(alpha: 0.1),
-                    _green.withValues(alpha: 0.04),
-                  ]
-                : [
-                    Colors.white.withValues(alpha: 0.03),
-                    Colors.white.withValues(alpha: 0.01),
-                  ],
-          ),
-          borderRadius: BorderRadius.circular(16),
+          color: _cardBg,
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isPremium
-                ? _green.withValues(alpha: 0.15)
-                : Colors.white.withValues(alpha: 0.08),
+                ? _gold.withValues(alpha: 0.12)
+                : _borderColor,
           ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _green.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.mosque,
-                    color: isPremium ? _green : Colors.white.withValues(alpha: 0.4),
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Prayer Analytics',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: isPremium ? 0.9 : 0.5),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-                if (!isPremium)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF40C463), Color(0xFF30A14E)],
-                      ),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text(
-                      'PRO',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  )
-                else
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    color: _green.withValues(alpha: 0.5),
-                    size: 14,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Mini stats
-            Row(
-              children: [
-                _buildMiniStat(
-                  Icons.calendar_today,
-                  '$thisWeekCount/35',
-                  'This Week',
-                  _green,
-                  isPremium,
-                ),
-                const SizedBox(width: 16),
-                _buildMiniStat(
-                  Icons.star,
-                  perfectDays.toString(),
-                  'Perfect Days',
-                  Colors.amber,
-                  isPremium,
-                ),
-              ],
-            ),
-
-            if (isPremium) ...[
-              const SizedBox(height: 16),
-              // Weekly prayer dots
-              Row(
-                children: List.generate(7, (i) {
-                  final date = now.subtract(Duration(days: 6 - i));
-                  final key = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-                  final record = recordsMap[key];
-                  final completed = record?.completedCount ?? 0;
-
-                  return Expanded(
-                    child: Container(
-                      height: 4,
-                      margin: EdgeInsets.only(right: i < 6 ? 3 : 0),
-                      decoration: BoxDecoration(
-                        color: completed == 0
-                            ? Colors.white.withValues(alpha: 0.05)
-                            : completed == 5
-                                ? _green
-                                : _green.withValues(alpha: completed / 5 * 0.8),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  );
-                }),
+            // Icon
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _gold.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(10),
               ),
-            ],
+              child: Icon(
+                Icons.mosque,
+                color: isPremium ? _gold : Colors.white.withValues(alpha: 0.3),
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Prayer Analytics',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: isPremium ? 0.85 : 0.45),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isPremium
+                        ? '$thisWeekCount/35 this week · $perfectDays perfect days'
+                        : 'Unlock detailed prayer insights',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.35),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Badge or arrow
+            if (!isPremium)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFC2A366), Color(0xFFA8874D)],
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'PRO',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              )
+            else
+              Icon(
+                Icons.arrow_forward_ios,
+                color: _gold.withValues(alpha: 0.4),
+                size: 14,
+              ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildMiniStat(IconData icon, String value, String label, Color color, bool isPremium) {
-    return Expanded(
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            color: isPremium ? color : Colors.white.withValues(alpha: 0.3),
-            size: 14,
-          ),
-          const SizedBox(width: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                isPremium ? value : '•••',
-                style: TextStyle(
-                  color: isPremium ? color : Colors.white.withValues(alpha: 0.3),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: isPremium ? 0.4 : 0.2),
-                  fontSize: 9,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

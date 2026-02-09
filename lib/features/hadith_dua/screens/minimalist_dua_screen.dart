@@ -5,9 +5,13 @@ import 'package:share_plus/share_plus.dart';
 import '../providers/hadith_dua_provider.dart';
 import '../models/hadith_dua_models.dart';
 
-// Design Tokens
+// ── Warm Reading Palette ──
+const Color _creamBg = Color(0xFFFDF6EC);
+const Color _warmSand = Color(0xFFF5E6C8);
+const Color _richBrown = Color(0xFF2C1810);
+const Color _warmBrown = Color(0xFF5C4033);
 const Color _gold = Color(0xFFC2A366);
-const Color _warmBg = Color(0xFF0D0D0D);
+const Color _islamicGreen = Color(0xFF2E7D32);
 
 /// Minimalist Dua Screen — Redesigned
 ///
@@ -29,12 +33,19 @@ class _MinimalistDuaScreenState extends ConsumerState<MinimalistDuaScreen> {
 
   static const List<Map<String, dynamic>> _categories = [
     {'id': 'all', 'name': 'All', 'icon': Icons.auto_awesome_outlined},
-    {'id': 'daily', 'name': 'Daily', 'icon': Icons.wb_sunny_outlined},
-    {'id': 'morning_evening', 'name': 'Morning', 'icon': Icons.nights_stay_outlined},
-    {'id': 'prayer', 'name': 'Prayer', 'icon': Icons.mosque_outlined},
-    {'id': 'protection', 'name': 'Protection', 'icon': Icons.shield_outlined},
-    {'id': 'travel', 'name': 'Travel', 'icon': Icons.flight_outlined},
-    {'id': 'food', 'name': 'Food', 'icon': Icons.restaurant_outlined},
+    {'id': 'Morning & Evening', 'name': 'Morning', 'icon': Icons.nights_stay_outlined},
+    {'id': 'Protection', 'name': 'Protection', 'icon': Icons.shield_outlined},
+    {'id': 'Sleep', 'name': 'Sleep', 'icon': Icons.bedtime_outlined},
+    {'id': 'Food & Drink', 'name': 'Food', 'icon': Icons.restaurant_outlined},
+    {'id': 'Travel', 'name': 'Travel', 'icon': Icons.flight_outlined},
+    {'id': 'Forgiveness', 'name': 'Forgiveness', 'icon': Icons.favorite_outline},
+    {'id': 'Distress', 'name': 'Distress', 'icon': Icons.healing_outlined},
+    {'id': 'Guidance', 'name': 'Guidance', 'icon': Icons.explore_outlined},
+    {'id': 'Gratitude', 'name': 'Gratitude', 'icon': Icons.volunteer_activism_outlined},
+    {'id': 'Health', 'name': 'Health', 'icon': Icons.health_and_safety_outlined},
+    {'id': 'Knowledge', 'name': 'Knowledge', 'icon': Icons.school_outlined},
+    {'id': 'Family', 'name': 'Family', 'icon': Icons.family_restroom_outlined},
+    {'id': 'General', 'name': 'General', 'icon': Icons.star_outline},
   ];
 
   @override
@@ -62,47 +73,30 @@ class _MinimalistDuaScreenState extends ConsumerState<MinimalistDuaScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: _gold.withValues(alpha: 0.12),
+              color: _islamicGreen.withOpacity(0.08),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.favorite_outline, color: _gold, size: 20),
+            child: Icon(Icons.favorite_outline, color: _islamicGreen.withOpacity(0.6), size: 20),
           ),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Duas',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Text(
-                'Supplications from Quran & Sunnah',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.4),
-                  fontSize: 11,
-                ),
-              ),
+              Text('Duas',
+                style: TextStyle(color: _richBrown.withOpacity(0.85), fontSize: 18, fontWeight: FontWeight.w600)),
+              Text('Supplications from Quran & Sunnah',
+                style: TextStyle(color: _warmBrown.withOpacity(0.4), fontSize: 11)),
             ],
           ),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
+              color: _islamicGreen.withOpacity(0.06),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(
-              '${allDuas.length}',
-              style: TextStyle(
-                color: _gold.withValues(alpha: 0.6),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: Text('${allDuas.length}',
+              style: TextStyle(color: _islamicGreen.withOpacity(0.6), fontSize: 13, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -136,13 +130,13 @@ class _MinimalistDuaScreenState extends ConsumerState<MinimalistDuaScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? _gold.withValues(alpha: 0.12)
-                    : Colors.white.withValues(alpha: 0.03),
+                    ? _islamicGreen.withOpacity(0.08)
+                    : _warmSand.withOpacity(0.4),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSelected
-                      ? _gold.withValues(alpha: 0.35)
-                      : Colors.white.withValues(alpha: 0.06),
+                      ? _islamicGreen.withOpacity(0.25)
+                      : _warmSand.withOpacity(0.6),
                 ),
               ),
               child: Row(
@@ -152,16 +146,16 @@ class _MinimalistDuaScreenState extends ConsumerState<MinimalistDuaScreen> {
                     category['icon'] as IconData,
                     size: 14,
                     color: isSelected
-                        ? _gold
-                        : Colors.white.withValues(alpha: 0.35),
+                        ? _islamicGreen.withOpacity(0.7)
+                        : _warmBrown.withOpacity(0.35),
                   ),
                   const SizedBox(width: 6),
                   Text(
                     category['name']!,
                     style: TextStyle(
                       color: isSelected
-                          ? _gold
-                          : Colors.white.withValues(alpha: 0.5),
+                          ? _islamicGreen.withOpacity(0.8)
+                          : _warmBrown.withOpacity(0.45),
                       fontSize: 12,
                       fontWeight:
                           isSelected ? FontWeight.w500 : FontWeight.w400,
@@ -174,16 +168,16 @@ class _MinimalistDuaScreenState extends ConsumerState<MinimalistDuaScreen> {
                           horizontal: 5, vertical: 1),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? _gold.withValues(alpha: 0.2)
-                            : Colors.white.withValues(alpha: 0.06),
+                            ? _islamicGreen.withOpacity(0.12)
+                            : _warmSand.withOpacity(0.6),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         '$count',
                         style: TextStyle(
                           color: isSelected
-                              ? _gold.withValues(alpha: 0.8)
-                              : Colors.white.withValues(alpha: 0.3),
+                              ? _islamicGreen.withOpacity(0.7)
+                              : _warmBrown.withOpacity(0.35),
                           fontSize: 9,
                           fontWeight: FontWeight.w600,
                         ),
@@ -229,28 +223,18 @@ class _MinimalistDuaScreenState extends ConsumerState<MinimalistDuaScreen> {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: _gold.withValues(alpha: 0.08),
+              color: _warmSand.withOpacity(0.5),
               shape: BoxShape.circle,
             ),
             child: Icon(Icons.favorite_outline,
-                color: _gold.withValues(alpha: 0.3), size: 24),
+                color: _warmBrown.withOpacity(0.3), size: 24),
           ),
           const SizedBox(height: 16),
-          Text(
-            'No duas in this category',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.4),
-              fontSize: 14,
-            ),
-          ),
+          Text('No duas in this category',
+            style: TextStyle(color: _warmBrown.withOpacity(0.5), fontSize: 14)),
           const SizedBox(height: 4),
-          Text(
-            'Try selecting a different category',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.2),
-              fontSize: 12,
-            ),
-          ),
+          Text('Try selecting a different category',
+            style: TextStyle(color: _warmBrown.withOpacity(0.3), fontSize: 12)),
         ],
       ),
     );
@@ -287,9 +271,9 @@ class _DuaCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.03),
+          color: _warmSand.withOpacity(0.3),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          border: Border.all(color: _warmSand.withOpacity(0.5)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -300,14 +284,14 @@ class _DuaCard extends StatelessWidget {
                   width: 28,
                   height: 28,
                   decoration: BoxDecoration(
-                    color: _gold.withValues(alpha: 0.1),
+                    color: _islamicGreen.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Center(
                     child: Text(
                       '${index + 1}',
                       style: TextStyle(
-                        color: _gold.withValues(alpha: 0.7),
+                        color: _islamicGreen.withOpacity(0.6),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -319,7 +303,7 @@ class _DuaCard extends StatelessWidget {
                   child: Text(
                     dua.title,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
+                      color: _richBrown.withOpacity(0.8),
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
@@ -333,13 +317,13 @@ class _DuaCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: _gold.withValues(alpha: 0.08),
+                      color: _islamicGreen.withOpacity(0.06),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       dua.category!.replaceAll('_', ' ').toUpperCase(),
                       style: TextStyle(
-                        color: _gold.withValues(alpha: 0.6),
+                        color: _islamicGreen.withOpacity(0.5),
                         fontSize: 8,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.5,
@@ -354,7 +338,7 @@ class _DuaCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.02),
+                color: Colors.white.withOpacity(0.4),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -362,9 +346,10 @@ class _DuaCard extends StatelessWidget {
                     ? '${dua.arabicText.substring(0, 100)}...'
                     : dua.arabicText,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.55),
+                  color: _richBrown.withOpacity(0.7),
                   fontSize: 18,
                   height: 1.8,
+                  fontFamily: 'Amiri',
                 ),
                 textDirection: TextDirection.rtl,
                 textAlign: TextAlign.center,
@@ -379,7 +364,7 @@ class _DuaCard extends StatelessWidget {
                   child: Text(
                     dua.translation,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.35),
+                      color: _warmBrown.withOpacity(0.45),
                       fontSize: 12,
                       height: 1.4,
                     ),
@@ -389,7 +374,7 @@ class _DuaCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Icon(Icons.arrow_forward_ios,
-                    size: 10, color: _gold.withValues(alpha: 0.3)),
+                    size: 10, color: _gold.withOpacity(0.3)),
               ],
             ),
           ],
@@ -438,25 +423,33 @@ class _DuaReaderScreenState extends State<DuaReaderScreen> {
   Widget build(BuildContext context) {
     final duas = widget.allDuas ?? [widget.dua];
 
-    return Scaffold(
-      backgroundColor: _warmBg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildReaderHeader(context, duas[_currentIndex]),
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: duas.length,
-                onPageChanged: (i) {
-                  setState(() => _currentIndex = i);
-                  HapticFeedback.selectionClick();
-                },
-                itemBuilder: (_, i) => _DuaPage(dua: duas[i]),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: _creamBg,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: _creamBg,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: _creamBg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildReaderHeader(context, duas[_currentIndex]),
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: duas.length,
+                  onPageChanged: (i) {
+                    setState(() => _currentIndex = i);
+                    HapticFeedback.selectionClick();
+                  },
+                  itemBuilder: (_, i) => _DuaPage(dua: duas[i]),
+                ),
               ),
-            ),
-            _buildActionBar(context, duas[_currentIndex], duas.length),
-          ],
+              _buildActionBar(context, duas[_currentIndex], duas.length),
+            ],
+          ),
         ),
       ),
     );
@@ -464,22 +457,15 @@ class _DuaReaderScreenState extends State<DuaReaderScreen> {
 
   Widget _buildReaderHeader(BuildContext context, Dua dua) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.fromLTRB(8, 4, 16, 8),
+      color: _creamBg,
       child: Row(
         children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.04),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(Icons.arrow_back_ios_new,
-                  color: Colors.white.withValues(alpha: 0.4), size: 16),
-            ),
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: Icon(Icons.arrow_back, color: _richBrown.withOpacity(0.6), size: 22),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 4),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -488,7 +474,7 @@ class _DuaReaderScreenState extends State<DuaReaderScreen> {
                   Text(
                     dua.category!.replaceAll('_', ' ').toUpperCase(),
                     style: TextStyle(
-                      color: _gold.withValues(alpha: 0.6),
+                      color: _warmBrown.withOpacity(0.4),
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1.2,
@@ -497,7 +483,7 @@ class _DuaReaderScreenState extends State<DuaReaderScreen> {
                 Text(
                   dua.title,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
+                    color: _richBrown.withOpacity(0.75),
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -510,13 +496,13 @@ class _DuaReaderScreenState extends State<DuaReaderScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: _gold.withValues(alpha: 0.08),
+              color: _islamicGreen.withOpacity(0.06),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               '${_currentIndex + 1} / ${widget.allDuas?.length ?? 1}',
               style: TextStyle(
-                color: _gold.withValues(alpha: 0.6),
+                color: _islamicGreen.withOpacity(0.55),
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
               ),
@@ -529,11 +515,10 @@ class _DuaReaderScreenState extends State<DuaReaderScreen> {
 
   Widget _buildActionBar(BuildContext context, Dua dua, int totalCount) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       decoration: BoxDecoration(
-        color: _warmBg,
-        border: Border(
-            top: BorderSide(color: Colors.white.withValues(alpha: 0.03))),
+        color: _creamBg,
+        border: Border(top: BorderSide(color: _warmSand.withOpacity(0.5))),
       ),
       child: Row(
         children: [
@@ -546,28 +531,34 @@ class _DuaReaderScreenState extends State<DuaReaderScreen> {
             ),
           ),
           const Spacer(),
-          _buildActionIcon(Icons.copy_rounded, 'Copy', () {
-            final text =
-                '${dua.arabicText}\n\n${dua.transliteration}\n\n${dua.translation}\n\n— ${dua.source ?? "Islamic Dua"}';
-            Clipboard.setData(ClipboardData(text: text));
-            HapticFeedback.lightImpact();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('Dua copied'),
-                backgroundColor: _gold.withValues(alpha: 0.9),
+          GestureDetector(
+            onTap: () {
+              final text =
+                  '${dua.arabicText}\n\n${dua.transliteration}\n\n${dua.translation}\n\n— ${dua.source ?? "Islamic Dua"}';
+              Clipboard.setData(ClipboardData(text: text));
+              HapticFeedback.lightImpact();
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: const Text('Copied', style: TextStyle(color: Colors.white)),
+                backgroundColor: _gold,
                 duration: const Duration(seconds: 1),
                 behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-            );
-          }),
-          const SizedBox(width: 16),
-          _buildActionIcon(Icons.share_rounded, 'Share', () {
-            final text =
-                '${dua.title}\n\n${dua.arabicText}\n\n${dua.transliteration}\n\n${dua.translation}\n\n— ${dua.source ?? "Islamic Dua"}';
-            Share.share(text);
-          }),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ));
+            },
+            child: Icon(Icons.copy_rounded, color: _warmBrown.withOpacity(0.4), size: 20),
+          ),
+          const SizedBox(width: 20),
+          Text('${_currentIndex + 1}/$totalCount',
+            style: TextStyle(color: _warmBrown.withOpacity(0.35), fontSize: 12, fontWeight: FontWeight.w500)),
+          const SizedBox(width: 20),
+          GestureDetector(
+            onTap: () {
+              final text =
+                  '${dua.title}\n\n${dua.arabicText}\n\n${dua.transliteration}\n\n${dua.translation}\n\n— ${dua.source ?? "Islamic Dua"}';
+              Share.share(text);
+            },
+            child: Icon(Icons.share_rounded, color: _warmBrown.withOpacity(0.4), size: 20),
+          ),
           const Spacer(),
           _buildNavButton(
             Icons.chevron_right,
@@ -585,51 +576,13 @@ class _DuaReaderScreenState extends State<DuaReaderScreen> {
   Widget _buildNavButton(IconData icon,
       {required bool enabled, required VoidCallback onTap}) {
     return GestureDetector(
-      onTap: enabled
-          ? () {
-              HapticFeedback.lightImpact();
-              onTap();
-            }
-          : null,
+      onTap: enabled ? () { HapticFeedback.lightImpact(); onTap(); } : null,
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: enabled ? 0.04 : 0.02),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon,
-            color: Colors.white.withValues(alpha: enabled ? 0.5 : 0.12),
-            size: 20),
-      ),
-    );
-  }
-
-  Widget _buildActionIcon(IconData icon, String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: Colors.white.withValues(alpha: 0.5), size: 16),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
+          color: enabled ? _warmSand.withOpacity(0.5) : _warmSand.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(8)),
+        child: Icon(icon, color: enabled ? _warmBrown.withOpacity(0.6) : _warmBrown.withOpacity(0.2), size: 20),
       ),
     );
   }
@@ -644,161 +597,93 @@ class _DuaPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      padding: const EdgeInsets.fromLTRB(28, 12, 28, 28),
       physics: const BouncingScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 8),
-          Center(
-            child: Container(
-              width: 60,
-              height: 1.5,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [
-                  Colors.transparent,
-                  _gold.withValues(alpha: 0.3),
-                  Colors.transparent,
-                ]),
+          Center(child: Container(width: 50, height: 1,
+            decoration: BoxDecoration(gradient: LinearGradient(
+              colors: [Colors.transparent, _gold.withOpacity(0.3), Colors.transparent])))),
+          const SizedBox(height: 20),
+          // Arabic in warm sand container
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            decoration: BoxDecoration(
+              color: _warmSand.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              dua.arabicText,
+              style: const TextStyle(
+                color: _richBrown,
+                fontSize: 26,
+                height: 2.2,
+                fontFamily: 'Amiri',
               ),
+              textDirection: TextDirection.rtl,
+              textAlign: TextAlign.center,
             ),
           ),
-          const SizedBox(height: 24),
-          Text(
-            dua.arabicText,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 26,
-              height: 2.2,
-            ),
-            textDirection: TextDirection.rtl,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                    width: 40,
-                    height: 0.5,
-                    color: _gold.withValues(alpha: 0.15)),
-                const SizedBox(width: 12),
-                Icon(Icons.star,
-                    size: 8, color: _gold.withValues(alpha: 0.2)),
-                const SizedBox(width: 12),
-                Container(
-                    width: 40,
-                    height: 0.5,
-                    color: _gold.withValues(alpha: 0.15)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
+          // Ornamental divider
+          Center(child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 30, height: 0.5, color: _gold.withOpacity(0.2)),
+            const SizedBox(width: 10),
+            Text('✦', style: TextStyle(fontSize: 8, color: _gold.withOpacity(0.3))),
+            const SizedBox(width: 10),
+            Container(width: 30, height: 0.5, color: _gold.withOpacity(0.2)),
+          ])),
+          const SizedBox(height: 20),
+          // Transliteration
           if (dua.transliteration.isNotEmpty) ...[
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: _gold.withValues(alpha: 0.04),
-                borderRadius: BorderRadius.circular(14),
-                border:
-                    Border.all(color: _gold.withValues(alpha: 0.08)),
+            Text(
+              dua.transliteration,
+              style: TextStyle(
+                color: _warmBrown.withOpacity(0.55),
+                fontSize: 15,
+                fontStyle: FontStyle.italic,
+                height: 1.7,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.record_voice_over_outlined,
-                          size: 14,
-                          color: _gold.withValues(alpha: 0.4)),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Transliteration',
-                        style: TextStyle(
-                          color: _gold.withValues(alpha: 0.5),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    dua.transliteration,
-                    style: TextStyle(
-                      color: _gold.withValues(alpha: 0.8),
-                      fontSize: 15,
-                      fontStyle: FontStyle.italic,
-                      height: 1.7,
-                    ),
-                  ),
-                ],
-              ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
           ],
+          // Translation
           Text(
             dua.translation,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.82),
+              color: _richBrown.withOpacity(0.8),
               fontSize: 17,
               height: 1.85,
               letterSpacing: 0.1,
             ),
           ),
           const SizedBox(height: 28),
+          // Source
           if (dua.source != null && dua.source!.isNotEmpty)
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.02),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.03)),
+                color: _warmSand.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.menu_book_rounded,
-                      size: 14,
-                      color: Colors.white.withValues(alpha: 0.2)),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Source',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      fontSize: 12,
-                    ),
-                  ),
+                  Text('Source', style: TextStyle(color: _warmBrown.withOpacity(0.4), fontSize: 12)),
                   const Spacer(),
                   Flexible(
-                    child: Text(
-                      dua.source!,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.55),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      textAlign: TextAlign.end,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    child: Text(dua.source!,
+                      style: TextStyle(color: _warmBrown.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.w500),
+                      textAlign: TextAlign.end, maxLines: 2, overflow: TextOverflow.ellipsis),
                   ),
                 ],
               ),
             ),
           const SizedBox(height: 20),
-          Center(
-            child: Text(
-              '\u2190 swipe for more \u2192',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.1),
-                fontSize: 11,
-                letterSpacing: 1,
-              ),
-            ),
-          ),
+          Center(child: Text('← swipe for more →',
+            style: TextStyle(color: _warmBrown.withOpacity(0.2), fontSize: 11, letterSpacing: 1))),
           const SizedBox(height: 40),
         ],
       ),

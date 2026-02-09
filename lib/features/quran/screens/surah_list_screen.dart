@@ -5,6 +5,14 @@ import '../providers/quran_provider.dart';
 import '../models/surah.dart';
 import 'surah_reader_screen.dart';
 
+// ── Warm Reading Palette ──
+const Color _creamBg = Color(0xFFFDF6EC);
+const Color _warmSand = Color(0xFFF5E6C8);
+const Color _richBrown = Color(0xFF2C1810);
+const Color _warmBrown = Color(0xFF5C4033);
+const Color _goldAccent = Color(0xFFC2A366);
+const Color _islamicGreen = Color(0xFF2E7D32);
+
 class SurahListScreen extends ConsumerStatefulWidget {
   final bool isEmbedded;
   
@@ -71,7 +79,7 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
     final readingProgress = ref.watch(readingProgressProvider);
 
     return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.3),
+      backgroundColor: _creamBg,
       body: SafeArea(
         child: Column(
           children: [
@@ -83,36 +91,36 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
               error: (_, __) => const SizedBox.shrink(),
             ),
           
-          // Search bar — always visible, elegant
+          // Search bar
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.04),
+                color: _warmSand.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: _isSearching
-                      ? const Color(0xFFC2A366).withValues(alpha: 0.25)
-                      : Colors.white.withValues(alpha: 0.06),
+                      ? _goldAccent.withOpacity(0.3)
+                      : _warmSand.withOpacity(0.6),
                 ),
               ),
               child: TextField(
                 controller: _searchController,
                 focusNode: _searchFocusNode,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
+                style: TextStyle(color: _richBrown.withOpacity(0.85), fontSize: 14),
                 onTap: () => setState(() => _isSearching = true),
                 decoration: InputDecoration(
                   hintText: 'Search surah by name or number...',
                   hintStyle: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.25),
+                    color: _warmBrown.withOpacity(0.3),
                     fontSize: 13,
                     fontWeight: FontWeight.w300,
                   ),
                   prefixIcon: Icon(
                     Icons.search_rounded,
                     color: _isSearching
-                        ? const Color(0xFFC2A366).withValues(alpha: 0.6)
-                        : Colors.white.withValues(alpha: 0.25),
+                        ? _goldAccent.withOpacity(0.7)
+                        : _warmBrown.withOpacity(0.3),
                     size: 18,
                   ),
                   prefixIconConstraints: const BoxConstraints(minWidth: 44),
@@ -127,7 +135,7 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                           },
                           child: Icon(
                             Icons.close_rounded,
-                            color: Colors.white.withValues(alpha: 0.3),
+                            color: _warmBrown.withOpacity(0.35),
                             size: 16,
                           ),
                         )
@@ -155,7 +163,7 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                     child: Text(
                       'No Surah found',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
+                        color: _warmBrown.withOpacity(0.4),
                         fontSize: 16,
                       ),
                     ),
@@ -171,29 +179,26 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                   itemCount: _filteredSurahs.length,
                   itemBuilder: (context, index) {
                     final surah = _filteredSurahs[index];
-                    return Card(
-                      color: const Color(0xFF1A1A1A),
-                      elevation: 0,
+                    return Container(
                       margin: const EdgeInsets.only(bottom: 8),
-                      shape: RoundedRectangleBorder(
+                      decoration: BoxDecoration(
+                        color: _warmSand.withOpacity(0.35),
                         borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(
-                          color: const Color(0xFFC2A366).withValues(alpha: 0.08),
-                        ),
+                        border: Border.all(color: _warmSand.withOpacity(0.5)),
                       ),
                       child: ListTile(
                         leading: Container(
-                          width: 44,
-                          height: 44,
+                          width: 42,
+                          height: 42,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFC2A366).withValues(alpha: 0.12),
+                            color: _islamicGreen.withOpacity(0.08),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Center(
                             child: Text(
                             '${surah.id}',
-                            style: const TextStyle(
-                              color: Color(0xFFC2A366),
+                            style: TextStyle(
+                              color: _islamicGreen.withOpacity(0.7),
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
                             ),
@@ -205,10 +210,11 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                             Expanded(
                               child: Text(
                                 surah.name,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: _richBrown.withOpacity(0.85),
                                   fontSize: 20,
                                   fontWeight: FontWeight.w500,
+                                  fontFamily: 'Amiri',
                                 ),
                                 textDirection: TextDirection.rtl,
                               ),
@@ -217,8 +223,8 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                             Text(
                               surah.transliteration,
                               style: TextStyle(
-                                color: Colors.grey[400],
-                                fontSize: 16,
+                                color: _warmBrown.withOpacity(0.65),
+                                fontSize: 15,
                               ),
                             ),
                           ],
@@ -229,14 +235,14 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                             Text(
                               surah.type == 'meccan' ? 'Meccan' : 'Medinan',
                               style: TextStyle(
-                                color: Colors.grey[500],
+                                color: _warmBrown.withOpacity(0.35),
                                 fontSize: 12,
                               ),
                             ),
                             Text(
                               '${surah.totalVerses} verses',
                               style: TextStyle(
-                                color: Colors.grey[500],
+                                color: _warmBrown.withOpacity(0.35),
                                 fontSize: 12,
                               ),
                             ),
@@ -244,7 +250,7 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                         ),
                         trailing: Icon(
                           Icons.arrow_forward_ios,
-                          color: const Color(0xFFC2A366).withValues(alpha: 0.4),
+                          color: _goldAccent.withOpacity(0.35),
                           size: 14,
                         ),
                         onTap: () {
@@ -256,13 +262,13 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                   },
                 );
               },
-              loading: () => const Center(
-                child: CircularProgressIndicator(color: Color(0xFFC2A366)),
+              loading: () => Center(
+                child: CircularProgressIndicator(color: _islamicGreen.withOpacity(0.5)),
               ),
               error: (error, stack) => Center(
                 child: Text(
                   'Error loading Quran: $error',
-                  style: const TextStyle(color: Colors.red),
+                  style: TextStyle(color: Colors.red.withOpacity(0.7)),
                 ),
               ),
             ),
@@ -277,10 +283,10 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFC2A366).withValues(alpha: 0.12),
+        color: _islamicGreen.withOpacity(0.08),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: const Color(0xFFC2A366).withValues(alpha: 0.25),
+          color: _islamicGreen.withOpacity(0.15),
           width: 1,
         ),
       ),
@@ -293,15 +299,13 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               children: [
-                // Play icon
-                const Icon(
+                Icon(
                   Icons.play_circle_filled,
-                  color: Color(0xFFC2A366),
+                  color: _islamicGreen.withOpacity(0.6),
                   size: 18,
                 ),
                 const SizedBox(width: 10),
                 
-                // Text - single line
                 Expanded(
                   child: RichText(
                     maxLines: 1,
@@ -311,15 +315,15 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                       children: [
                         TextSpan(
                           text: position.surahTransliteration,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: _richBrown.withOpacity(0.8),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         TextSpan(
                           text: '  ·  ayah ${position.ayahNumber}/${position.totalVerses}',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
+                            color: _warmBrown.withOpacity(0.4),
                             fontWeight: FontWeight.w300,
                           ),
                         ),
@@ -328,10 +332,9 @@ class _SurahListScreenState extends ConsumerState<SurahListScreen> {
                   ),
                 ),
                 
-                // Arrow
                 Icon(
                   Icons.chevron_right,
-                  color: const Color(0xFFC2A366).withValues(alpha: 0.7),
+                  color: _islamicGreen.withOpacity(0.5),
                   size: 20,
                 ),
               ],

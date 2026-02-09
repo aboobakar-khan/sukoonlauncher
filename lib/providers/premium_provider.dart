@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'camel_coin_provider.dart';
 
 /// Premium Features - What's included in premium
 enum PremiumFeature {
@@ -296,9 +297,11 @@ final premiumProvider = StateNotifierProvider<PremiumNotifier, PremiumState>(
   (ref) => PremiumNotifier(),
 );
 
-/// Helper provider for quick premium check
+/// Helper provider for quick premium check (includes coin-based premium)
 final isPremiumProvider = Provider<bool>((ref) {
-  return ref.watch(premiumProvider).isPremium;
+  final premiumState = ref.watch(premiumProvider).isPremium;
+  final coinPremium = ref.watch(hasCoinPremiumProvider);
+  return premiumState || coinPremium;
 });
 
 /// Helper provider for feature access

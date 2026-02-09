@@ -1,14 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/clock_style_provider.dart';
+import '../providers/premium_provider.dart';
+import '../providers/camel_coin_provider.dart';
+import 'premium_paywall_screen.dart';
 
 /// Clock Style Picker Screen
 class ClockStylePickerScreen extends ConsumerWidget {
   const ClockStylePickerScreen({super.key});
 
+  // First 3 clock styles are free (digital, analog, minimalist)
+  static const int freeClockCount = 3;
+
+  // Map clock styles to store item IDs
+  static const _clockStoreMap = {
+    'Analog': 'clock_analog',
+    'Bold': 'clock_bold',
+    'Modern': 'clock_modern',
+    'Retro': 'clock_retro',
+    'Elegant': 'clock_elegant',
+    'Binary': 'clock_binary',
+  };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentStyle = ref.watch(clockStyleProvider);
+    final isPremium = ref.watch(premiumProvider).isPremium;
+    final coinState = ref.watch(camelCoinProvider);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -26,12 +45,16 @@ class ClockStylePickerScreen extends ConsumerWidget {
                 itemBuilder: (context, index) {
                   final style = ClockStyle.values[index];
                   final isSelected = style == currentStyle;
+                  final storeId = _clockStoreMap[style.name];
+                  final purchasedViaCoin = storeId != null && coinState.ownsItem(storeId);
+                  final isLocked = !isPremium && !purchasedViaCoin && index >= freeClockCount;
 
                   return _buildClockStyleOption(
                     context,
                     ref,
                     style,
                     isSelected,
+                    isLocked,
                   );
                 },
               ),
@@ -75,9 +98,15 @@ class ClockStylePickerScreen extends ConsumerWidget {
     WidgetRef ref,
     ClockStyle style,
     bool isSelected,
+    bool isLocked,
   ) {
     return GestureDetector(
       onTap: () {
+        HapticFeedback.lightImpact();
+        if (isLocked) {
+          showPremiumPaywall(context, triggerFeature: 'Clock: ${style.name}');
+          return;
+        }
         ref.read(clockStyleProvider.notifier).setClockStyle(style);
         Navigator.of(context).pop();
       },
@@ -137,6 +166,22 @@ class ClockStylePickerScreen extends ConsumerWidget {
                 Icons.check_circle,
                 color: Colors.white.withValues(alpha: 0.7),
                 size: 24,
+              )
+            else if (isLocked)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFC2A366).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.lock_rounded, color: const Color(0xFFC2A366).withValues(alpha: 0.7), size: 12),
+                    const SizedBox(width: 3),
+                    Text('PRO', style: TextStyle(color: const Color(0xFFC2A366).withValues(alpha: 0.8), fontSize: 9, fontWeight: FontWeight.w700)),
+                  ],
+                ),
               ),
           ],
         ),

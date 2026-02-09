@@ -34,6 +34,14 @@ class TafseerBottomSheet extends ConsumerWidget {
     );
   }
 
+  // Warm reading palette
+  static const _creamBg = Color(0xFFFDF6EC);
+  static const _warmSand = Color(0xFFF5E6C8);
+  static const _richBrown = Color(0xFF2C1810);
+  static const _warmBrown = Color(0xFF5C4033);
+  static const _gold = Color(0xFFC2A366);
+  static const _islamicGreen = Color(0xFF2E7D32);
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tafseerAsync = ref.watch(tafseerProvider((surahId: surahId, ayahId: ayahId)));
@@ -46,12 +54,9 @@ class TafseerBottomSheet extends ConsumerWidget {
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A),
+            color: _creamBg,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.1),
-              width: 1,
-            ),
+            border: Border.all(color: _warmSand, width: 1),
           ),
           child: Column(
             children: [
@@ -61,7 +66,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.3),
+                  color: _warmBrown.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -74,12 +79,12 @@ class TafseerBottomSheet extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFA67B5B).withValues(alpha: 0.2),
+                        color: _islamicGreen.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.menu_book_rounded,
-                        color: Color(0xFFC2A366),
+                        color: _islamicGreen.withOpacity(0.6),
                         size: 20,
                       ),
                     ),
@@ -90,8 +95,8 @@ class TafseerBottomSheet extends ConsumerWidget {
                         children: [
                           Text(
                             selectedEdition.name,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: _richBrown.withOpacity(0.85),
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                             ),
@@ -101,7 +106,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                           Text(
                             '$surahName • Ayah $ayahId',
                             style: TextStyle(
-                              color: Colors.grey[400],
+                              color: _warmBrown.withOpacity(0.45),
                               fontSize: 13,
                             ),
                           ),
@@ -117,7 +122,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: const Text('Copied to clipboard'),
-                              backgroundColor: const Color(0xFFA67B5B),
+                              backgroundColor: _gold,
                               behavior: SnackBarBehavior.floating,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
@@ -128,7 +133,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                       },
                       icon: Icon(
                         Icons.copy_outlined,
-                        color: Colors.grey[500],
+                        color: _warmBrown.withOpacity(0.6),
                         size: 20,
                       ),
                     ),
@@ -136,14 +141,14 @@ class TafseerBottomSheet extends ConsumerWidget {
                       onPressed: () => Navigator.pop(context),
                       icon: Icon(
                         Icons.close,
-                        color: Colors.grey[400],
+                        color: _warmBrown.withOpacity(0.5),
                       ),
                     ),
                   ],
                 ),
               ),
               
-              const Divider(color: Color(0xFF333333), height: 1),
+              Divider(color: _warmSand, height: 1),
               
               // Content
               Expanded(
@@ -156,14 +161,14 @@ class TafseerBottomSheet extends ConsumerWidget {
                           children: [
                             Icon(
                               Icons.info_outline,
-                              color: Colors.grey[600],
+                              color: _warmBrown.withOpacity(0.4),
                               size: 48,
                             ),
                             const SizedBox(height: 16),
                             Text(
                               'Tafseer not available',
                               style: TextStyle(
-                                color: Colors.grey[400],
+                                color: _warmBrown,
                                 fontSize: 16,
                               ),
                             ),
@@ -171,7 +176,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                             Text(
                               'Try selecting a different edition in Settings',
                               style: TextStyle(
-                                color: Colors.grey[600],
+                                color: _warmBrown.withOpacity(0.5),
                                 fontSize: 13,
                               ),
                             ),
@@ -187,7 +192,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                       child: Text(
                         tafseer.text,
                         style: TextStyle(
-                          color: Colors.grey[200],
+                          color: _richBrown.withOpacity(0.85),
                           fontSize: 17,
                           height: 1.9,
                           letterSpacing: 0.2,
@@ -195,9 +200,9 @@ class TafseerBottomSheet extends ConsumerWidget {
                       ),
                     );
                   },
-                  loading: () => const Center(
+                  loading: () => Center(
                     child: CircularProgressIndicator(
-                      color: Color(0xFFC2A366),
+                      color: _islamicGreen.withOpacity(0.5),
                     ),
                   ),
                   error: (error, _) => Center(
@@ -206,14 +211,14 @@ class TafseerBottomSheet extends ConsumerWidget {
                       children: [
                         Icon(
                           Icons.cloud_off,
-                          color: Colors.grey[600],
+                          color: _warmBrown.withOpacity(0.4),
                           size: 48,
                         ),
                         const SizedBox(height: 16),
                         Text(
                           'Could not load tafseer',
                           style: TextStyle(
-                            color: Colors.grey[400],
+                            color: _warmBrown,
                             fontSize: 16,
                           ),
                         ),
@@ -221,7 +226,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                         Text(
                           'Check your internet connection',
                           style: TextStyle(
-                            color: Colors.grey[600],
+                            color: _warmBrown.withOpacity(0.5),
                             fontSize: 13,
                           ),
                         ),

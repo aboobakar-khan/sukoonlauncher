@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,25 +8,39 @@ import '../providers/premium_provider.dart';
 import 'launcher_shell.dart';
 
 /// ═══════════════════════════════════════════════════════════════════
-/// 🐪 CAMEL LAUNCHER — PROFESSIONAL ONBOARDING
+/// 🐪 CAMEL LAUNCHER — PREMIUM ONBOARDING EXPERIENCE
 /// ═══════════════════════════════════════════════════════════════════
 ///
-/// Psychology-based 5-screen onboarding flow:
+/// A modern, addictive 5-screen onboarding flow.
 ///
-///  1. HOOK        — Emotional connection, identity ("You're different")
-///  2. PAIN POINT  — Mirror their frustration with phone addiction
-///  3. SOLUTION    — Show the product as the answer
-///  4. SOCIAL PROOF + PRO — Build trust + upsell naturally
-///  5. ACTIVATION  — Set as default launcher (commitment step)
+/// Design principles:
+///  • Staggered micro-animations — elements appear with choreographed timing
+///  • Parallax depth — background layers move at different speeds
+///  • Psychology-based UX — hook → pain → solution → value → commitment
+///  • Consistent camel/desert brand tokens throughout
+///  • Responsive layout — adapts to any screen size
+///  • Haptic feedback on every interaction
 ///
-/// Principles applied:
-///  • Zeigarnik Effect — Progress bar creates completion drive
-///  • Loss Aversion   — Frame around what they're losing (time, focus)
-///  • Endowment Effect — "Your minimalist home screen" (ownership)
-///  • Identity Framing — "You're the kind of person who…"
-///  • Reciprocity      — Give value first, ask for upgrade after
-///  • Anchoring        — Show yearly price after lifetime
+/// Screens:
+///  1. HOOK — Emotional identity ("Your Phone. Your Rules.")
+///  2. IMPACT — Loss aversion with animated stat
+///  3. SOLUTION — Product features as the answer
+///  4. PRO — Soft upsell with free trial
+///  5. ACTIVATE — Set as default launcher
 /// ═══════════════════════════════════════════════════════════════════
+
+// ─── Design Tokens ──────────────────────────────────────────────
+const Color _bg = Color(0xFF050508);
+const Color _cardBg = Color(0xFF0D0D12);
+const Color _surfaceBg = Color(0xFF0A0A0F);
+const Color _borderDim = Color(0xFF1A1A22);
+const Color _gold = Color(0xFFC2A366);
+const Color _goldLight = Color(0xFFE8D5B7);
+const Color _green = Color(0xFF7BAE6E);
+const Color _sunset = Color(0xFFE8915A);
+const Color _textPrimary = Color(0xFFF2F0ED);
+const Color _textSecondary = Color(0xFF9A9590);
+const Color _textMuted = Color(0xFF585450);
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -40,37 +55,45 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   int _currentPage = 0;
   static const int _totalPages = 5;
 
-  // Animations
+  // Master entrance animation per page
+  late AnimationController _entranceController;
+  // Pulse for CTA buttons
   late AnimationController _pulseController;
-  late AnimationController _fadeController;
-  late Animation<double> _pulseAnimation;
+  late Animation<double> _pulseAnim;
+  // Floating particles
+  late AnimationController _particleController;
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
 
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 500),
+    _entranceController = AnimationController(
+      duration: const Duration(milliseconds: 900),
       vsync: this,
     )..forward();
 
-    // Immersive mode
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 2200),
+      vsync: this,
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 1.0, end: 1.04).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _particleController = AnimationController(
+      duration: const Duration(seconds: 12),
+      vsync: this,
+    )..repeat();
+
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _entranceController.dispose();
     _pulseController.dispose();
-    _fadeController.dispose();
-    // Restore system UI
+    _particleController.dispose();
     SystemChrome.setEnabledSystemUIMode(
       SystemUiMode.edgeToEdge,
       overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
@@ -78,7 +101,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     super.dispose();
   }
 
-  // ───────── Navigation ─────────
+  // ─── Navigation ───────────────────────────────────────────────
 
   Future<void> _completeOnboarding() async {
     final box = await Hive.openBox('settingsBox');
@@ -89,7 +112,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     HapticFeedback.lightImpact();
     if (_currentPage < _totalPages - 1) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 400),
+        duration: const Duration(milliseconds: 500),
         curve: Curves.easeOutCubic,
       );
     }
@@ -110,82 +133,98 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
       debugPrint('Home settings error: $e');
     }
     await _completeOnboarding();
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const LauncherShell(),
-          transitionsBuilder: (_, anim, __, child) =>
-              FadeTransition(opacity: anim, child: child),
-          transitionDuration: const Duration(milliseconds: 600),
-        ),
-      );
-    }
+    if (mounted) _navigateToLauncher();
   }
 
   void _skipToLauncher() async {
     HapticFeedback.lightImpact();
     await _completeOnboarding();
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const LauncherShell(),
-          transitionsBuilder: (_, anim, __, child) =>
-              FadeTransition(opacity: anim, child: child),
-          transitionDuration: const Duration(milliseconds: 600),
-        ),
-      );
-    }
+    if (mounted) _navigateToLauncher();
   }
 
-  // ───────── BUILD ─────────
+  void _navigateToLauncher() {
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const LauncherShell(),
+        transitionsBuilder: (_, anim, __, child) {
+          return FadeTransition(
+            opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.02),
+                end: Offset.zero,
+              ).animate(
+                  CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+              child: child,
+            ),
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 700),
+      ),
+    );
+  }
+
+  // ─── Build ────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final screenH = MediaQuery.of(context).size.height;
-    final bottomPad = MediaQuery.of(context).padding.bottom;
+    final mq = MediaQuery.of(context);
+    final bottomPad = mq.padding.bottom;
+    final topPad = mq.padding.top;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0F),
+      backgroundColor: _bg,
       body: Stack(
         children: [
-          // Subtle radial gradient background
+          // Layer 1: Animated gradient background
+          Positioned.fill(child: _GradientBg(page: _currentPage)),
+
+          // Layer 2: Floating particles
           Positioned.fill(
-            child: _AnimatedGradientBg(page: _currentPage),
+            child: _FloatingParticles(controller: _particleController),
           ),
 
-          // Main content
-          Column(
-            children: [
-              SizedBox(height: screenH * 0.06),
+          // Layer 3: Content
+          SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                SizedBox(height: topPad > 40 ? 4 : 12),
 
-              // Top bar: progress + skip
-              _buildTopBar(),
+                // Progress bar + Skip
+                _buildTopBar(),
 
-              // Pages
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  physics: const BouncingScrollPhysics(),
-                  onPageChanged: (i) {
-                    setState(() => _currentPage = i);
-                    _fadeController.reset();
-                    _fadeController.forward();
-                  },
-                  children: [
-                    _page1Hook(),
-                    _page2PainPoint(),
-                    _page3Solution(),
-                    _page4ProUpsell(),
-                    _page5Activation(),
-                  ],
+                const SizedBox(height: 8),
+
+                // Pages
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    physics: const ClampingScrollPhysics(),
+                    onPageChanged: (i) {
+                      setState(() => _currentPage = i);
+                      _entranceController.reset();
+                      _entranceController.forward();
+                    },
+                    children: [
+                      _PageHook(entrance: _entranceController),
+                      _PageImpact(entrance: _entranceController),
+                      _PageSolution(entrance: _entranceController),
+                      _PagePro(entrance: _entranceController),
+                      _PageActivate(
+                        entrance: _entranceController,
+                        pulse: _pulseAnim,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
-              // Bottom CTA
-              _buildBottomCTA(),
+                // Bottom CTA
+                _buildBottomCTA(),
 
-              SizedBox(height: bottomPad + 16),
-            ],
+                SizedBox(height: bottomPad + 16),
+              ],
+            ),
           ),
         ],
       ),
@@ -196,23 +235,55 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
 
   Widget _buildTopBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 4),
       child: Row(
         children: [
-          // Segmented progress bar
-          Expanded(child: _buildProgressBar()),
-          const SizedBox(width: 16),
-          // Skip (not on last page)
+          // Segmented progress with glow on active
+          Expanded(
+            child: Row(
+              children: List.generate(_totalPages, (i) {
+                final isActive = i <= _currentPage;
+                final isCurrent = i == _currentPage;
+                return Expanded(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeOut,
+                    height: isCurrent ? 4 : 3,
+                    margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(2),
+                      color: isActive
+                          ? _gold
+                          : Colors.white.withValues(alpha: 0.06),
+                      boxShadow: isCurrent
+                          ? [
+                              BoxShadow(
+                                  color: _gold.withValues(alpha: 0.4),
+                                  blurRadius: 8)
+                            ]
+                          : null,
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(width: 20),
+          // Skip
           if (_currentPage < _totalPages - 1)
             GestureDetector(
               onTap: _skipToLauncher,
-              child: Text(
-                'Skip',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.35),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.3,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                child: Text(
+                  'Skip',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
@@ -221,35 +292,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     );
   }
 
-  Widget _buildProgressBar() {
-    return Row(
-      children: List.generate(_totalPages, (i) {
-        final isActive = i <= _currentPage;
-        return Expanded(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 350),
-            curve: Curves.easeOut,
-            height: 3,
-            margin: const EdgeInsets.symmetric(horizontal: 2),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(2),
-              color: isActive
-                  ? CamelColors.sandGold
-                  : Colors.white.withValues(alpha: 0.08),
-            ),
-          ),
-        );
-      }),
-    );
-  }
-
   // ═══════════ BOTTOM CTA ═══════════
 
   Widget _buildBottomCTA() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+      padding: const EdgeInsets.fromLTRB(28, 0, 28, 4),
       child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 350),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
         child: _currentPage == 3
             ? _buildProButtons()
             : _currentPage == 4
@@ -260,33 +311,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   }
 
   Widget _buildNextButton() {
-    return SizedBox(
+    final labels = [
+      'Begin Your Journey',
+      'Show Me the Way',
+      'Discover Features',
+      'Continue',
+      'Continue',
+    ];
+    return _PrimaryCTA(
       key: ValueKey('next_$_currentPage'),
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: _goToNext,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: CamelColors.sandGold,
-          foregroundColor: const Color(0xFF1A1000),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: Text(
-          _currentPage == 0
-              ? 'Begin Your Journey'
-              : _currentPage == 1
-                  ? 'Show Me the Way'
-                  : 'Continue',
-          style: const TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.3,
-          ),
-        ),
-      ),
+      label: labels[_currentPage],
+      onTap: _goToNext,
     );
   }
 
@@ -295,46 +330,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
       key: const ValueKey('pro_buttons'),
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Primary: Start free trial
-        SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: ElevatedButton(
-            onPressed: _activateTrialAndContinue,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: CamelColors.sandGold,
-              foregroundColor: const Color(0xFF1A1000),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-            child: const Text(
-              'Start 7-Day Free Trial',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.3,
-              ),
-            ),
-          ),
+        _PrimaryCTA(
+          label: 'Start 7-Day Free Trial',
+          onTap: _activateTrialAndContinue,
+          icon: Icons.diamond_outlined,
         ),
-        const SizedBox(height: 12),
-        // Secondary: skip
-        GestureDetector(
-          onTap: _goToNext,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              'Maybe later',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ),
+        const SizedBox(height: 10),
+        _SecondaryCTA(label: 'Maybe later', onTap: _goToNext),
       ],
     );
   }
@@ -344,518 +346,673 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
       key: const ValueKey('activation_buttons'),
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Primary: Set as default
         ScaleTransition(
-          scale: _pulseAnimation,
-          child: SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              onPressed: _setDefaultAndFinish,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: CamelColors.sandGold,
-                foregroundColor: const Color(0xFF1A1000),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.home_rounded, size: 22),
-                  SizedBox(width: 8),
-                  Text(
-                    'Set as My Launcher',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          scale: _pulseAnim,
+          child: _PrimaryCTA(
+            label: 'Set as My Launcher',
+            onTap: _setDefaultAndFinish,
+            icon: Icons.home_rounded,
           ),
         ),
-        const SizedBox(height: 12),
-        // Secondary: not now
-        GestureDetector(
-          onTap: _skipToLauncher,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              'I\'ll do this later',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ),
+        const SizedBox(height: 10),
+        _SecondaryCTA(
+            label: "I'll do this later", onTap: _skipToLauncher),
       ],
     );
   }
+}
 
-  // ═══════════════════════════════════════════════════
-  //  PAGE 1 — HOOK (Identity + Curiosity)
-  // ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+//  PAGE 1 — HOOK (Identity + Curiosity)
+// ═══════════════════════════════════════════════════════════════════
 
-  Widget _page1Hook() {
-    return FadeTransition(
-      opacity: _fadeController,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Spacer(flex: 2),
+class _PageHook extends StatelessWidget {
+  final AnimationController entrance;
+  const _PageHook({required this.entrance});
 
-            // Elegant icon
-            _GlowingIcon(
-              icon: '🐪',
-              size: 100,
-              glowColor: CamelColors.sandGold,
-            ),
+  @override
+  Widget build(BuildContext context) {
+    final h = MediaQuery.of(context).size.height;
+    final isSmall = h < 700;
 
-            const SizedBox(height: 48),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 36),
+      child: Column(
+        children: [
+          SizedBox(height: isSmall ? h * 0.06 : h * 0.10),
 
-            // Identity hook headline
-            const Text(
+          // Camel icon with radial glow
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.0,
+            child: _BrandIcon(size: isSmall ? 80 : 100),
+          ),
+
+          SizedBox(height: isSmall ? 28 : 44),
+
+          // Headline
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.15,
+            child: const Text(
               'Your Phone.\nYour Rules.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 36,
+                fontSize: 38,
                 fontWeight: FontWeight.w800,
-                color: Colors.white,
-                height: 1.15,
-                letterSpacing: -0.5,
+                color: _textPrimary,
+                height: 1.12,
+                letterSpacing: -0.8,
               ),
             ),
+          ),
 
-            const SizedBox(height: 20),
+          const SizedBox(height: 20),
 
-            // Subtext — aspirational
-            Text(
-              'Join thousands of Muslims who chose\na mindful, distraction-free phone.',
+          // Subtext
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.30,
+            child: Text(
+              'Join thousands of mindful Muslims\nwho reclaimed their focus and time.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 16,
-                color: Colors.white.withValues(alpha: 0.55),
-                height: 1.6,
+                fontSize: 15.5,
+                color: Colors.white.withValues(alpha: 0.48),
+                height: 1.65,
                 letterSpacing: 0.1,
               ),
             ),
+          ),
 
-            const Spacer(flex: 3),
-          ],
-        ),
+          const SizedBox(height: 36),
+
+          // Three mini trust chips
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.45,
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _TrustChip(icon: Icons.people_outline, label: '10K+ Users'),
+                SizedBox(width: 12),
+                _TrustChip(icon: Icons.star_outline, label: '4.8 Rating'),
+                SizedBox(width: 12),
+                _TrustChip(icon: Icons.verified_outlined, label: 'Ad-Free'),
+              ],
+            ),
+          ),
+
+          const Spacer(),
+        ],
       ),
     );
   }
+}
 
-  // ═══════════════════════════════════════════════════
-  //  PAGE 2 — PAIN POINT (Loss Aversion)
-  // ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+//  PAGE 2 — IMPACT (Loss Aversion)
+// ═══════════════════════════════════════════════════════════════════
 
-  Widget _page2PainPoint() {
-    return FadeTransition(
-      opacity: _fadeController,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Spacer(flex: 2),
+class _PageImpact extends StatelessWidget {
+  final AnimationController entrance;
+  const _PageImpact({required this.entrance});
 
-            // Shocking stat
-            _AnimatedCounter(
-              targetNumber: 4,
-              suffix: 'hrs',
+  @override
+  Widget build(BuildContext context) {
+    final h = MediaQuery.of(context).size.height;
+    final isSmall = h < 700;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 36),
+      child: Column(
+        children: [
+          SizedBox(height: isSmall ? h * 0.04 : h * 0.08),
+
+          // Big animated stat
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.0,
+            child: _AnimatedStat(
+              value: 4,
+              suffix: ' hrs',
               label: 'Average daily screen time',
-              color: CamelColors.desertSunset,
+              color: _sunset,
             ),
+          ),
 
-            const SizedBox(height: 40),
+          SizedBox(height: isSmall ? 24 : 36),
 
-            // Emotional headline
-            const Text(
-              'That\'s 60 days\nyou lose every year.',
+          // Headline
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.20,
+            child: const Text(
+              "That's 60 days\nyou lose every year.",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 30,
                 fontWeight: FontWeight.w800,
-                color: Colors.white,
-                height: 1.2,
-                letterSpacing: -0.3,
+                color: _textPrimary,
+                height: 1.18,
+                letterSpacing: -0.4,
               ),
             ),
+          ),
 
-            const SizedBox(height: 20),
+          const SizedBox(height: 18),
 
-            Text(
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.35,
+            child: Text(
               '60 days that could be spent in worship,\nwith family, or building your dreams.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 15,
-                color: Colors.white.withValues(alpha: 0.5),
-                height: 1.6,
+                fontSize: 14.5,
+                color: Colors.white.withValues(alpha: 0.45),
+                height: 1.65,
               ),
             ),
+          ),
 
-            const SizedBox(height: 40),
+          SizedBox(height: isSmall ? 28 : 44),
 
-            // Visual: time blocks lost
-            _TimeBlocksVisual(),
+          // Time blocks visual
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.50,
+            child: const _TimeBlockBar(),
+          ),
 
-            const Spacer(flex: 3),
-          ],
-        ),
+          const SizedBox(height: 14),
+
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.55,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(2),
+                    color: _sunset.withValues(alpha: 0.5),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text('Wasted',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withValues(alpha: 0.3))),
+                const SizedBox(width: 16),
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(2),
+                    color: _green.withValues(alpha: 0.5),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text('Reclaimed',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withValues(alpha: 0.3))),
+              ],
+            ),
+          ),
+
+          const Spacer(),
+        ],
       ),
     );
   }
+}
 
-  // ═══════════════════════════════════════════════════
-  //  PAGE 3 — SOLUTION (Product as the Answer)
-  // ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+//  PAGE 3 — SOLUTION (Features)
+// ═══════════════════════════════════════════════════════════════════
 
-  Widget _page3Solution() {
-    return FadeTransition(
-      opacity: _fadeController,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Spacer(flex: 2),
+class _PageSolution extends StatelessWidget {
+  final AnimationController entrance;
+  const _PageSolution({required this.entrance});
 
-            // Headline
-            RichText(
+  @override
+  Widget build(BuildContext context) {
+    final h = MediaQuery.of(context).size.height;
+    final isSmall = h < 700;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Column(
+        children: [
+          SizedBox(height: isSmall ? h * 0.03 : h * 0.06),
+
+          // Headline
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.0,
+            child: RichText(
               textAlign: TextAlign.center,
-              text: TextSpan(
+              text: const TextSpan(
                 children: [
-                  const TextSpan(
+                  TextSpan(
                     text: 'Everything you need.\n',
                     style: TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                      color: _textPrimary,
                       height: 1.2,
+                      letterSpacing: -0.3,
                     ),
                   ),
                   TextSpan(
-                    text: 'Nothing you don\'t.',
+                    text: "Nothing you don't.",
                     style: TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.w800,
-                      color: CamelColors.sandGold,
+                      color: _gold,
                       height: 1.2,
+                      letterSpacing: -0.3,
                     ),
                   ),
                 ],
               ),
             ),
+          ),
 
-            const SizedBox(height: 44),
+          SizedBox(height: isSmall ? 24 : 36),
 
-            // Feature cards — modern glass style
-            const _FeatureCard(
+          // Feature cards
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.12,
+            child: const _FeatureCard(
               icon: Icons.menu_book_rounded,
               title: 'Quran & Hadith',
               desc: 'Read, reflect, and grow daily',
-              color: Color(0xFF2D5A27),
+              accentColor: _green,
             ),
-            const SizedBox(height: 12),
-            const _FeatureCard(
+          ),
+          const SizedBox(height: 10),
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.22,
+            child: const _FeatureCard(
               icon: Icons.timer_outlined,
               title: 'Focus & Productivity',
-              desc: 'Pomodoro, app blocking, and todo lists',
-              color: Color(0xFF4A3728),
+              desc: 'Pomodoro, app blocking, and task lists',
+              accentColor: _sunset,
             ),
-            const SizedBox(height: 12),
-            const _FeatureCard(
-              icon: Icons.favorite_border_rounded,
+          ),
+          const SizedBox(height: 10),
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.32,
+            child: const _FeatureCard(
+              icon: Icons.favorite_outline_rounded,
               title: 'Prayer & Dhikr',
-              desc: 'Track salah, count dhikr, build habits',
-              color: Color(0xFF1E3A5F),
+              desc: 'Track salah, count dhikr, build streaks',
+              accentColor: Color(0xFF6BA3D6),
             ),
-            const SizedBox(height: 12),
-            const _FeatureCard(
+          ),
+          const SizedBox(height: 10),
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.42,
+            child: const _FeatureCard(
               icon: Icons.palette_outlined,
               title: 'Minimal by Design',
               desc: 'No clutter, no noise — just peace',
-              color: Color(0xFF3D2E4F),
+              accentColor: Color(0xFFB088C9),
             ),
+          ),
 
-            const Spacer(flex: 3),
-          ],
-        ),
+          const Spacer(),
+        ],
       ),
     );
   }
+}
 
-  // ═══════════════════════════════════════════════════
-  //  PAGE 4 — PRO UPSELL (Soft, Value-First)
-  // ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+//  PAGE 4 — PRO UPSELL
+// ═══════════════════════════════════════════════════════════════════
 
-  Widget _page4ProUpsell() {
-    return FadeTransition(
-      opacity: _fadeController,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Spacer(flex: 2),
+class _PagePro extends StatelessWidget {
+  final AnimationController entrance;
+  const _PagePro({required this.entrance});
 
-            // Pro badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+  @override
+  Widget build(BuildContext context) {
+    final h = MediaQuery.of(context).size.height;
+    final isSmall = h < 700;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Column(
+        children: [
+          SizedBox(height: isSmall ? h * 0.03 : h * 0.06),
+
+          // Pro badge
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.0,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    CamelColors.sandGold.withValues(alpha: 0.15),
-                    CamelColors.desertWarm.withValues(alpha: 0.08),
+                    _gold.withValues(alpha: 0.14),
+                    _gold.withValues(alpha: 0.04),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: CamelColors.sandGold.withValues(alpha: 0.3),
-                ),
+                border:
+                    Border.all(color: _gold.withValues(alpha: 0.25)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.workspace_premium_rounded,
-                      color: CamelColors.sandGold, size: 18),
+                      color: _gold, size: 18),
                   const SizedBox(width: 8),
-                  Text(
+                  const Text(
                     'CAMEL PRO',
                     style: TextStyle(
-                      color: CamelColors.sandGold,
-                      fontSize: 13,
+                      color: _gold,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 1.5,
+                      letterSpacing: 1.8,
                     ),
                   ),
                 ],
               ),
             ),
+          ),
 
-            const SizedBox(height: 28),
+          SizedBox(height: isSmall ? 20 : 28),
 
-            // Headline
-            const Text(
+          // Headline
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.10,
+            child: const Text(
               'Unlock Your\nFull Potential',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.w800,
-                color: Colors.white,
-                height: 1.15,
+                color: _textPrimary,
+                height: 1.12,
+                letterSpacing: -0.3,
               ),
             ),
+          ),
 
-            const SizedBox(height: 36),
+          SizedBox(height: isSmall ? 24 : 34),
 
-            // Pro features — clean checklist
-            _ProFeatureRow(icon: Icons.color_lens_outlined, text: 'All themes & clock styles'),
-            const SizedBox(height: 16),
-            _ProFeatureRow(icon: Icons.mosque_outlined, text: 'Full Dua library & Tafseer'),
-            const SizedBox(height: 16),
-            _ProFeatureRow(icon: Icons.shield_outlined, text: 'Deen Mode & Hard Block'),
-            const SizedBox(height: 16),
-            _ProFeatureRow(icon: Icons.analytics_outlined, text: 'Advanced statistics & dashboards'),
-            const SizedBox(height: 16),
-            _ProFeatureRow(icon: Icons.cloud_outlined, text: 'Cloud backup & data export'),
-            const SizedBox(height: 16),
-            _ProFeatureRow(icon: Icons.auto_awesome, text: 'Priority support & updates'),
+          // Pro features
+          ..._proFeatures.asMap().entries.map((e) {
+            final i = e.key;
+            final f = e.value;
+            return Padding(
+              padding: EdgeInsets.only(bottom: isSmall ? 12 : 15),
+              child: _StaggeredFade(
+                entrance: entrance,
+                delay: 0.18 + (i * 0.07),
+                child: _ProRow(
+                    icon: f['icon'] as IconData,
+                    text: f['text'] as String),
+              ),
+            );
+          }),
 
-            const SizedBox(height: 36),
+          const Spacer(),
 
-            // Trust badges
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+          // Trust badges
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.65,
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _TrustBadge(icon: Icons.lock_outline, label: 'Cancel\nanytime'),
-                SizedBox(width: 24),
-                _TrustBadge(icon: Icons.credit_card_off_outlined, label: 'No charge\nfor 7 days'),
-                SizedBox(width: 24),
-                _TrustBadge(icon: Icons.verified_outlined, label: 'Secure\npayment'),
+                _TrustPill(
+                    icon: Icons.lock_outline, label: 'Cancel anytime'),
+                _TrustPill(
+                    icon: Icons.credit_card_off,
+                    label: 'Free for 7 days'),
+                _TrustPill(
+                    icon: Icons.verified_outlined, label: 'Secure'),
               ],
             ),
+          ),
 
-            const Spacer(flex: 3),
-          ],
-        ),
+          const SizedBox(height: 16),
+        ],
       ),
     );
   }
 
-  // ═══════════════════════════════════════════════════
-  //  PAGE 5 — ACTIVATION (Default Launcher CTA)
-  // ═══════════════════════════════════════════════════
+  static const List<Map<String, dynamic>> _proFeatures = [
+    {'icon': Icons.color_lens_outlined, 'text': 'All themes & clock styles'},
+    {'icon': Icons.mosque_outlined, 'text': 'Full Dua library & Tafseer'},
+    {'icon': Icons.shield_outlined, 'text': 'Deen Mode & Hard Block'},
+    {
+      'icon': Icons.analytics_outlined,
+      'text': 'Advanced analytics & dashboards'
+    },
+    {'icon': Icons.cloud_outlined, 'text': 'Cloud backup & data export'},
+    {'icon': Icons.auto_awesome, 'text': 'Priority support & updates'},
+  ];
+}
 
-  Widget _page5Activation() {
-    return FadeTransition(
-      opacity: _fadeController,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Spacer(flex: 2),
+// ═══════════════════════════════════════════════════════════════════
+//  PAGE 5 — ACTIVATION
+// ═══════════════════════════════════════════════════════════════════
 
-            // Animated home icon
-            ScaleTransition(
-              scale: _pulseAnimation,
+class _PageActivate extends StatelessWidget {
+  final AnimationController entrance;
+  final Animation<double> pulse;
+  const _PageActivate({required this.entrance, required this.pulse});
+
+  @override
+  Widget build(BuildContext context) {
+    final h = MediaQuery.of(context).size.height;
+    final isSmall = h < 700;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        children: [
+          SizedBox(height: isSmall ? h * 0.06 : h * 0.10),
+
+          // Animated home icon
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.0,
+            child: ScaleTransition(
+              scale: pulse,
               child: Container(
-                width: 100,
-                height: 100,
+                width: 96,
+                height: 96,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      CamelColors.sandGold.withValues(alpha: 0.2),
-                      CamelColors.sandGold.withValues(alpha: 0.03),
+                      _gold.withValues(alpha: 0.18),
+                      _gold.withValues(alpha: 0.02),
                     ],
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _gold.withValues(alpha: 0.12),
+                      blurRadius: 40,
+                      spreadRadius: 8,
+                    ),
+                  ],
                 ),
-                child: Icon(
-                  Icons.home_rounded,
-                  size: 48,
-                  color: CamelColors.sandGold,
-                ),
+                child: const Icon(Icons.home_rounded,
+                    size: 44, color: _gold),
               ),
             ),
+          ),
 
-            const SizedBox(height: 40),
+          SizedBox(height: isSmall ? 28 : 40),
 
-            const Text(
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.12,
+            child: const Text(
               'One Last Step',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.w800,
-                color: Colors.white,
-                height: 1.15,
+                color: _textPrimary,
+                height: 1.12,
               ),
             ),
+          ),
 
-            const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-            Text(
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.22,
+            child: Text(
               'Set Camel Launcher as your\ndefault home screen',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 16,
-                color: Colors.white.withValues(alpha: 0.55),
+                fontSize: 15.5,
+                color: Colors.white.withValues(alpha: 0.48),
                 height: 1.6,
               ),
             ),
+          ),
 
-            const SizedBox(height: 44),
+          SizedBox(height: isSmall ? 28 : 44),
 
-            // Steps — minimal
-            Container(
-              padding: const EdgeInsets.all(24),
+          // Steps card
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.35,
+            child: Container(
+              padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.04),
+                color: Colors.white.withValues(alpha: 0.03),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.06),
-                ),
+                border: Border.all(color: _borderDim),
               ),
               child: Column(
                 children: [
-                  const _StepRow(number: '1', text: 'Tap "Set as My Launcher" below'),
+                  const _SetupStepRow(
+                      num: '1',
+                      text: 'Tap "Set as My Launcher" below'),
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 14),
                     child: Divider(
-                      color: Colors.white.withValues(alpha: 0.06),
-                      height: 1,
-                    ),
+                        color:
+                            Colors.white.withValues(alpha: 0.04),
+                        height: 1),
                   ),
-                  const _StepRow(number: '2', text: 'Select "Camel Launcher"'),
+                  const _SetupStepRow(
+                      num: '2', text: 'Select "Camel Launcher"'),
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 14),
                     child: Divider(
-                      color: Colors.white.withValues(alpha: 0.06),
-                      height: 1,
-                    ),
+                        color:
+                            Colors.white.withValues(alpha: 0.04),
+                        height: 1),
                   ),
-                  const _StepRow(number: '3', text: 'Press the Home button — done!'),
+                  const _SetupStepRow(
+                      num: '3',
+                      text: "Press Home — you're done!"),
                 ],
               ),
             ),
+          ),
 
-            const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
-            // Reassurance
-            Row(
+          _StaggeredFade(
+            entrance: entrance,
+            delay: 0.50,
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.info_outline_rounded,
-                    size: 14, color: Colors.white.withValues(alpha: 0.3)),
-                const SizedBox(width: 8),
+                    size: 13,
+                    color: Colors.white.withValues(alpha: 0.25)),
+                const SizedBox(width: 6),
                 Text(
                   'You can change this anytime in Settings',
                   style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white.withValues(alpha: 0.3),
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.25),
                   ),
                 ),
               ],
             ),
+          ),
 
-            const Spacer(flex: 3),
-          ],
-        ),
+          const Spacer(),
+        ],
       ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  REUSABLE COMPONENTS
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+//  REUSABLE DESIGN COMPONENTS
+// ═══════════════════════════════════════════════════════════════════
 
-/// Animated gradient background that shifts per page
-class _AnimatedGradientBg extends StatelessWidget {
-  final int page;
-  const _AnimatedGradientBg({required this.page});
+/// Staggered fade + slide-up entrance animation
+class _StaggeredFade extends StatelessWidget {
+  final AnimationController entrance;
+  final double delay; // 0.0 - 1.0
+  final Widget child;
+
+  const _StaggeredFade({
+    required this.entrance,
+    required this.delay,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final colors = [
-      [const Color(0xFF0A0A1A), const Color(0xFF0F0A00)],
-      [const Color(0xFF1A0505), const Color(0xFF0A0A0F)],
-      [const Color(0xFF051A0A), const Color(0xFF0A0A0F)],
-      [const Color(0xFF1A1200), const Color(0xFF0A0A0F)],
-      [const Color(0xFF0A0F1A), const Color(0xFF0A0A0F)],
-    ];
+    final start = delay.clamp(0.0, 0.85);
+    final end = (delay + 0.35).clamp(0.0, 1.0);
 
-    final c = colors[page.clamp(0, 4)];
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 600),
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment.topCenter,
-          radius: 1.4,
-          colors: [c[0], c[1]],
-        ),
-      ),
+    final opacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+          parent: entrance,
+          curve: Interval(start, end, curve: Curves.easeOut)),
+    );
+    final slide =
+        Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
+            .animate(
+      CurvedAnimation(
+          parent: entrance,
+          curve: Interval(start, end, curve: Curves.easeOutCubic)),
+    );
+
+    return FadeTransition(
+      opacity: opacity,
+      child: SlideTransition(position: slide, child: child),
     );
   }
 }
 
-/// Emoji with soft glow effect
-class _GlowingIcon extends StatelessWidget {
-  final String icon;
+/// Brand camel icon with ambient glow
+class _BrandIcon extends StatelessWidget {
   final double size;
-  final Color glowColor;
-  const _GlowingIcon({required this.icon, required this.size, required this.glowColor});
+  const _BrandIcon({required this.size});
 
   @override
   Widget build(BuildContext context) {
@@ -866,66 +1023,103 @@ class _GlowingIcon extends StatelessWidget {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: glowColor.withValues(alpha: 0.15),
+            color: _gold.withValues(alpha: 0.12),
             blurRadius: 60,
             spreadRadius: 20,
           ),
         ],
       ),
       child: Center(
-        child: Text(icon, style: TextStyle(fontSize: size)),
+        child: Text(
+            '\u{1F42A}', style: TextStyle(fontSize: size)),
       ),
     );
   }
 }
 
-/// Animated number counter for shock stat
-class _AnimatedCounter extends StatefulWidget {
-  final int targetNumber;
+/// Trust chip (page 1)
+class _TrustChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _TrustChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: _gold.withValues(alpha: 0.7)),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.white.withValues(alpha: 0.45),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Animated stat counter (page 2)
+class _AnimatedStat extends StatefulWidget {
+  final int value;
   final String suffix;
   final String label;
   final Color color;
-  const _AnimatedCounter({
-    required this.targetNumber,
+  const _AnimatedStat({
+    required this.value,
     required this.suffix,
     required this.label,
     required this.color,
   });
 
   @override
-  State<_AnimatedCounter> createState() => _AnimatedCounterState();
+  State<_AnimatedStat> createState() => _AnimatedStatState();
 }
 
-class _AnimatedCounterState extends State<_AnimatedCounter>
+class _AnimatedStatState extends State<_AnimatedStat>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+    _ctrl = AnimationController(
+      duration: const Duration(milliseconds: 1400),
       vsync: this,
     );
-    _animation = Tween<double>(begin: 0, end: widget.targetNumber.toDouble())
-        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) _controller.forward();
+    _anim =
+        Tween<double>(begin: 0, end: widget.value.toDouble()).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic),
+    );
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) _ctrl.forward();
     });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _ctrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
+      animation: _anim,
+      builder: (context, _) {
         return Column(
           children: [
             Row(
@@ -933,22 +1127,24 @@ class _AnimatedCounterState extends State<_AnimatedCounter>
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  _animation.value.toStringAsFixed(0),
+                  _anim.value.toStringAsFixed(0),
                   style: TextStyle(
-                    fontSize: 72,
+                    fontSize: 76,
                     fontWeight: FontWeight.w900,
                     color: widget.color,
                     height: 1,
+                    letterSpacing: -2,
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 8, left: 4),
+                  padding:
+                      const EdgeInsets.only(bottom: 10, left: 4),
                   child: Text(
                     widget.suffix,
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w600,
-                      color: widget.color.withValues(alpha: 0.7),
+                      color: widget.color.withValues(alpha: 0.6),
                     ),
                   ),
                 ),
@@ -958,8 +1154,8 @@ class _AnimatedCounterState extends State<_AnimatedCounter>
             Text(
               widget.label,
               style: TextStyle(
-                fontSize: 14,
-                color: Colors.white.withValues(alpha: 0.4),
+                fontSize: 13,
+                color: Colors.white.withValues(alpha: 0.35),
                 letterSpacing: 0.3,
               ),
             ),
@@ -970,51 +1166,51 @@ class _AnimatedCounterState extends State<_AnimatedCounter>
   }
 }
 
-/// Visual time blocks (showing wasted time)
-class _TimeBlocksVisual extends StatelessWidget {
+/// Time blocks bar (page 2 — wasted vs reclaimed)
+class _TimeBlockBar extends StatelessWidget {
+  const _TimeBlockBar();
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 40,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(12, (i) {
-          final isWasted = i < 8;
-          return Container(
-            width: 22,
-            height: 22,
-            margin: const EdgeInsets.symmetric(horizontal: 3),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(5),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(12, (i) {
+        final isWasted = i < 8;
+        return AnimatedContainer(
+          duration: Duration(milliseconds: 300 + i * 50),
+          width: 22,
+          height: 22,
+          margin: const EdgeInsets.symmetric(horizontal: 2.5),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(5),
+            color: isWasted
+                ? _sunset.withValues(alpha: 0.12 + (i * 0.04))
+                : _green.withValues(alpha: 0.10 + ((i - 8) * 0.06)),
+            border: Border.all(
               color: isWasted
-                  ? CamelColors.desertSunset.withValues(alpha: 0.15 + (i * 0.05))
-                  : CamelColors.oasisGreen.withValues(alpha: 0.12),
-              border: Border.all(
-                color: isWasted
-                    ? CamelColors.desertSunset.withValues(alpha: 0.3)
-                    : CamelColors.oasisGreen.withValues(alpha: 0.2),
-                width: 1,
-              ),
+                  ? _sunset.withValues(alpha: 0.25)
+                  : _green.withValues(alpha: 0.2),
+              width: 1,
             ),
-          );
-        }),
-      ),
+          ),
+        );
+      }),
     );
   }
 }
 
-/// Feature card — modern glass style
+/// Feature card (page 3)
 class _FeatureCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String desc;
-  final Color color;
+  final Color accentColor;
 
   const _FeatureCard({
     required this.icon,
     required this.title,
     required this.desc,
-    required this.color,
+    required this.accentColor,
   });
 
   @override
@@ -1022,22 +1218,23 @@ class _FeatureCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.25),
+        color: _cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withValues(alpha: 0.15),
-        ),
+        border: Border.all(color: _borderDim),
       ),
       child: Row(
         children: [
+          // Icon container
           Container(
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
+              color: accentColor.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: accentColor.withValues(alpha: 0.12)),
             ),
-            child: Icon(icon, color: Colors.white.withValues(alpha: 0.85), size: 22),
+            child: Icon(icon, color: accentColor, size: 21),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -1049,7 +1246,7 @@ class _FeatureCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: _textPrimary,
                     letterSpacing: 0.1,
                   ),
                 ),
@@ -1058,11 +1255,88 @@ class _FeatureCard extends StatelessWidget {
                   desc,
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.white.withValues(alpha: 0.45),
+                    color: Colors.white.withValues(alpha: 0.40),
                     height: 1.3,
                   ),
                 ),
               ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded,
+              color: Colors.white.withValues(alpha: 0.12), size: 20),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pro feature row (page 4)
+class _ProRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _ProRow({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: _gold.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _gold.withValues(alpha: 0.10)),
+          ),
+          child: Icon(icon,
+              color: _gold.withValues(alpha: 0.85), size: 18),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 14.5,
+              color: Colors.white.withValues(alpha: 0.75),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Icon(Icons.check_circle_rounded,
+            color: _green.withValues(alpha: 0.55), size: 20),
+      ],
+    );
+  }
+}
+
+/// Trust pill (page 4 bottom)
+class _TrustPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _TrustPill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon,
+              size: 13,
+              color: Colors.white.withValues(alpha: 0.35)),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10.5,
+              color: Colors.white.withValues(alpha: 0.35),
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -1071,102 +1345,31 @@ class _FeatureCard extends StatelessWidget {
   }
 }
 
-/// Pro feature row with check
-class _ProFeatureRow extends StatelessWidget {
-  final IconData icon;
+/// Setup step row (page 5)
+class _SetupStepRow extends StatelessWidget {
+  final String num;
   final String text;
-  const _ProFeatureRow({required this.icon, required this.text});
+  const _SetupStepRow({required this.num, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: CamelColors.sandGold.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: CamelColors.sandGold, size: 18),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 15,
-              color: Colors.white.withValues(alpha: 0.8),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        Icon(Icons.check_circle_rounded,
-            color: CamelColors.oasisGreen.withValues(alpha: 0.6), size: 20),
-      ],
-    );
-  }
-}
-
-/// Trust badge
-class _TrustBadge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _TrustBadge({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-          ),
-          child: Icon(icon, color: Colors.white.withValues(alpha: 0.5), size: 20),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.white.withValues(alpha: 0.35),
-            height: 1.3,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Step row for activation page
-class _StepRow extends StatelessWidget {
-  final String number;
-  final String text;
-  const _StepRow({required this.number, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 28,
-          height: 28,
+          width: 30,
+          height: 30,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: CamelColors.sandGold.withValues(alpha: 0.12),
+            color: _gold.withValues(alpha: 0.10),
+            border: Border.all(color: _gold.withValues(alpha: 0.18)),
           ),
           child: Center(
             child: Text(
-              number,
-              style: TextStyle(
-                color: CamelColors.sandGold,
+              num,
+              style: const TextStyle(
+                color: _gold,
                 fontWeight: FontWeight.w700,
-                fontSize: 14,
+                fontSize: 13,
               ),
             ),
           ),
@@ -1176,8 +1379,8 @@ class _StepRow extends StatelessWidget {
           child: Text(
             text,
             style: TextStyle(
-              fontSize: 15,
-              color: Colors.white.withValues(alpha: 0.7),
+              fontSize: 14.5,
+              color: Colors.white.withValues(alpha: 0.65),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -1185,4 +1388,197 @@ class _StepRow extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Primary CTA button
+class _PrimaryCTA extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  const _PrimaryCTA({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: Material(
+        color: _gold,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          splashColor: Colors.white.withValues(alpha: 0.1),
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon,
+                      size: 20, color: const Color(0xFF1A1000)),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1000),
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Secondary CTA (text link)
+class _SecondaryCTA extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _SecondaryCTA({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.35),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  ANIMATED BACKGROUND LAYERS
+// ═══════════════════════════════════════════════════════════════════
+
+/// Gradient background that morphs per page
+class _GradientBg extends StatelessWidget {
+  final int page;
+  const _GradientBg({required this.page});
+
+  @override
+  Widget build(BuildContext context) {
+    const gradients = [
+      [
+        Color(0xFF0A0A1A),
+        Color(0xFF0F0A00),
+        Color(0xFF050508)
+      ], // Hook
+      [
+        Color(0xFF1A0808),
+        Color(0xFF100505),
+        Color(0xFF050508)
+      ], // Impact
+      [
+        Color(0xFF061A0A),
+        Color(0xFF050F05),
+        Color(0xFF050508)
+      ], // Solution
+      [
+        Color(0xFF1A1200),
+        Color(0xFF0F0A00),
+        Color(0xFF050508)
+      ], // Pro
+      [
+        Color(0xFF0A0F1A),
+        Color(0xFF050A10),
+        Color(0xFF050508)
+      ], // Activate
+    ];
+
+    final g = gradients[page.clamp(0, 4)];
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 700),
+      curve: Curves.easeInOut,
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: const Alignment(0, -0.4),
+          radius: 1.6,
+          colors: g,
+          stops: const [0.0, 0.5, 1.0],
+        ),
+      ),
+    );
+  }
+}
+
+/// Floating particles — subtle ambient effect
+class _FloatingParticles extends StatelessWidget {
+  final AnimationController controller;
+  const _FloatingParticles({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        return CustomPaint(
+          painter:
+              _ParticlePainter(progress: controller.value),
+          size: Size.infinite,
+        );
+      },
+    );
+  }
+}
+
+class _ParticlePainter extends CustomPainter {
+  final double progress;
+  _ParticlePainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+    final rng = math.Random(42); // Fixed seed for consistent particles
+
+    for (int i = 0; i < 20; i++) {
+      final baseX = rng.nextDouble() * size.width;
+      final baseY = rng.nextDouble() * size.height;
+      final speed = 0.3 + rng.nextDouble() * 0.7;
+      final phase = rng.nextDouble() * math.pi * 2;
+      final radius = 1.0 + rng.nextDouble() * 1.5;
+
+      final x =
+          baseX +
+          math.sin(progress * math.pi * 2 * speed + phase) * 20;
+      final y =
+          baseY +
+          math.cos(progress * math.pi * 2 * speed * 0.7 + phase) *
+              15;
+      final alpha =
+          (0.04 +
+              math
+                      .sin(progress * math.pi * 2 + phase)
+                      .abs() *
+                  0.06);
+
+      paint.color = _gold.withValues(alpha: alpha);
+      canvas.drawCircle(Offset(x, y), radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ParticlePainter old) =>
+      old.progress != progress;
 }

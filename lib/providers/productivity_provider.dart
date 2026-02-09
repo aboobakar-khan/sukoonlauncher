@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../models/productivity_models.dart';
+import '../services/native_app_blocker_service.dart';
 
 const _uuid = Uuid();
 
@@ -118,10 +119,11 @@ final todoProvider = StateNotifierProvider<TodoNotifier, List<TodoItem>>(
 // 🍅 POMODORO PROVIDER
 // ═══════════════════════════════════════════════════════════════════════════════
 
-enum PomodoroState { idle, focusing, shortBreak, longBreak }
+enum PomodoroState { idle, focusing, shortBreak, longBreak, paused }
 
 class PomodoroTimerState {
   final PomodoroState state;
+  final PomodoroState? previousState; // Track what was running before pause
   final int remainingSeconds;
   final int completedSessions;
   final int totalFocusMinutesToday;
@@ -130,6 +132,7 @@ class PomodoroTimerState {
 
   PomodoroTimerState({
     this.state = PomodoroState.idle,
+    this.previousState,
     this.remainingSeconds = 1500, // 25 min
     this.completedSessions = 0,
     this.totalFocusMinutesToday = 0,
@@ -139,15 +142,18 @@ class PomodoroTimerState {
 
   PomodoroTimerState copyWith({
     PomodoroState? state,
+    PomodoroState? previousState,
     int? remainingSeconds,
     int? completedSessions,
     int? totalFocusMinutesToday,
     String? activeTodoId,
     PomodoroSettings? settings,
     bool clearTodoId = false,
+    bool clearPreviousState = false,
   }) {
     return PomodoroTimerState(
       state: state ?? this.state,
+      previousState: clearPreviousState ? null : (previousState ?? this.previousState),
       remainingSeconds: remainingSeconds ?? this.remainingSeconds,
       completedSessions: completedSessions ?? this.completedSessions,
       totalFocusMinutesToday: totalFocusMinutesToday ?? this.totalFocusMinutesToday,
@@ -163,9 +169,11 @@ class PomodoroTimerState {
   }
 
   double get progress {
-    final total = state == PomodoroState.focusing
+    // Use previousState for paused to show accurate progress
+    final effectiveState = state == PomodoroState.paused ? previousState ?? PomodoroState.focusing : state;
+    final total = effectiveState == PomodoroState.focusing
         ? settings.focusMinutes * 60
-        : state == PomodoroState.longBreak
+        : effectiveState == PomodoroState.longBreak
             ? settings.longBreakMinutes * 60
             : settings.shortBreakMinutes * 60;
     if (total == 0) return 0;
@@ -210,7 +218,7 @@ class PomodoroNotifier extends StateNotifier<PomodoroTimerState> {
   }
 
   void tick() {
-    if (state.state == PomodoroState.idle) return;
+    if (state.state == PomodoroState.idle || state.state == PomodoroState.paused) return;
     if (state.remainingSeconds <= 0) {
       _onTimerComplete();
       return;
@@ -240,7 +248,20 @@ class PomodoroNotifier extends StateNotifier<PomodoroTimerState> {
   }
 
   void pause() {
-    state = state.copyWith(state: PomodoroState.idle);
+    // Save the current state so we can resume from it
+    state = state.copyWith(
+      previousState: state.state,
+      state: PomodoroState.paused,
+    );
+  }
+
+  /// Resume from paused — continues the timer from where it left off
+  void resume() {
+    if (state.state != PomodoroState.paused || state.previousState == null) return;
+    state = state.copyWith(
+      state: state.previousState,
+      clearPreviousState: true,
+    );
   }
 
   void reset() {
@@ -248,6 +269,7 @@ class PomodoroNotifier extends StateNotifier<PomodoroTimerState> {
       state: PomodoroState.idle,
       remainingSeconds: state.settings.focusMinutes * 60,
       clearTodoId: true,
+      clearPreviousState: true,
     );
   }
 
@@ -507,6 +529,44 @@ class AppBlockRuleNotifier extends StateNotifier<List<AppBlockRule>> {
   Future<void> _init() async {
     _box = await Hive.openBox<AppBlockRule>('app_block_rules');
     state = _box!.values.toList();
+    // Sync to native blocker on startup
+    _syncToNativeBlocker();
+  }
+
+  /// Sync all currently-blocked packages to the native foreground service.
+  /// This is the key integration point — the native service will monitor
+  /// the foreground app and block any that are in this list.
+  void _syncToNativeBlocker() {
+    final now = DateTime.now();
+    final allBlockedPackages = <String>{};
+
+    for (final rule in state) {
+      if (!rule.isEnabled) continue;
+
+      if (rule.isTimeBased) {
+        if (rule.startHour == null || rule.endHour == null) continue;
+        if (!rule.activeDays.contains(now.weekday)) continue;
+
+        final startMin = rule.startHour! * 60 + (rule.startMinute ?? 0);
+        final endMin = rule.endHour! * 60 + (rule.endMinute ?? 0);
+        final nowMin = now.hour * 60 + now.minute;
+
+        bool inWindow;
+        if (startMin <= endMin) {
+          inWindow = nowMin >= startMin && nowMin <= endMin;
+        } else {
+          inWindow = nowMin >= startMin || nowMin <= endMin;
+        }
+        if (inWindow) {
+          allBlockedPackages.addAll(rule.blockedPackages);
+        }
+      } else {
+        // Manual toggle — always active when enabled
+        allBlockedPackages.addAll(rule.blockedPackages);
+      }
+    }
+
+    NativeAppBlockerService.updateBlockedPackages(allBlockedPackages.toList());
   }
 
   Future<AppBlockRule> addRule({
@@ -540,6 +600,7 @@ class AppBlockRuleNotifier extends StateNotifier<List<AppBlockRule>> {
     );
     await _box?.put(rule.id, rule);
     state = [...state, rule];
+    _syncToNativeBlocker();
     return rule;
   }
 
@@ -552,6 +613,7 @@ class AppBlockRuleNotifier extends StateNotifier<List<AppBlockRule>> {
       if (rule.isEnabled) rule.breaksTaken = 0; // Reset breaks on re-enable
       await rule.save();
       state = _box!.values.toList();
+      _syncToNativeBlocker();
     }
   }
 
@@ -581,6 +643,7 @@ class AppBlockRuleNotifier extends StateNotifier<List<AppBlockRule>> {
       if (blockMessage != null) rule.blockMessage = blockMessage;
       await rule.save();
       state = _box!.values.toList();
+      _syncToNativeBlocker();
     }
   }
 
@@ -590,6 +653,7 @@ class AppBlockRuleNotifier extends StateNotifier<List<AppBlockRule>> {
     if (rule != null && rule.isHardBlock) return;
     await _box?.delete(id);
     state = state.where((r) => r.id != id).toList();
+    _syncToNativeBlocker();
   }
 
   Future<void> takeBreak(String id) async {

@@ -8,7 +8,6 @@ class AmbientSoundWidget extends ConsumerWidget {
   const AmbientSoundWidget({super.key});
 
   static const _sandGold = Color(0xFFC2A366);
-  static const _desertSunset = Color(0xFFE8915A);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -22,104 +21,49 @@ class AmbientSoundWidget extends ConsumerWidget {
 
     return GestureDetector(
       onTap: () => _showSoundPicker(context, ref),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: soundState.isPlaying
-                ? _sandGold.withValues(alpha: 0.2)
-                : Colors.white.withValues(alpha: 0.06),
-          ),
-        ),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
           children: [
-            // Sound icon
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: soundState.isPlaying
-                    ? _sandGold.withValues(alpha: 0.12)
-                    : Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Text(
-                  currentSound?.emoji ?? '🎵',
-                  style: const TextStyle(fontSize: 20),
-                ),
-              ),
+            // Emoji
+            Text(
+              currentSound?.emoji ?? '🎵',
+              style: const TextStyle(fontSize: 18),
             ),
-            const SizedBox(width: 12),
-            // Info
+            const SizedBox(width: 10),
+            // Name
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    soundState.isPlaying
-                        ? currentSound?.name ?? 'Ambient Sound'
-                        : 'Ambient Sound',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    soundState.isPlaying
-                        ? 'Playing · Tap to change'
-                        : 'Tap to select a sound',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.35),
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Mute / Play-pause controls
-            if (soundState.currentSoundId != null) ...[
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  ref.read(ambientSoundProvider.notifier).toggleMute();
-                },
-                child: Icon(
-                  soundState.isMuted
-                      ? Icons.volume_off_rounded
-                      : Icons.volume_up_rounded,
-                  color: _sandGold.withValues(alpha: 0.5),
-                  size: 20,
+              child: Text(
+                soundState.isPlaying
+                    ? currentSound?.name ?? 'Ambient Sound'
+                    : 'Ambient Sound',
+                style: TextStyle(
+                  color: soundState.isPlaying
+                      ? Colors.white.withValues(alpha: 0.7)
+                      : Colors.white.withValues(alpha: 0.35),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
-              const SizedBox(width: 12),
+            ),
+            // Controls
+            if (soundState.currentSoundId != null) ...[
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
                   ref.read(ambientSoundProvider.notifier).togglePlayPause();
                 },
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: _sandGold.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    soundState.isPlaying
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                    color: _sandGold,
-                    size: 18,
-                  ),
+                child: Icon(
+                  soundState.isPlaying
+                      ? Icons.pause_rounded
+                      : Icons.play_arrow_rounded,
+                  color: _sandGold.withValues(alpha: 0.6),
+                  size: 20,
                 ),
               ),
-            ],
+            ] else
+              Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.15), size: 18),
           ],
         ),
       ),
@@ -233,7 +177,7 @@ class AmbientSoundWidget extends ConsumerWidget {
                     Navigator.pop(ctx);
                   },
                   style: TextButton.styleFrom(
-                    foregroundColor: _desertSunset.withValues(alpha: 0.7),
+                    foregroundColor: Colors.white.withValues(alpha: 0.4),
                   ),
                   child: const Text('Stop Sound'),
                 ),
