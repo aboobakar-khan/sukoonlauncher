@@ -1,4 +1,4 @@
-package com.example.minimalist_app
+package com.sukoon.launcher
 
 import android.content.BroadcastReceiver
 import android.content.Context

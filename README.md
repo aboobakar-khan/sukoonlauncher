@@ -1,6 +1,6 @@
-# Camel: Islamic Minimalist Launcher 🌿
+# Sukoon Launcher ☪️
 
-A clean, distraction-free Android launcher built with Flutter.
+A peaceful Islamic launcher for a focused digital life. Built with Flutter.
 
 ## ✨ Features
 

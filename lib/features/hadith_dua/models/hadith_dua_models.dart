@@ -360,7 +360,7 @@ class Hadith {
     
     buffer.writeln();
     buffer.writeln('──────────────────────');
-    buffer.writeln('Shared via Camel Launcher 🐪');
+    buffer.writeln('Shared via Sukoon Launcher ☪️');
     
     return buffer.toString();
   }
@@ -461,7 +461,7 @@ class Dua {
     
     buffer.writeln();
     buffer.writeln('──────────────────────');
-    buffer.writeln('Shared via Camel Launcher 🐪');
+    buffer.writeln('Shared via Sukoon Launcher ☪️');
     
     return buffer.toString();
   }

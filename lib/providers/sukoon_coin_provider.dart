@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
-// ─── Camel Coin Economy ─────────────────────────────────────────────────────
+// ─── Sukoon Coin Economy ─────────────────────────────────────────────────────
 // Designed so a consistent 30-day prayer person earns enough for premium.
 //
 // EARNING RATES (daily max ~45-80 coins):
@@ -122,7 +122,7 @@ class StoreItem {
 }
 
 /// All store items definition
-class CamelStore {
+class SukoonStore {
   static const List<StoreItem> allItems = [
     // ─── Premium ───
     StoreItem(
@@ -385,8 +385,8 @@ class CamelStore {
       allItems.where((i) => i.category == cat).toList();
 }
 
-/// Camel Coin state
-class CamelCoinState {
+/// Sukoon Coin state
+class SukoonCoinState {
   final int balance;
   final List<CoinTransaction> history;
   final Set<String> ownedItems; // item IDs the user has purchased
@@ -405,7 +405,7 @@ class CamelCoinState {
   final int pomodoroCoinsToday;
   final String? lastPomodoroDate;
 
-  const CamelCoinState({
+  const SukoonCoinState({
     this.balance = 0,
     this.history = const [],
     this.ownedItems = const {},
@@ -425,7 +425,7 @@ class CamelCoinState {
     this.lastPomodoroDate,
   });
 
-  CamelCoinState copyWith({
+  SukoonCoinState copyWith({
     int? balance,
     List<CoinTransaction>? history,
     Set<String>? ownedItems,
@@ -444,7 +444,7 @@ class CamelCoinState {
     int? pomodoroCoinsToday,
     String? lastPomodoroDate,
   }) {
-    return CamelCoinState(
+    return SukoonCoinState(
       balance: balance ?? this.balance,
       history: history ?? this.history,
       ownedItems: ownedItems ?? this.ownedItems,
@@ -474,11 +474,12 @@ class CamelCoinState {
   }
 }
 
-/// Camel Coin Notifier — manages the entire coin economy
-class CamelCoinNotifier extends StateNotifier<CamelCoinState> {
+/// Sukoon Coin Notifier — manages the entire coin economy
+class SukoonCoinNotifier extends StateNotifier<SukoonCoinState> {
+  // NOTE: Keep legacy box name 'camel_coins' to preserve existing user data
   static const String _boxName = 'camel_coins';
 
-  CamelCoinNotifier() : super(const CamelCoinState()) {
+  SukoonCoinNotifier() : super(const SukoonCoinState()) {
     _load();
   }
 
@@ -526,7 +527,7 @@ class CamelCoinNotifier extends StateNotifier<CamelCoinState> {
         }
       }
 
-      state = CamelCoinState(
+      state = SukoonCoinState(
         balance: balance,
         history: history,
         ownedItems: ownedItems,
@@ -842,16 +843,16 @@ class CamelCoinNotifier extends StateNotifier<CamelCoinState> {
 
 // ─── PROVIDERS ──────────────────────────────────────────────────────────────
 
-final camelCoinProvider = StateNotifierProvider<CamelCoinNotifier, CamelCoinState>(
-  (ref) => CamelCoinNotifier(),
+final sukoonCoinProvider = StateNotifierProvider<SukoonCoinNotifier, SukoonCoinState>(
+  (ref) => SukoonCoinNotifier(),
 );
 
 /// Quick balance check
 final coinBalanceProvider = Provider<int>((ref) {
-  return ref.watch(camelCoinProvider).balance;
+  return ref.watch(sukoonCoinProvider).balance;
 });
 
 /// Check if user has coin-based premium
 final hasCoinPremiumProvider = Provider<bool>((ref) {
-  return ref.watch(camelCoinProvider.notifier).hasCoinPremium;
+  return ref.watch(sukoonCoinProvider.notifier).hasCoinPremium;
 });

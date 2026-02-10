@@ -1,5 +1,5 @@
-name: minimalist_app
-description: "A new Flutter project."
+name: sukoon_launcher
+description: "Sukoon Launcher — A peaceful Islamic launcher for a focused digital life."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

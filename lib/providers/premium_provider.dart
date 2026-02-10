@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'camel_coin_provider.dart';
+import 'sukoon_coin_provider.dart';
 
 /// Premium Features - What's included in premium
 enum PremiumFeature {

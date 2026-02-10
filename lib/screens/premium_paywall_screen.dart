@@ -187,7 +187,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
             ElevatedButton(
               onPressed: () async {
                 final code = couponController.text.trim().toUpperCase();
-                if (code == 'CAMEL') {
+                if (code == 'SUKOON') {
                   Navigator.pop(dialogContext);
                   
                   // Activate premium with zero cost
@@ -911,7 +911,7 @@ class _PremiumCelebrationPage extends StatefulWidget {
 class _PremiumCelebrationPageState extends State<_PremiumCelebrationPage>
     with TickerProviderStateMixin {
   static const _sandGold = Color(0xFFC2A366);
-  static const _camelBrown = Color(0xFFA67B5B);
+  static const _warmBrown = Color(0xFFA67B5B);
   static const _desertSunset = Color(0xFFE8915A);
 
   late AnimationController _scaleCtrl;

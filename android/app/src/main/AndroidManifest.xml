@@ -28,7 +28,7 @@
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     
     <application
-        android:label="Camel"
+        android:label="Sukoon"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="false">
@@ -82,7 +82,7 @@
             android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
             android:excludeFromRecents="true"
             android:launchMode="singleTop"
-            android:taskAffinity="com.example.minimalist_app.blocker" />
+            android:taskAffinity="com.sukoon.launcher.blocker" />
         
         <!-- Restart blocker service after device reboot -->
         <receiver

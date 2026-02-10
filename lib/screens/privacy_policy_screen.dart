@@ -60,7 +60,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
         _buildSection(
           title: 'Last updated: $formattedDate',
           content:
-              'Camel Launcher ("we", "our", or "the app") is a minimalist launcher application. Your privacy is very important to us. This Privacy Policy explains how we handle information when you use our application.\n\nBy using this app, you agree to the practices described in this policy.',
+              'Sukoon Launcher ("we", "our", or "the app") is a peaceful Islamic launcher application. Your privacy is very important to us. This Privacy Policy explains how we handle information when you use our application.\n\nBy using this app, you agree to the practices described in this policy.',
         ),
         const SizedBox(height: 24),
         _buildSection(
@@ -146,7 +146,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           title: '11. Contact Us',
           content:
               'If you have any questions about this Privacy Policy, you may contact us at:\n\n'
-              '📧 [camellauncher@gmail.com]',
+              '📧 [sukoonlauncher@gmail.com]',
         ),
         const SizedBox(height: 40),
       ],

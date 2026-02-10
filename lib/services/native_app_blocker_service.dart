@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 ///
 /// Requires USAGE_STATS permission (user must grant in settings).
 class NativeAppBlockerService {
-  static const _channel = MethodChannel('com.minimalist.launcher/app_blocker');
+  static const _channel = MethodChannel('com.sukoon.launcher/app_blocker');
 
   /// Start the native foreground blocker service
   static Future<bool> startService() async {

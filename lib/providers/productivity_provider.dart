@@ -579,7 +579,7 @@ class AppBlockRuleNotifier extends StateNotifier<List<AppBlockRule>> {
     int? endMinute,
     List<int>? activeDays,
     String? linkedEventId,
-    String blockMessage = 'Stay focused! 🐪',
+    String blockMessage = 'Stay focused! 🌙',
     bool allowBreaks = true,
     bool isHardBlock = false,
   }) async {

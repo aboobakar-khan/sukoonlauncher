@@ -78,7 +78,7 @@ class DeenModeNotifier extends StateNotifier<DeenModeSettings> {
   Future<void> _muteNotifications() async {
     try {
       // Use platform channel to enable DND mode
-      const platform = MethodChannel('com.minimalist.launcher/dnd');
+      const platform = MethodChannel('com.sukoon.launcher/dnd');
       await platform.invokeMethod('enableDND');
     } catch (e) {
       // Silent fail - DND might not be available
@@ -88,7 +88,7 @@ class DeenModeNotifier extends StateNotifier<DeenModeSettings> {
   /// Restore notifications (disable DND)
   Future<void> _restoreNotifications() async {
     try {
-      const platform = MethodChannel('com.minimalist.launcher/dnd');
+      const platform = MethodChannel('com.sukoon.launcher/dnd');
       await platform.invokeMethod('disableDND');
     } catch (e) {
       // Silent fail

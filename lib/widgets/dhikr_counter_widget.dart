@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/tasbih_provider.dart';
 import '../providers/theme_provider.dart';
-import '../providers/camel_coin_provider.dart';
+import '../providers/sukoon_coin_provider.dart';
 import '../screens/dhikr_history_pro_dashboard_redesigned.dart';
 
 /// Dhikr Counter Widget — Clean Minimalist Redesign
@@ -27,7 +27,7 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
   late AnimationController _countAnimController;
   late Animation<double> _scaleAnimation;
 
-  // 🐪 Camel-brand design tokens — consistent with app theme
+  // ☪️ Sukoon brand design tokens — consistent with app theme
   static const Color _cardBg = Color(0xFF111111);
   static const Color _surfaceBg = Color(0xFF0A0A0A);
   static const Color _borderColor = Color(0xFF1E1E1E);
@@ -136,10 +136,10 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
     HapticFeedback.lightImpact();
     _countAnimController.forward().then((_) => _countAnimController.reverse());
     ref.read(tasbihProvider.notifier).increment();
-    // 🪙 Award Camel Coins at 100 dhikr milestone
+    // 🪙 Award Sukoon Coins at 100 dhikr milestone
     final tasbih = ref.read(tasbihProvider);
     if (tasbih.currentCount == 100) {
-      ref.read(camelCoinProvider.notifier).awardDhikrMilestone();
+      ref.read(sukoonCoinProvider.notifier).awardDhikrMilestone();
     }
   }
 

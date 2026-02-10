@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/prayer_provider.dart';
 import '../providers/theme_provider.dart';
-import '../providers/camel_coin_provider.dart';
+import '../providers/sukoon_coin_provider.dart';
 import '../screens/prayer_history_dashboard_redesigned.dart';
 
 /// Prayer Tracker Widget - Professional Minimalist Design
@@ -30,7 +30,7 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
   // Track which day we're viewing: 0 = today, 1 = yesterday
   int _selectedDayOffset = 0;
 
-  // 🐪 Camel-brand design tokens — aligned with app theme
+  // ☪️ Sukoon brand design tokens — aligned with app theme
   static const Color _bgDark = Color(0xFF0A0A0A);
   static const Color _cardBg = Color(0xFF111111);
   static const Color _borderColor = Color(0xFF1E1E1E);
@@ -40,7 +40,7 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
   static const Color _textPrimary = Color(0xFFE6EDF3);
   static const Color _textSecondary = Color(0xFF8B949E);
   static const Color _textMuted = Color(0xFF484F58);
-  static const Color _amberAccent = Color(0xFFC2A366);    // Camel sand gold
+  static const Color _amberAccent = Color(0xFFC2A366);    // Sand gold
 
   // Prayer data with Islamic context
   static const List<Map<String, dynamic>> _prayers = [
@@ -507,13 +507,13 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
                 selectedDate,
                 prayer['name'],
               );
-              // 🪙 Check if all 5 prayers completed → award Camel Coins
+              // 🪙 Check if all 5 prayers completed → award Sukoon Coins
               Future.delayed(const Duration(milliseconds: 100), () {
                 final todayRecord = ref.read(todayPrayerRecordProvider);
                 if (todayRecord != null &&
                     todayRecord.fajr && todayRecord.dhuhr && todayRecord.asr &&
                     todayRecord.maghrib && todayRecord.isha) {
-                  ref.read(camelCoinProvider.notifier).awardDailyPrayer();
+                  ref.read(sukoonCoinProvider.notifier).awardDailyPrayer();
                 }
               });
             }

@@ -7,7 +7,7 @@ import 'package:hijri/hijri_calendar.dart';
 import '../providers/prayer_provider.dart';
 import '../models/prayer_record.dart';
 
-// ─── Design tokens (Camel brand — disciplined palette) ─────────────────────
+// ─── Design tokens (Sukoon brand — disciplined palette) ─────────────────────
 const Color _sandGold = Color(0xFFC2A366);
 const Color _oasisGreen = Color(0xFF7BAE6E);
 

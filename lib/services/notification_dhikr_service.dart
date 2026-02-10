@@ -20,7 +20,7 @@ import '../utils/hive_box_manager.dart';
 /// - Always available spiritual tool
 class NotificationDhikrService {
   static const MethodChannel _channel = 
-      MethodChannel('com.minimalist.launcher/dhikr_notification');
+      MethodChannel('com.sukoon.launcher/dhikr_notification');
   
   static bool _isServiceRunning = false;
   static int _currentCount = 0;

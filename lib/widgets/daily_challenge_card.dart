@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../providers/camel_coin_provider.dart';
+import '../providers/sukoon_coin_provider.dart';
 import '../screens/daily_challenges_analytics_screen.dart';
 import '../screens/dhikr_history_pro_dashboard_redesigned.dart';
 import '../screens/productivity_hub_screen.dart';
@@ -142,8 +142,8 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
         await box.put('challenge_streak', newStreak);
         setState(() => _challengeStreak = newStreak);
         
-        // 🪙 Award Camel Coins for completing all challenges
-        ref.read(camelCoinProvider.notifier).awardDailyChallenge();
+        // 🪙 Award Sukoon Coins for completing all challenges
+        ref.read(sukoonCoinProvider.notifier).awardDailyChallenge();
         
         _showCompletionReward();
       }
@@ -226,7 +226,7 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
               ),
               const SizedBox(height: 8),
               Text(
-                '🪙 +15 Camel Coins earned!',
+                '🪙 +15 Sukoon Coins earned!',
                 style: TextStyle(color: _gold.withValues(alpha: 0.9), fontSize: 14, fontWeight: FontWeight.w600),
               ),
               if (_challengeStreak > 0) ...[

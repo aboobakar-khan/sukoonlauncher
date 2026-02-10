@@ -13,7 +13,7 @@ import '../providers/arabic_font_provider.dart';
 import '../providers/premium_provider.dart';
 import '../providers/tafseer_edition_provider.dart';
 import '../providers/amoled_provider.dart';
-import '../providers/camel_coin_provider.dart';
+import '../providers/sukoon_coin_provider.dart';
 import '../providers/ramadan_provider.dart';
 import 'theme_color_picker_screen.dart';
 import 'font_picker_screen.dart';
@@ -23,7 +23,7 @@ import 'premium_paywall_screen.dart';
 import 'favorite_picker_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'credits_screen.dart';
-import 'camel_coin_store_screen.dart';
+import 'sukoon_coin_store_screen.dart';
 import '../services/offline_content_manager.dart';
 import '../widgets/offline_download_indicator.dart';
 import '../widgets/swipe_back_wrapper.dart';
@@ -237,7 +237,7 @@ class SettingsScreen extends ConsumerWidget {
                   const SizedBox(height: 24),
                   _buildRamadanSection(context, ref),
                   const SizedBox(height: 24),
-                  _buildCamelStoreSection(context, ref),
+                  _buildSukoonStoreSection(context, ref),
                   const SizedBox(height: 24),
                   _buildSettingsSection(
                     title: 'PREMIUM',
@@ -346,15 +346,15 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                       _buildSettingsItem(
                         icon: Icons.monetization_on_rounded,
-                        title: 'Add 500 Camel Coins (Test)',
+                        title: 'Add 500 Sukoon Coins (Test)',
                         subtitle: 'Give yourself coins to test the store',
                         onTap: () async {
-                          await ref.read(camelCoinProvider.notifier).addTestCoins(500);
+                          await ref.read(sukoonCoinProvider.notifier).addTestCoins(500);
                           HapticFeedback.heavyImpact();
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('🪙 +500 Camel Coins added · Balance: ${ref.read(coinBalanceProvider)}'),
+                                content: Text('🪙 +500 Sukoon Coins added · Balance: ${ref.read(coinBalanceProvider)}'),
                                 backgroundColor: const Color(0xFFC2A366),
                                 behavior: SnackBarBehavior.floating,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -375,15 +375,15 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCamelStoreSection(BuildContext context, WidgetRef ref) {
-    final coinState = ref.watch(camelCoinProvider);
+  Widget _buildSukoonStoreSection(BuildContext context, WidgetRef ref) {
+    final coinState = ref.watch(sukoonCoinProvider);
     const gold = Color(0xFFC2A366);
 
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const CamelCoinStoreScreen()),
+          MaterialPageRoute(builder: (_) => const SukoonCoinStoreScreen()),
         );
       },
       child: Container(
@@ -417,7 +417,7 @@ class SettingsScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Camel Store',
+                    'Sukoon Store',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 15,
@@ -671,7 +671,7 @@ class SettingsScreen extends ConsumerWidget {
   void _openHomeLauncherSettings(BuildContext context) async {
     try {
       // Open Android home screen settings using platform channel
-      const platform = MethodChannel('com.example.minimalist_app/launcher');
+      const platform = MethodChannel('com.sukoon.launcher/launcher');
       await platform.invokeMethod('openHomeLauncherSettings');
     } catch (e) {
       if (context.mounted) {

@@ -8,21 +8,21 @@ import '../providers/theme_provider.dart';
 import '../providers/installed_apps_provider.dart';
 import '../models/installed_app.dart';
 import '../providers/premium_provider.dart';
-import '../providers/camel_coin_provider.dart';
+import '../providers/sukoon_coin_provider.dart';
 import '../models/productivity_models.dart';
 import '../providers/ambient_sound_provider.dart';
 import '../services/native_app_blocker_service.dart';
 import '../widgets/zen_mode_widget.dart';
 import 'premium_paywall_screen.dart';
 
-// ─── Camel Design Tokens ────────────────────────────────────────────────────
+// ─── Sukoon Design Tokens ────────────────────────────────────────────────────
 const Color _sandGold = Color(0xFFC2A366);
-const Color _camelBrown = Color(0xFFA67B5B);
+const Color _warmBrown = Color(0xFFA67B5B);
 const Color _oasisGreen = Color(0xFF7BAE6E);
 const Color _desertWarm = Color(0xFFD4A96A);
 const Color _desertSunset = Color(0xFFE8915A);
 
-/// 🐪 Productivity Hub — Distraction-free tools
+/// 🌙 Productivity Hub — Distraction-free tools
 /// Features: Todo · Pomodoro · Academic Doubts · Events · App Blocker
 class ProductivityHubScreen extends ConsumerStatefulWidget {
   const ProductivityHubScreen({super.key});
@@ -881,7 +881,7 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
 
     final colorOptions = {
       'C2A366': _sandGold,
-      'A67B5B': _camelBrown,
+      'A67B5B': _warmBrown,
       '7BAE6E': _oasisGreen,
       'E8915A': _desertSunset,
     };
@@ -1083,10 +1083,10 @@ class _PomodoroTabState extends ConsumerState<_PomodoroTab> {
     final pomo = ref.watch(pomodoroProvider);
     final todos = ref.watch(todoProvider).where((t) => !t.isCompleted).toList();
 
-    // 🪙 Award Camel Coins when a focus session completes (session count increases)
+    // 🪙 Award Sukoon Coins when a focus session completes (session count increases)
     if (pomo.completedSessions > _prevSessionCount) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(camelCoinProvider.notifier).awardPomodoroComplete();
+        ref.read(sukoonCoinProvider.notifier).awardPomodoroComplete();
         setState(() => _prevSessionCount = pomo.completedSessions);
       });
     }
@@ -1101,7 +1101,7 @@ class _PomodoroTabState extends ConsumerState<_PomodoroTab> {
 
     final stateLabels = {
       PomodoroState.idle: 'Ready to Focus',
-      PomodoroState.focusing: 'Stay Focused 🐪',
+      PomodoroState.focusing: 'Stay Focused 🌙',
       PomodoroState.shortBreak: 'Short Break',
       PomodoroState.longBreak: 'Long Break',
       PomodoroState.paused: 'Paused',
@@ -1476,7 +1476,7 @@ class _PomodoroTabState extends ConsumerState<_PomodoroTab> {
                       label: 'Sessions',
                       value: sessions,
                       suffix: '',
-                      color: _camelBrown,
+                      color: _warmBrown,
                       onMinus: () { if (sessions > 2) setBS(() => sessions--); },
                       onPlus: () { if (sessions < 8) setBS(() => sessions++); },
                     ),
@@ -2590,7 +2590,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
 
     final colorOptions = {
       'C2A366': _sandGold,
-      'A67B5B': _camelBrown,
+      'A67B5B': _warmBrown,
       '7BAE6E': _oasisGreen,
       'E8915A': _desertSunset,
       'D4A96A': _desertWarm,
@@ -2962,7 +2962,7 @@ class _BlockerTab extends ConsumerWidget {
                           style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.3))),
                       const SizedBox(height: 4),
-                      Text('Block distracting apps 🐪',
+                      Text('Block distracting apps 🌙',
                           style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.2),
                               fontSize: 12)),

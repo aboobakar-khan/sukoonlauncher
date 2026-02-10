@@ -225,7 +225,7 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
           stops: const [0.0, 0.5, 1.0],
         );
       case WallpaperType.desertGradient:
-        // 🐪 Camel desert gradient - warm sand tones
+        // 🌙 Desert gradient - warm sand tones
         return LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,

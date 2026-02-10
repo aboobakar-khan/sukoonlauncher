@@ -1,4 +1,4 @@
-package com.example.minimalist_app
+package com.sukoon.launcher
 
 import android.app.AppOpsManager
 import android.app.KeyguardManager
@@ -22,11 +22,11 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.example.minimalist_app/launcher"
+    private val CHANNEL = "com.sukoon.launcher/launcher"
     private val APP_SETTINGS_CHANNEL = "app_settings"
-    private val USAGE_STATS_CHANNEL = "com.minimalist.launcher/usage_stats"
-    private val BLOCKER_CHANNEL = "com.minimalist.launcher/app_blocker"
-    private val DND_CHANNEL = "com.minimalist.launcher/dnd"
+    private val USAGE_STATS_CHANNEL = "com.sukoon.launcher/usage_stats"
+    private val BLOCKER_CHANNEL = "com.sukoon.launcher/app_blocker"
+    private val DND_CHANNEL = "com.sukoon.launcher/dnd"
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

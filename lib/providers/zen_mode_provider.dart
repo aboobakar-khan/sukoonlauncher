@@ -76,9 +76,9 @@ class ZenModeNotifier extends StateNotifier<ZenModeState> {
   }
 
   static const _boxName = 'zen_mode_box';
-  static const _dndChannel = MethodChannel('com.minimalist.launcher/dnd');
-  static const _appChannel = MethodChannel('com.minimalist.launcher/apps');
-  static const _blockerChannel = MethodChannel('com.minimalist.launcher/app_blocker');
+  static const _dndChannel = MethodChannel('com.sukoon.launcher/dnd');
+  static const _appChannel = MethodChannel('com.sukoon.launcher/apps');
+  static const _blockerChannel = MethodChannel('com.sukoon.launcher/app_blocker');
 
   Box? _box;
 
@@ -120,7 +120,7 @@ class ZenModeNotifier extends StateNotifier<ZenModeState> {
         allPackages = result
             .map((app) => (app as Map)['package'] as String)
             .where((pkg) =>
-                pkg != 'com.example.minimalist_app' && // our app
+                pkg != 'com.sukoon.launcher' && // our app
                 !pkg.startsWith('com.android.server') &&
                 pkg != 'com.android.phone' && // phone app
                 pkg != 'com.android.dialer' && // dialer

@@ -185,7 +185,7 @@ class WallpaperPickerScreen extends ConsumerWidget {
           ],
         );
       case WallpaperType.desertGradient:
-        // 🐪 Camel desert gradient preview
+        // 🌙 Desert gradient preview
         return LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,

@@ -59,11 +59,11 @@ void main() async {
     HiveBoxManager.get('tasbih_data'),
   ]);
 
-  runApp(const ProviderScope(child: MinimalistLauncherApp()));
+  runApp(const ProviderScope(child: SukoonLauncherApp()));
 }
 
-class MinimalistLauncherApp extends ConsumerWidget {
-  const MinimalistLauncherApp({super.key});
+class SukoonLauncherApp extends ConsumerWidget {
+  const SukoonLauncherApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -73,7 +73,7 @@ class MinimalistLauncherApp extends ConsumerWidget {
     final bgColor = isAmoled ? Colors.black : Colors.black.withValues(alpha: 0.5);
 
     return MaterialApp(
-      title: 'Camel Launcher',
+      title: 'Sukoon Launcher',
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
         return MediaQuery(
@@ -176,7 +176,7 @@ class _LauncherEntryPointState extends State<_LauncherEntryPoint>
             backgroundColor: Colors.black,
             body: Center(
               child: CircularProgressIndicator(
-                color: Color(0xFFC2A366), // CamelColors.sandGold
+                color: Color(0xFFC2A366), // SukoonColors.sandGold
               ),
             ),
           );

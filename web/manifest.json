@@ -1,11 +1,11 @@
 {
-    "name": "minimalist_app",
-    "short_name": "minimalist_app",
+    "name": "Sukoon Launcher",
+    "short_name": "Sukoon Launcher",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Sukoon Launcher — A peaceful Islamic launcher for a focused digital life.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

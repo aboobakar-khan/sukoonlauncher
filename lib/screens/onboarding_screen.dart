@@ -8,7 +8,7 @@ import '../providers/premium_provider.dart';
 import 'launcher_shell.dart';
 
 /// ═══════════════════════════════════════════════════════════════════
-/// 🐪 CAMEL LAUNCHER — PREMIUM ONBOARDING EXPERIENCE
+/// ☪️ SUKOON LAUNCHER — PREMIUM ONBOARDING EXPERIENCE
 /// ═══════════════════════════════════════════════════════════════════
 ///
 /// A modern, addictive 5-screen onboarding flow.
@@ -17,7 +17,7 @@ import 'launcher_shell.dart';
 ///  • Staggered micro-animations — elements appear with choreographed timing
 ///  • Parallax depth — background layers move at different speeds
 ///  • Psychology-based UX — hook → pain → solution → value → commitment
-///  • Consistent camel/desert brand tokens throughout
+///  • Consistent sukoon/desert brand tokens throughout
 ///  • Responsive layout — adapts to any screen size
 ///  • Haptic feedback on every interaction
 ///
@@ -127,7 +127,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   void _setDefaultAndFinish() async {
     HapticFeedback.heavyImpact();
     try {
-      const platform = MethodChannel('com.example.minimalist_app/launcher');
+      const platform = MethodChannel('com.sukoon.launcher/launcher');
       await platform.invokeMethod('openHomeLauncherSettings');
     } catch (e) {
       debugPrint('Home settings error: $e');
@@ -381,7 +381,7 @@ class _PageHook extends StatelessWidget {
         children: [
           SizedBox(height: isSmall ? h * 0.06 : h * 0.10),
 
-          // Camel icon with radial glow
+          // Brand icon with radial glow
           _StaggeredFade(
             entrance: entrance,
             delay: 0.0,
@@ -721,7 +721,7 @@ class _PagePro extends StatelessWidget {
                       color: _gold, size: 18),
                   const SizedBox(width: 8),
                   const Text(
-                    'CAMEL PRO',
+                    'SUKOON PRO',
                     style: TextStyle(
                       color: _gold,
                       fontSize: 12,
@@ -884,7 +884,7 @@ class _PageActivate extends StatelessWidget {
             entrance: entrance,
             delay: 0.22,
             child: Text(
-              'Set Camel Launcher as your\ndefault home screen',
+              'Set Sukoon Launcher as your\ndefault home screen',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 15.5,
@@ -921,7 +921,7 @@ class _PageActivate extends StatelessWidget {
                         height: 1),
                   ),
                   const _SetupStepRow(
-                      num: '2', text: 'Select "Camel Launcher"'),
+                      num: '2', text: 'Select "Sukoon Launcher"'),
                   Padding(
                     padding:
                         const EdgeInsets.symmetric(vertical: 14),
@@ -1009,7 +1009,7 @@ class _StaggeredFade extends StatelessWidget {
   }
 }
 
-/// Brand camel icon with ambient glow
+/// Brand icon with ambient glow
 class _BrandIcon extends StatelessWidget {
   final double size;
   const _BrandIcon({required this.size});

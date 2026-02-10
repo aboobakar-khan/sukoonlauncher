@@ -2,11 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/camel_coin_provider.dart';
+import '../providers/sukoon_coin_provider.dart';
 import '../providers/premium_provider.dart';
 import '../widgets/swipe_back_wrapper.dart';
 
-// ─── Camel Coin Store ───────────────────────────────────────────────────────
+// ─── Sukoon Coin Store ───────────────────────────────────────────────────────
 // Inspired by: Duolingo Shop, Forest app, Habitica store
 // Psychology: variable reward, loss aversion, endowed progress effect,
 //   collection instinct, social proof via badges
@@ -18,14 +18,14 @@ const Color _bg = Color(0xFF0A0A0A);
 const Color _card = Color(0xFF141414);
 const Color _cardLight = Color(0xFF1A1A1A);
 
-class CamelCoinStoreScreen extends ConsumerStatefulWidget {
-  const CamelCoinStoreScreen({super.key});
+class SukoonCoinStoreScreen extends ConsumerStatefulWidget {
+  const SukoonCoinStoreScreen({super.key});
 
   @override
-  ConsumerState<CamelCoinStoreScreen> createState() => _CamelCoinStoreScreenState();
+  ConsumerState<SukoonCoinStoreScreen> createState() => _SukoonCoinStoreScreenState();
 }
 
-class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
+class _SukoonCoinStoreScreenState extends ConsumerState<SukoonCoinStoreScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _showHistory = false;
@@ -74,7 +74,7 @@ class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
 
   @override
   Widget build(BuildContext context) {
-    final coinState = ref.watch(camelCoinProvider);
+    final coinState = ref.watch(sukoonCoinProvider);
 
     return SwipeBackWrapper(
       child: Scaffold(
@@ -101,7 +101,7 @@ class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
 
   // ─── Header ───────────────────────────────────────────────────
 
-  Widget _buildHeader(CamelCoinState coinState) {
+  Widget _buildHeader(SukoonCoinState coinState) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Row(
@@ -123,7 +123,7 @@ class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Camel Store',
+              'Sukoon Store',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 20,
@@ -175,8 +175,8 @@ class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
 
   // ─── Balance Card ─────────────────────────────────────────────
 
-  Widget _buildBalanceCard(CamelCoinState coinState) {
-    final notifier = ref.read(camelCoinProvider.notifier);
+  Widget _buildBalanceCard(SukoonCoinState coinState) {
+    final notifier = ref.read(sukoonCoinProvider.notifier);
     final hasCoinPremium = notifier.hasCoinPremium;
     final premiumExpiry = notifier.coinPremiumExpiry;
 
@@ -230,7 +230,7 @@ class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Camel Coins',
+                      'Sukoon Coins',
                       style: TextStyle(
                         color: _gold.withValues(alpha: 0.7),
                         fontSize: 13,
@@ -354,11 +354,11 @@ class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
 
   // ─── Tab Content ──────────────────────────────────────────────
 
-  Widget _buildTabContent(CamelCoinState coinState) {
+  Widget _buildTabContent(SukoonCoinState coinState) {
     return TabBarView(
       controller: _tabController,
       children: _tabs.map((category) {
-        final items = CamelStore.byCategory(category);
+        final items = SukoonStore.byCategory(category);
         if (category == StoreCategory.premium) {
           return _buildPremiumSection(coinState, items);
         }
@@ -369,9 +369,9 @@ class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
 
   // ─── Premium Section (special design) ─────────────────────────
 
-  Widget _buildPremiumSection(CamelCoinState coinState, List<StoreItem> items) {
+  Widget _buildPremiumSection(SukoonCoinState coinState, List<StoreItem> items) {
     final item = items.first;
-    final notifier = ref.read(camelCoinProvider.notifier);
+    final notifier = ref.read(sukoonCoinProvider.notifier);
     final hasCoinPremium = notifier.hasCoinPremium;
     final premiumExpiry = notifier.coinPremiumExpiry;
     final canAfford = coinState.balance >= item.price;
@@ -668,7 +668,7 @@ class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
 
   // ─── Item Grid (for non-premium categories) ───────────────────
 
-  Widget _buildItemGrid(CamelCoinState coinState, List<StoreItem> items) {
+  Widget _buildItemGrid(SukoonCoinState coinState, List<StoreItem> items) {
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -688,7 +688,7 @@ class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
     );
   }
 
-  Widget _buildStoreItemCard(StoreItem item, bool owned, bool canAfford, CamelCoinState coinState) {
+  Widget _buildStoreItemCard(StoreItem item, bool owned, bool canAfford, SukoonCoinState coinState) {
     // Check if this item is currently equipped
     bool isEquipped = false;
     if (item.category == StoreCategory.titles) {
@@ -832,7 +832,7 @@ class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
 
   // ─── Purchase Sheet ───────────────────────────────────────────
 
-  Widget _buildPurchaseButton(StoreItem item, CamelCoinState coinState, {String? label}) {
+  Widget _buildPurchaseButton(StoreItem item, SukoonCoinState coinState, {String? label}) {
     final canAfford = coinState.balance >= item.price;
 
     return GestureDetector(
@@ -871,7 +871,7 @@ class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
     );
   }
 
-  void _showPurchaseSheet(StoreItem item, CamelCoinState coinState) {
+  void _showPurchaseSheet(StoreItem item, SukoonCoinState coinState) {
     final canAfford = coinState.balance >= item.price;
 
     showModalBottomSheet(
@@ -995,7 +995,7 @@ class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
 
   Future<void> _confirmPurchase(StoreItem item) async {
     HapticFeedback.mediumImpact();
-    final notifier = ref.read(camelCoinProvider.notifier);
+    final notifier = ref.read(sukoonCoinProvider.notifier);
     final success = await notifier.purchaseItem(item);
 
     if (!mounted) return;
@@ -1155,7 +1155,7 @@ class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
             GestureDetector(
               onTap: () {
                 HapticFeedback.mediumImpact();
-                final notifier = ref.read(camelCoinProvider.notifier);
+                final notifier = ref.read(sukoonCoinProvider.notifier);
                 if (isCurrentlyEquipped) {
                   // Unequip
                   if (item.category == StoreCategory.titles) notifier.equipTitle(null);
@@ -1201,7 +1201,7 @@ class _CamelCoinStoreScreenState extends ConsumerState<CamelCoinStoreScreen>
 
   // ─── History View ─────────────────────────────────────────────
 
-  Widget _buildHistoryView(CamelCoinState coinState) {
+  Widget _buildHistoryView(SukoonCoinState coinState) {
     if (coinState.history.isEmpty) {
       return Center(
         child: Column(

@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/clock_style_provider.dart';
 import '../providers/premium_provider.dart';
-import '../providers/camel_coin_provider.dart';
+import '../providers/sukoon_coin_provider.dart';
 import 'premium_paywall_screen.dart';
 
 /// Clock Style Picker Screen
@@ -27,7 +27,7 @@ class ClockStylePickerScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentStyle = ref.watch(clockStyleProvider);
     final isPremium = ref.watch(premiumProvider).isPremium;
-    final coinState = ref.watch(camelCoinProvider);
+    final coinState = ref.watch(sukoonCoinProvider);
 
     return Scaffold(
       backgroundColor: Colors.black,

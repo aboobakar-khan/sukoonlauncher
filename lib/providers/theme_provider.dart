@@ -15,26 +15,26 @@ class AppThemeColor {
   });
 }
 
-/// 🐪 Camel Brand Color Palette - Desert-inspired design system
-class CamelColors {
-  // Primary camel/desert tones
+/// ☪️ Sukoon Brand Color Palette - Desert-inspired design system
+class SukoonColors {
+  // Primary desert tones
   static const Color sandGold = Color(0xFFC2A366);       // Primary brand
   static const Color desertWarm = Color(0xFFD4A96A);      // Warm accent
-  static const Color camelBrown = Color(0xFFA67B5B);      // Rich depth
+  static const Color warmBrown = Color(0xFFA67B5B);      // Rich depth
   static const Color sandBeige = Color(0xFFE8D5B7);       // Light sand
   static const Color duneAmber = Color(0xFFDAB87A);       // Golden dune
   static const Color oasisGreen = Color(0xFF7BAE6E);      // Oasis accent
   static const Color desertSunset = Color(0xFFE8915A);    // Sunset glow
   static const Color nightSky = Color(0xFF1A1A2E);        // Desert night
   static const Color starlight = Color(0xFFE6D5A8);       // Star-like warm
-  static const Color camelMilk = Color(0xFFF5ECD7);       // Soft cream
+  static const Color softCream = Color(0xFFF5ECD7);       // Soft cream
 }
 
 /// Predefined theme colors
 class ThemeColors {
-  // 🐪 Camel (Desert) is the DEFAULT brand theme
-  static const camel = AppThemeColor(
-    name: 'Camel',
+  // 🌙 Sukoon (Desert) is the DEFAULT brand theme
+  static const sukoon = AppThemeColor(
+    name: 'Sukoon',
     color: Color(0xFFC2A366),
     accentColor: Color(0xFFD4A96A),
   );
@@ -88,7 +88,7 @@ class ThemeColors {
   );
 
   static List<AppThemeColor> get all => [
-    camel,
+    sukoon,
     white,
     blue,
     purple,
@@ -111,7 +111,7 @@ class ThemeColorNotifier extends StateNotifier<AppThemeColor> {
   static const String _themeKey = 'themeColor';
   Box? _box;
 
-  ThemeColorNotifier() : super(ThemeColors.camel) {
+  ThemeColorNotifier() : super(ThemeColors.sukoon) {
     _init();
   }
 
@@ -123,13 +123,13 @@ class ThemeColorNotifier extends StateNotifier<AppThemeColor> {
       if (savedThemeName != null) {
         final theme = ThemeColors.all.firstWhere(
           (t) => t.name == savedThemeName,
-          orElse: () => ThemeColors.camel,
+          orElse: () => ThemeColors.sukoon,
         );
         state = theme;
       }
     } catch (e) {
       // Handle error, use default theme
-      state = ThemeColors.camel;
+      state = ThemeColors.sukoon;
     }
   }
 

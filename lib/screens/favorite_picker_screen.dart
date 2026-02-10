@@ -18,7 +18,7 @@ class _FavoritePickerScreenState extends ConsumerState<FavoritePickerScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
 
   static const Color _sandGold = Color(0xFFC2A366);
-  static const Color _camelBrown = Color(0xFFA67B5B);
+  static const Color _warmBrown = Color(0xFFA67B5B);
   static const Color _desertSunset = Color(0xFFE8915A);
 
   @override
@@ -111,7 +111,7 @@ class _FavoritePickerScreenState extends ConsumerState<FavoritePickerScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [_sandGold, favCount >= 7 ? _desertSunset : _camelBrown],
+                    colors: [_sandGold, favCount >= 7 ? _desertSunset : _warmBrown],
                   ),
                   borderRadius: BorderRadius.circular(2),
                 ),

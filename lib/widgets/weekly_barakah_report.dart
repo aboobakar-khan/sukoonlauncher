@@ -143,7 +143,7 @@ class _WeeklyBarakahReportState extends ConsumerState<WeeklyBarakahReport>
 
 May Allah bless our efforts. 🤲
 
-#Barakah #IslamicProductivity #CamelLauncher
+#Barakah #IslamicProductivity #SukoonLauncher
     ''';
 
     await Share.share(shareText);

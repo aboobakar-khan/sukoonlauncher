@@ -72,7 +72,7 @@ extension WallpaperTypeUI on WallpaperType {
       case WallpaperType.darkGradient:
         return 'Dark animated gradient';
       case WallpaperType.desertGradient:
-        return '🐪 Desert camel gradient';
+        return '🌙 Desert gradient';
       case WallpaperType.blueGradient:
         return 'Blue animated gradient';
       case WallpaperType.purpleGradient:

@@ -34,7 +34,7 @@ class _ZenModeActiveScreenState extends ConsumerState<ZenModeActiveScreen>
   bool _isMelodyPlaying = false;
   int _selectedSoundIndex = 0;
   
-  static const _blockerChannel = MethodChannel('com.minimalist.launcher/app_blocker');
+  static const _blockerChannel = MethodChannel('com.sukoon.launcher/app_blocker');
 
   static const _sounds = [
     {'name': 'Gentle Water', 'file': 'sounds/gentlewater warm.mp3'},
@@ -537,7 +537,7 @@ class _ZenModeActiveScreenState extends ConsumerState<ZenModeActiveScreen>
       // Fallback via URL
       try {
         await _blockerChannel.invokeMethod('temporaryUnpin');
-        const channel = MethodChannel('com.minimalist.launcher/apps');
+        const channel = MethodChannel('com.sukoon.launcher/apps');
         await channel.invokeMethod('launchApp', {
           'package': 'com.android.camera',
         });

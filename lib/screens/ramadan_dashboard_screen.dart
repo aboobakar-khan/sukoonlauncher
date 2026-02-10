@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/ramadan_provider.dart';
 import '../providers/prayer_provider.dart';
-import '../providers/camel_coin_provider.dart';
+import '../providers/sukoon_coin_provider.dart';
 import '../models/prayer_record.dart';
 import '../features/quran/screens/surah_list_screen.dart';
 
@@ -938,7 +938,7 @@ class _RamadanDashboardScreenState
             return ElevatedButton(
               onPressed: () {
                 ref.read(ramadanProvider.notifier).addQuranPages(p);
-                ref.read(camelCoinProvider.notifier).awardQuranReading();
+                ref.read(sukoonCoinProvider.notifier).awardQuranReading();
                 Navigator.pop(ctx);
               },
               style: ElevatedButton.styleFrom(
@@ -1105,7 +1105,7 @@ class _RamadanDashboardScreenState
               final amount = double.tryParse(controller.text) ?? 0;
               if (amount > 0) {
                 ref.read(ramadanProvider.notifier).addCharity(amount);
-                ref.read(camelCoinProvider.notifier).awardDailyChallenge();
+                ref.read(sukoonCoinProvider.notifier).awardDailyChallenge();
                 Navigator.pop(ctx);
               }
             },

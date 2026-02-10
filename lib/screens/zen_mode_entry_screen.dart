@@ -31,8 +31,8 @@ class _ZenModeEntryScreenState extends ConsumerState<ZenModeEntryScreen> {
 
   // Platform channels
   static const _blockerChannel =
-      MethodChannel('com.minimalist.launcher/app_blocker');
-  static const _dndChannel = MethodChannel('com.minimalist.launcher/dnd');
+      MethodChannel('com.sukoon.launcher/app_blocker');
+  static const _dndChannel = MethodChannel('com.sukoon.launcher/dnd');
 
   @override
   Widget build(BuildContext context) {
@@ -380,7 +380,7 @@ class _ZenModeEntryScreenState extends ConsumerState<ZenModeEntryScreen> {
           icon: Icons.bar_chart_rounded,
           title: 'Usage Access Required',
           description:
-              'Zen Mode needs usage access to detect and block apps.\n\nPlease find "Camel" in the list and enable it.',
+              'Zen Mode needs usage access to detect and block apps.\n\nPlease find "Sukoon" in the list and enable it.',
           onGrant: () async {
             await _blockerChannel.invokeMethod('requestUsageStatsPermission');
           },
@@ -403,7 +403,7 @@ class _ZenModeEntryScreenState extends ConsumerState<ZenModeEntryScreen> {
           icon: Icons.notifications_off_rounded,
           title: 'Do Not Disturb Access',
           description:
-              'Zen Mode needs DND access to mute all notifications during your session.\n\nPlease find "Camel" and enable it.',
+              'Zen Mode needs DND access to mute all notifications during your session.\n\nPlease find "Sukoon" and enable it.',
           onGrant: () async {
             await _dndChannel.invokeMethod('requestDndPermission');
           },

@@ -600,7 +600,7 @@ class AppFilterUtils {
     // ════════════════════════════════════════════════════
     // PRIORITY 1: Block This Launcher Itself
     // ════════════════════════════
-    if (pkg == 'com.example.minimalist_app') return false;
+    if (pkg == 'com.sukoon.launcher') return false;
 
     // ════════════════════════════════════════════════════
     // PRIORITY 2: Block Known Junk Patterns

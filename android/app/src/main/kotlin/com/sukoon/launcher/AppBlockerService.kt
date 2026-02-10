@@ -1,4 +1,4 @@
-package com.example.minimalist_app
+package com.sukoon.launcher
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -479,7 +479,7 @@ class AppBlockerService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = if (isZen) "🧘 Zen Mode Active" else "🐪 Focus Mode Active"
+        val title = if (isZen) "🧘 Zen Mode Active" else "☪️ Focus Mode Active"
         val text = if (isZen) "Phone locked · Put it down & enjoy life" else "$blockedCount apps blocked · Stay focused"
 
         return NotificationCompat.Builder(this, CHANNEL_ID)

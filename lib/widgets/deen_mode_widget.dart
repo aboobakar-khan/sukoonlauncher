@@ -7,13 +7,13 @@ import '../screens/deen_mode_entry_screen.dart';
 import '../screens/deen_mode_screen.dart';
 import '../screens/premium_paywall_screen.dart';
 
-/// Deen Mode Widget — Minimalist Camel Design 🐪
+/// Deen Mode Widget — Sukoon Design 🌙
 /// Clean, subtle entry point on the dashboard
 class DeenModeWidget extends ConsumerWidget {
   const DeenModeWidget({super.key});
 
   static const _sandGold = Color(0xFFC2A366);
-  static const _camelBrown = Color(0xFFA67B5B);
+  static const _warmBrown = Color(0xFFA67B5B);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -101,7 +101,7 @@ class DeenModeWidget extends ConsumerWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [_sandGold, _camelBrown],
+                              colors: [_sandGold, _warmBrown],
                             ),
                             borderRadius: BorderRadius.circular(3),
                           ),
