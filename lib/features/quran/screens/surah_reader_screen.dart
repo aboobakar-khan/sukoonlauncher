@@ -232,12 +232,13 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
             onPressed: () => Navigator.pop(context),
             icon: const Icon(Icons.arrow_back, color: _richBrown, size: 22),
           ),
-          Text(
-            widget.surah.transliteration,
-            style: const TextStyle(color: _richBrown, fontSize: 18, fontWeight: FontWeight.w600),
+          Expanded(
+            child: Text(
+              widget.surah.transliteration,
+              style: const TextStyle(color: _richBrown, fontSize: 18, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          Icon(Icons.arrow_drop_down, color: _warmBrown.withOpacity(0.6), size: 22),
-          const Spacer(),
           IconButton(
             onPressed: _isDownloading ? null : _downloadTafseer,
             icon: _isDownloading
@@ -248,10 +249,118 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
                     color: _isDownloaded ? _islamicGreen : _warmBrown, size: 22),
           ),
           IconButton(
-            onPressed: () {},
-            icon: Icon(Icons.settings_outlined, color: _warmBrown.withOpacity(0.6), size: 22),
+            onPressed: () => _showReaderSettings(),
+            icon: Icon(Icons.settings_outlined, color: _warmBrown.withOpacity(0.7), size: 22),
           ),
         ],
+      ),
+    );
+  }
+
+  // ── Reader Settings — font & tafseer ──
+  void _showReaderSettings() {
+    final arabicFont = ref.read(arabicFontProvider);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _creamBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.55,
+        minChildSize: 0.3,
+        maxChildSize: 0.8,
+        expand: false,
+        builder: (ctx, scrollCtrl) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(
+                    color: _warmBrown.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Icon(Icons.text_fields_rounded, color: _warmBrown.withOpacity(0.6), size: 20),
+                  const SizedBox(width: 8),
+                  Text('Reading Settings',
+                    style: TextStyle(color: _richBrown, fontSize: 17, fontWeight: FontWeight.w600)),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Font section
+              Text('Arabic Font',
+                style: TextStyle(color: _warmBrown.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollCtrl,
+                  itemCount: ArabicFonts.all.length,
+                  itemBuilder: (ctx, i) {
+                    final font = ArabicFonts.all[i];
+                    final isSelected = arabicFont.name == font.name;
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        ref.read(arabicFontProvider.notifier).setFont(font);
+                        Navigator.pop(ctx);
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: isSelected ? _goldAccent.withOpacity(0.1) : _warmSand.withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected ? _goldAccent.withOpacity(0.4) : _warmSand.withOpacity(0.6),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(font.name,
+                                    style: TextStyle(
+                                      color: isSelected ? _richBrown : _warmBrown,
+                                      fontSize: 14,
+                                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                    )),
+                                  const SizedBox(height: 4),
+                                  Text('بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+                                    style: TextStyle(
+                                      color: _richBrown.withOpacity(0.6),
+                                      fontSize: 18,
+                                      fontFamily: font.fontFamily,
+                                    ),
+                                    textDirection: TextDirection.rtl,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isSelected)
+                              Icon(Icons.check_circle_rounded, color: _islamicGreen.withOpacity(0.7), size: 20),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -5,12 +5,15 @@ import '../widgets/daily_challenge_card.dart';
 import '../widgets/prayer_tracker_widget.dart';
 import '../widgets/dhikr_counter_widget.dart';
 import 'premium_paywall_screen.dart';
+import 'ramadan_dashboard_screen.dart';
 import '../features/quran/providers/quran_provider.dart';
 import '../features/quran/widgets/tafseer_bottom_sheet.dart';
 import '../providers/arabic_font_provider.dart';
 import '../providers/premium_provider.dart';
+import '../providers/ramadan_provider.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/ambient_sound_widget.dart';
+
 
 /// Widget Dashboard — Minimalist Redesign
 /// Clean vertical flow with subtle section dividers.
@@ -26,6 +29,12 @@ class WidgetDashboardScreen extends ConsumerWidget {
     final arabicFont = ref.watch(arabicFontProvider);
     final isPremium = ref.watch(premiumProvider);
     final currentTheme = ref.watch(themeColorProvider);
+    final ramadan = ref.watch(ramadanProvider);
+
+    // 🌙 When Ramadan Mode is ON → show Ramadan Dashboard
+    if (ramadan.isEnabled) {
+      return const RamadanDashboardScreen();
+    }
 
     return Container(
       color: Colors.black.withValues(alpha: 0.3),

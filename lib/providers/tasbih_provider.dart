@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../utils/hive_box_manager.dart';
 
 /// Achievement badge types
 enum DhikrAchievement {

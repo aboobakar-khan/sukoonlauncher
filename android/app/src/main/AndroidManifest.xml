@@ -21,6 +21,12 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     
+    <!-- Zen Mode: overlay to block notification bar pull-down -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    
+    <!-- Zen Mode: Do Not Disturb control (must be declared to appear in DND access list) -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    
     <application
         android:label="Camel"
         android:name="${applicationName}"

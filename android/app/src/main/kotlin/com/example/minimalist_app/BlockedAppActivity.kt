@@ -48,7 +48,20 @@ class BlockedAppActivity : Activity() {
             blockedPackage?.split(".")?.lastOrNull() ?: "App"
         }
 
-        // Build the blocking UI programmatically (no XML needed)
+        // Motivational messages — matches Flutter BlockedAppScreen
+        val motivations = arrayOf(
+            "This urge will pass.\nYour discipline won't.",
+            "Every second of resistance\nrewires your brain.",
+            "You chose to block this.\nTrust your better self.",
+            "The discomfort is temporary.\nThe growth is permanent.",
+            "Stay the course.\nYour future self thanks you.",
+            "Distraction steals time\nyou can never get back."
+        )
+        val motivation = motivations[(System.currentTimeMillis() % motivations.size).toInt()]
+
+        // Build the blocking UI — minimalist red theme
+        val blockRed = 0xFFD93025.toInt()
+
         val root = FrameLayout(this).apply {
             setBackgroundColor(0xFF0A0A0A.toInt()) // Near-black background
             isClickable = true  // Consume all touches
@@ -58,67 +71,70 @@ class BlockedAppActivity : Activity() {
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(80, 0, 80, 0)
+            setPadding(100, 0, 100, 0)
         }
 
-        // Shield icon
+        // Block icon (⛔ style using text)
         val icon = TextView(this).apply {
-            text = "🛡️"
-            textSize = 64f
+            text = "⊘"
+            textSize = 52f
+            setTextColor(0x99D93025.toInt()) // Red 60%
             gravity = Gravity.CENTER
         }
         content.addView(icon)
 
         // Spacing
-        content.addView(spacer(48))
+        content.addView(spacer(32))
 
-        // "App Blocked" title
-        val title = TextView(this).apply {
-            text = "App Blocked"
-            textSize = 28f
-            setTextColor(0xFFFFFFFF.toInt())
-            gravity = Gravity.CENTER
-            letterSpacing = 0.02f
-            paint.isFakeBoldText = true
-        }
-        content.addView(title)
-
-        // Spacing
-        content.addView(spacer(16))
-
-        // App name
+        // App name — subtle
         val subtitle = TextView(this).apply {
-            text = "$appName is blocked right now"
-            textSize = 16f
-            setTextColor(0x99FFFFFF.toInt()) // White 60%
+            text = appName
+            textSize = 13f
+            setTextColor(0x59FFFFFF.toInt()) // White 35%
             gravity = Gravity.CENTER
+            letterSpacing = 0.1f
         }
         content.addView(subtitle)
 
         // Spacing
-        content.addView(spacer(12))
+        content.addView(spacer(8))
+
+        // "BLOCKED" label — red accent
+        val blockedLabel = TextView(this).apply {
+            text = "BLOCKED"
+            textSize = 11f
+            setTextColor(0xB3D93025.toInt()) // Red 70%
+            gravity = Gravity.CENTER
+            letterSpacing = 0.2f
+            paint.isFakeBoldText = true
+        }
+        content.addView(blockedLabel)
+
+        // Spacing
+        content.addView(spacer(36))
 
         // Motivational message
         val message = TextView(this).apply {
-            text = "Stay focused! 🐪\nYou're doing great."
-            textSize = 14f
-            setTextColor(0x66FFFFFF.toInt()) // White 40%
+            text = motivation
+            textSize = 15f
+            setTextColor(0x8CFFFFFF.toInt()) // White 55%
             gravity = Gravity.CENTER
-            setLineSpacing(8f, 1f)
+            setLineSpacing(10f, 1f)
         }
         content.addView(message)
 
         // Spacing
-        content.addView(spacer(48))
+        content.addView(spacer(56))
 
-        // "Go Home" button
+        // "Go Back" button — subtle white
         val goHomeBtn = TextView(this).apply {
-            text = "← Go Home"
-            textSize = 16f
-            setTextColor(0xFFC2A366.toInt()) // Gold accent
+            text = "Go Back"
+            textSize = 14f
+            setTextColor(0x80FFFFFF.toInt()) // White 50%
             gravity = Gravity.CENTER
-            setPadding(64, 32, 64, 32)
-            setBackgroundColor(0x1AC2A366.toInt()) // Gold 10%
+            letterSpacing = 0.03f
+            setPadding(80, 40, 80, 40)
+            setBackgroundColor(0x0AFFFFFF.toInt()) // White 4%
             setOnClickListener { goHome() }
         }
         content.addView(goHomeBtn)

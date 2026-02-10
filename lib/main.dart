@@ -13,6 +13,7 @@ import 'screens/onboarding_screen.dart';
 import 'providers/font_provider.dart';
 import 'providers/font_size_provider.dart';
 import 'providers/amoled_provider.dart';
+import 'utils/hive_box_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,6 +51,13 @@ void main() async {
     overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
   );
   await Hive.openBox('wallpaperBox');
+
+  // Pre-open frequently used Hive boxes (avoids repeated I/O)
+  await Future.wait([
+    HiveBoxManager.get('settingsBox'),
+    HiveBoxManager.get('zen_mode_box'),
+    HiveBoxManager.get('tasbih_data'),
+  ]);
 
   runApp(const ProviderScope(child: MinimalistLauncherApp()));
 }
@@ -118,9 +126,44 @@ class MinimalistLauncherApp extends ConsumerWidget {
   }
 }
 
-/// Entry point that checks if onboarding is completed
-class _LauncherEntryPoint extends StatelessWidget {
+/// Entry point that checks onboarding + manages app lifecycle
+class _LauncherEntryPoint extends StatefulWidget {
   const _LauncherEntryPoint();
+
+  @override
+  State<_LauncherEntryPoint> createState() => _LauncherEntryPointState();
+}
+
+class _LauncherEntryPointState extends State<_LauncherEntryPoint>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        // Compact Hive boxes when app goes to background
+        HiveBoxManager.compactAll();
+        break;
+      case AppLifecycleState.resumed:
+        // Nothing special needed on resume
+        break;
+      default:
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -149,7 +192,7 @@ class _LauncherEntryPoint extends StatelessWidget {
   }
 
   Future<bool> _checkOnboardingStatus() async {
-    final box = await Hive.openBox('settingsBox');
+    final box = await HiveBoxManager.get('settingsBox');
     return box.get('onboarding_completed', defaultValue: false);
   }
 }

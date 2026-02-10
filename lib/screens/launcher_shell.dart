@@ -14,6 +14,8 @@ import 'productivity_hub_screen.dart';
 import '../features/quran/screens/surah_list_screen.dart';
 import '../features/hadith_dua/screens/minimalist_hadith_screen.dart';
 import '../features/hadith_dua/screens/minimalist_dua_screen.dart';
+import '../providers/zen_mode_provider.dart';
+import 'zen_mode_active_screen.dart';
 
 /// Professional spring-based page scroll physics (like Samsung/Pixel launchers)
 class _LauncherPagePhysics extends ScrollPhysics {
@@ -69,6 +71,22 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
       duration: const Duration(seconds: 10),
       vsync: this,
     )..repeat(reverse: true);
+
+    // 🧘 ZEN MODE SURVIVAL: Check if Zen Mode is active (survives restart/reboot)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final zen = ref.read(zenModeProvider);
+      if (zen.isActive && !zen.hasExpired) {
+        // Zen Mode is still active — immediately navigate to lockdown screen
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const ZenModeActiveScreen(),
+          ),
+        );
+      } else if (zen.isActive && zen.hasExpired) {
+        // Timer expired while app was closed — clean up
+        ref.read(zenModeProvider.notifier).endZenMode();
+      }
+    });
   }
 
   void _onPageChanged() {

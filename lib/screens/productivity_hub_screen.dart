@@ -12,6 +12,7 @@ import '../providers/camel_coin_provider.dart';
 import '../models/productivity_models.dart';
 import '../providers/ambient_sound_provider.dart';
 import '../services/native_app_blocker_service.dart';
+import '../widgets/zen_mode_widget.dart';
 import 'premium_paywall_screen.dart';
 
 // ─── Camel Design Tokens ────────────────────────────────────────────────────
@@ -1383,7 +1384,7 @@ class _PomodoroTabState extends ConsumerState<_PomodoroTab> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: const Color(0xFF0D0D0D),
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       isScrollControlled: true,
@@ -1392,7 +1393,7 @@ class _PomodoroTabState extends ConsumerState<_PomodoroTab> {
           padding: EdgeInsets.only(
             left: 24,
             right: 24,
-            top: 24,
+            top: 28,
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
           ),
           child: SingleChildScrollView(
@@ -1400,157 +1401,212 @@ class _PomodoroTabState extends ConsumerState<_PomodoroTab> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Focus Settings',
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600)),
-              const SizedBox(height: 20),
-              _SliderRow(
-                label: 'Focus',
-                value: focus,
-                min: 5,
-                max: 90,
-                suffix: 'min',
-                color: _desertSunset,
-                onChanged: (v) => setBS(() => focus = v),
+              // ── Header ──
+              Row(
+                children: [
+                  Container(
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      color: _sandGold.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.tune_rounded, color: _sandGold.withValues(alpha: 0.6), size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Focus Settings',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 17, fontWeight: FontWeight.w600)),
+                      Text('Customize your session',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 11)),
+                    ],
+                  ),
+                ],
               ),
-              _SliderRow(
-                label: 'Short Break',
-                value: shortBreak,
-                min: 1,
-                max: 15,
-                suffix: 'min',
-                color: _oasisGreen,
-                onChanged: (v) => setBS(() => shortBreak = v),
+              const SizedBox(height: 24),
+
+              // ── Timer Settings — Clean card ──
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                ),
+                child: Column(
+                  children: [
+                    _SettingRow(
+                      label: 'Focus',
+                      value: focus,
+                      suffix: 'min',
+                      color: _desertSunset,
+                      onMinus: () { if (focus > 5) setBS(() => focus -= 5); },
+                      onPlus: () { if (focus < 90) setBS(() => focus += 5); },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Container(height: 1, color: Colors.white.withValues(alpha: 0.04)),
+                    ),
+                    _SettingRow(
+                      label: 'Short Break',
+                      value: shortBreak,
+                      suffix: 'min',
+                      color: _oasisGreen,
+                      onMinus: () { if (shortBreak > 1) setBS(() => shortBreak--); },
+                      onPlus: () { if (shortBreak < 15) setBS(() => shortBreak++); },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Container(height: 1, color: Colors.white.withValues(alpha: 0.04)),
+                    ),
+                    _SettingRow(
+                      label: 'Long Break',
+                      value: longBreak,
+                      suffix: 'min',
+                      color: _sandGold,
+                      onMinus: () { if (longBreak > 5) setBS(() => longBreak -= 5); },
+                      onPlus: () { if (longBreak < 30) setBS(() => longBreak += 5); },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Container(height: 1, color: Colors.white.withValues(alpha: 0.04)),
+                    ),
+                    _SettingRow(
+                      label: 'Sessions',
+                      value: sessions,
+                      suffix: '',
+                      color: _camelBrown,
+                      onMinus: () { if (sessions > 2) setBS(() => sessions--); },
+                      onPlus: () { if (sessions < 8) setBS(() => sessions++); },
+                    ),
+                  ],
+                ),
               ),
-              _SliderRow(
-                label: 'Long Break',
-                value: longBreak,
-                min: 5,
-                max: 30,
-                suffix: 'min',
-                color: _sandGold,
-                onChanged: (v) => setBS(() => longBreak = v),
+
+              const SizedBox(height: 22),
+
+              // ── Soothing Sounds ──
+              Row(
+                children: [
+                  Icon(Icons.spa_rounded, color: _sandGold.withValues(alpha: 0.5), size: 16),
+                  const SizedBox(width: 8),
+                  Text('Soothing Sounds',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14, fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  Text('Auto-plays on focus',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 10)),
+                ],
               ),
-              _SliderRow(
-                label: 'Sessions',
-                value: sessions,
-                min: 2,
-                max: 8,
-                suffix: '',
-                color: _camelBrown,
-                onChanged: (v) => setBS(() => sessions = v),
-              ),
-              const SizedBox(height: 20),
-              // ── Ambient Sounds Section ──
-              Text('Soothing Sounds',
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600)),
-              const SizedBox(height: 4),
-              Text('Plays automatically when focus starts',
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      fontSize: 11)),
               const SizedBox(height: 12),
               Consumer(
                 builder: (ctx, sRef, _) {
                   final soundState = sRef.watch(ambientSoundProvider);
-                  return Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      // None / off option
-                      _buildSoundChip(
-                        emoji: '🔇',
-                        label: 'None',
-                        isSelected: soundState.currentSoundId == null && !soundState.isPlaying,
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          sRef.read(ambientSoundProvider.notifier).stop();
-                        },
-                      ),
-                      ...ambientSounds.map((sound) {
-                        final isSelected = soundState.currentSoundId == sound.id;
-                        return _buildSoundChip(
-                          emoji: sound.emoji,
-                          label: sound.name,
-                          isSelected: isSelected && soundState.isPlaying,
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            if (isSelected && soundState.isPlaying) {
-                              sRef.read(ambientSoundProvider.notifier).stop();
-                            } else {
-                              sRef.read(ambientSoundProvider.notifier).selectAndPlay(sound.id);
-                            }
-                          },
-                        );
-                      }),
-                    ],
-                  );
-                },
-              ),
-              // Volume slider
-              Consumer(
-                builder: (ctx, sRef, _) {
-                  final soundState = sRef.watch(ambientSoundProvider);
-                  if (!soundState.isPlaying) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Row(
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                    ),
+                    child: Column(
                       children: [
-                        Icon(Icons.volume_down_rounded, 
-                            size: 16, color: Colors.white.withValues(alpha: 0.4)),
-                        Expanded(
-                          child: SliderTheme(
-                            data: SliderThemeData(
-                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-                              trackHeight: 3,
-                              activeTrackColor: _sandGold.withValues(alpha: 0.7),
-                              inactiveTrackColor: Colors.white.withValues(alpha: 0.08),
-                              thumbColor: _sandGold,
-                            ),
-                            child: Slider(
-                              value: soundState.volume,
-                              min: 0.0,
-                              max: 1.0,
-                              onChanged: (v) {
-                                sRef.read(ambientSoundProvider.notifier).setVolume(v);
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _buildSoundChip(
+                              emoji: '🔇',
+                              label: 'None',
+                              isSelected: soundState.currentSoundId == null && !soundState.isPlaying,
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                sRef.read(ambientSoundProvider.notifier).stop();
                               },
                             ),
-                          ),
+                            ...ambientSounds.map((sound) {
+                              final isSelected = soundState.currentSoundId == sound.id;
+                              return _buildSoundChip(
+                                emoji: sound.emoji,
+                                label: sound.name,
+                                isSelected: isSelected && soundState.isPlaying,
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  if (isSelected && soundState.isPlaying) {
+                                    sRef.read(ambientSoundProvider.notifier).stop();
+                                  } else {
+                                    sRef.read(ambientSoundProvider.notifier).selectAndPlay(sound.id);
+                                  }
+                                },
+                              );
+                            }),
+                          ],
                         ),
-                        Icon(Icons.volume_up_rounded,
-                            size: 16, color: Colors.white.withValues(alpha: 0.4)),
+                        // Volume slider — only if playing
+                        if (soundState.isPlaying) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Icon(Icons.volume_down_rounded,
+                                  size: 15, color: Colors.white.withValues(alpha: 0.3)),
+                              Expanded(
+                                child: SliderTheme(
+                                  data: SliderThemeData(
+                                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                                    trackHeight: 2.5,
+                                    activeTrackColor: _sandGold.withValues(alpha: 0.6),
+                                    inactiveTrackColor: Colors.white.withValues(alpha: 0.06),
+                                    thumbColor: _sandGold,
+                                  ),
+                                  child: Slider(
+                                    value: soundState.volume,
+                                    min: 0.0,
+                                    max: 1.0,
+                                    onChanged: (v) {
+                                      sRef.read(ambientSoundProvider.notifier).setVolume(v);
+                                    },
+                                  ),
+                                ),
+                              ),
+                              Icon(Icons.volume_up_rounded,
+                                  size: 15, color: Colors.white.withValues(alpha: 0.3)),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   );
                 },
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    final s = PomodoroSettings(
-                      focusMinutes: focus,
-                      shortBreakMinutes: shortBreak,
-                      longBreakMinutes: longBreak,
-                      sessionsBeforeLongBreak: sessions,
-                    );
-                    ref.read(pomodoroProvider.notifier).updateSettings(s);
-                    Navigator.pop(ctx);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _sandGold.withValues(alpha: 0.2),
-                    foregroundColor: _sandGold,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+
+              const SizedBox(height: 22),
+
+              // ── Save Button ──
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  final s = PomodoroSettings(
+                    focusMinutes: focus,
+                    shortBreakMinutes: shortBreak,
+                    longBreakMinutes: longBreak,
+                    sessionsBeforeLongBreak: sessions,
+                  );
+                  ref.read(pomodoroProvider.notifier).updateSettings(s);
+                  Navigator.pop(ctx);
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  decoration: BoxDecoration(
+                    color: _sandGold.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _sandGold.withValues(alpha: 0.2)),
                   ),
-                  child: const Text('Save'),
+                  child: Center(
+                    child: Text('Save',
+                      style: TextStyle(color: _sandGold, fontSize: 14, fontWeight: FontWeight.w600)),
+                  ),
                 ),
               ),
             ],
@@ -2865,6 +2921,12 @@ class _BlockerTab extends ConsumerWidget {
 
     return Column(
       children: [
+        // ─── Zen Mode Card ────────────────────────────
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: ZenModeWidget(),
+        ),
+
         // Active rules count
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -4998,6 +5060,108 @@ class _BlockerTab extends ConsumerWidget {
     );
   }
 
+  // ── Hard Mode Info Page ──
+  void _showHardModeInfo(BuildContext ctx, VoidCallback onConfirm) {
+    showModalBottomSheet(
+      context: ctx,
+      backgroundColor: const Color(0xFF111111),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      isScrollControlled: true,
+      builder: (bsCtx) => Padding(
+        padding: EdgeInsets.only(
+          left: 24, right: 24, top: 28,
+          bottom: MediaQuery.of(bsCtx).viewInsets.bottom + 28,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Red lock icon
+            Container(
+              width: 56, height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFD93025).withValues(alpha: 0.08),
+                border: Border.all(color: const Color(0xFFD93025).withValues(alpha: 0.2)),
+              ),
+              child: Icon(Icons.lock_rounded, color: const Color(0xFFD93025).withValues(alpha: 0.7), size: 26),
+            ),
+            const SizedBox(height: 18),
+            const Text('Hard Mode',
+              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Text('This cannot be undone easily',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13)),
+            const SizedBox(height: 24),
+            // Rules
+            _hardModeRule(Icons.block_rounded, "Can't disable or delete this rule"),
+            const SizedBox(height: 12),
+            _hardModeRule(Icons.pause_circle_outline_rounded, "Can't pause or take breaks"),
+            const SizedBox(height: 12),
+            _hardModeRule(Icons.delete_forever_rounded, "Can't uninstall blocked apps"),
+            const SizedBox(height: 12),
+            _hardModeRule(Icons.timer_off_rounded, "Only expires when the timer ends"),
+            const SizedBox(height: 28),
+            // Confirm
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.heavyImpact();
+                Navigator.pop(bsCtx);
+                onConfirm();
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD93025).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFD93025).withValues(alpha: 0.25)),
+                ),
+                child: const Center(
+                  child: Text('I understand, enable Hard Mode',
+                    style: TextStyle(color: Color(0xFFD93025), fontSize: 14, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () => Navigator.pop(bsCtx),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Center(
+                  child: Text('Cancel',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 14)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _hardModeRule(IconData icon, String text) {
+    return Row(
+      children: [
+        Container(
+          width: 36, height: 36,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: Colors.white.withValues(alpha: 0.35), size: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(text,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
+        ),
+      ],
+    );
+  }
+
   // ── Shared: Break Difficulty Selector ──
   Widget _buildBreakDifficultySelector(
       WidgetRef ref, int difficulty, ValueChanged<int> onChanged, BuildContext ctx) {
@@ -5063,7 +5227,8 @@ class _BlockerTab extends ConsumerWidget {
                   return;
                 }
                 HapticFeedback.selectionClick();
-                onChanged(1);
+                // Show Hard Mode info page first
+                _showHardModeInfo(ctx, () => onChanged(1));
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
@@ -5999,6 +6164,71 @@ class _LinkTodoRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Minimalist +/- setting row for focus settings
+class _SettingRow extends StatelessWidget {
+  final String label;
+  final int value;
+  final String suffix;
+  final Color color;
+  final VoidCallback onMinus;
+  final VoidCallback onPlus;
+
+  const _SettingRow({
+    required this.label,
+    required this.value,
+    required this.suffix,
+    required this.color,
+    required this.onMinus,
+    required this.onPlus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
+          ),
+          GestureDetector(
+            onTap: () { HapticFeedback.selectionClick(); onMinus(); },
+            child: Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.remove_rounded, color: Colors.white.withValues(alpha: 0.4), size: 16),
+            ),
+          ),
+          SizedBox(
+            width: 52,
+            child: Center(
+              child: Text(
+                suffix.isNotEmpty ? '$value$suffix' : '$value',
+                style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () { HapticFeedback.selectionClick(); onPlus(); },
+            child: Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.add_rounded, color: Colors.white.withValues(alpha: 0.4), size: 16),
+            ),
+          ),
+        ],
       ),
     );
   }

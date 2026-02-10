@@ -237,22 +237,69 @@ class _OverviewTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
-        _buildMetricsGrid(stats),
-        const SizedBox(height: 16),
+        // ── Psychology insight — one line of encouragement ──
+        _buildInsight(stats),
+        const SizedBox(height: 18),
         _buildStreakCard(stats),
-        const SizedBox(height: 24),
-        _buildSectionLabel('Weekly Consistency'),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
+        _buildMetricsGrid(stats),
+        const SizedBox(height: 22),
         _buildWeeklyChart(stats),
-        const SizedBox(height: 24),
-        _buildSectionLabel('Prayer Breakdown'),
-        const SizedBox(height: 12),
+        const SizedBox(height: 22),
         _buildPrayerBreakdown(stats),
-        const SizedBox(height: 24),
-        _buildSectionLabel('Daily Namaz History'),
-        const SizedBox(height: 12),
+        const SizedBox(height: 22),
+        _buildSectionLabel('This Week'),
+        const SizedBox(height: 10),
         _buildNamazHistory(),
       ],
+    );
+  }
+
+  Widget _buildInsight(Map<String, dynamic> stats) {
+    final streak = stats['currentStreak'] as int;
+    final consistency = stats['consistency'] as double;
+    final atRisk = stats['streakAtRisk'] as bool;
+
+    String text;
+    IconData icon;
+    if (atRisk) {
+      text = "Don't break your streak — pray now to keep it alive";
+      icon = Icons.warning_amber_rounded;
+    } else if (streak >= 7) {
+      text = "You've prayed consistently for $streak days. MashaAllah!";
+      icon = Icons.auto_awesome_rounded;
+    } else if (consistency >= 80) {
+      text = "${consistency.toStringAsFixed(0)}% consistency — you're building a powerful habit";
+      icon = Icons.trending_up_rounded;
+    } else if (streak > 0) {
+      text = "$streak day streak — keep going, every prayer counts";
+      icon = Icons.local_fire_department_outlined;
+    } else {
+      text = "Start today. One prayer at a time builds a lifetime of devotion";
+      icon = Icons.wb_twilight_rounded;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: (atRisk ? const Color(0xFFFF6B35) : _gold).withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: (atRisk ? const Color(0xFFFF6B35) : _gold).withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: atRisk ? const Color(0xFFFF6B35) : _gold, size: 18),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(text,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 13,
+                height: 1.4,
+              )),
+          ),
+        ],
+      ),
     );
   }
 

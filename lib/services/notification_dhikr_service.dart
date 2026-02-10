@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../utils/hive_box_manager.dart';
 
 /// Notification Dhikr Counter Service
 /// 
@@ -24,16 +25,17 @@ class NotificationDhikrService {
   static bool _isServiceRunning = false;
   static int _currentCount = 0;
   static const String _boxName = 'notification_dhikr';
+  static Box? _cachedBox; // Cache Hive box to avoid repeated openBox calls
 
   /// Start the notification dhikr counter
   static Future<void> startService() async {
     if (_isServiceRunning) return;
 
     try {
-      // Load current count
-      final box = await Hive.openBox(_boxName);
+      // Load current count (using cached box)
+      _cachedBox = await HiveBoxManager.get(_boxName);
       final today = DateTime.now().toIso8601String().substring(0, 10);
-      _currentCount = box.get('count_$today', defaultValue: 0);
+      _currentCount = _cachedBox!.get('count_$today', defaultValue: 0);
 
       // Start Android foreground service
       await _channel.invokeMethod('startDhikrNotification', {
@@ -82,10 +84,10 @@ class NotificationDhikrService {
   static Future<void> _handleIncrement() async {
     _currentCount++;
     
-    // Save to Hive
-    final box = await Hive.openBox(_boxName);
+    // Save to cached Hive box (no redundant openBox)
+    _cachedBox ??= await HiveBoxManager.get(_boxName);
     final today = DateTime.now().toIso8601String().substring(0, 10);
-    await box.put('count_$today', _currentCount);
+    await _cachedBox!.put('count_$today', _currentCount);
 
     // Also sync to main tasbih counter
     await _syncToMainCounter();
@@ -101,9 +103,9 @@ class NotificationDhikrService {
   static Future<void> _handleReset() async {
     _currentCount = 0;
     
-    final box = await Hive.openBox(_boxName);
+    _cachedBox ??= await HiveBoxManager.get(_boxName);
     final today = DateTime.now().toIso8601String().substring(0, 10);
-    await box.put('count_$today', 0);
+    await _cachedBox!.put('count_$today', 0);
 
     await _updateNotification();
   }
@@ -111,7 +113,7 @@ class NotificationDhikrService {
   /// Sync notification count to main tasbih counter
   static Future<void> _syncToMainCounter() async {
     try {
-      final tasbihBox = await Hive.openBox('tasbih_data');
+      final tasbihBox = await HiveBoxManager.get('tasbih_data');
       final today = DateTime.now().toIso8601String().substring(0, 10);
       final lastDate = tasbihBox.get('lastDate', defaultValue: '');
       
@@ -171,15 +173,15 @@ class NotificationDhikrService {
 
   /// Get today's notification dhikr count
   static Future<int> getTodayCount() async {
-    final box = await Hive.openBox(_boxName);
+    _cachedBox ??= await HiveBoxManager.get(_boxName);
     final today = DateTime.now().toIso8601String().substring(0, 10);
-    return box.get('count_$today', defaultValue: 0);
+    return _cachedBox!.get('count_$today', defaultValue: 0);
   }
 
   /// Enable/disable notification dhikr
   static Future<void> setEnabled(bool enabled) async {
-    final box = await Hive.openBox(_boxName);
-    await box.put('enabled', enabled);
+    _cachedBox ??= await HiveBoxManager.get(_boxName);
+    await _cachedBox!.put('enabled', enabled);
     
     if (enabled) {
       await startService();
@@ -190,8 +192,8 @@ class NotificationDhikrService {
 
   /// Check if notification dhikr is enabled
   static Future<bool> isEnabled() async {
-    final box = await Hive.openBox(_boxName);
-    return box.get('enabled', defaultValue: false);
+    _cachedBox ??= await HiveBoxManager.get(_boxName);
+    return _cachedBox!.get('enabled', defaultValue: false);
   }
 }
 
@@ -210,7 +212,7 @@ class NotificationDhikrSettings {
   });
 
   static Future<NotificationDhikrSettings> load() async {
-    final box = await Hive.openBox('notification_dhikr');
+    final box = await HiveBoxManager.get('notification_dhikr');
     return NotificationDhikrSettings(
       enabled: box.get('enabled', defaultValue: false),
       showArabic: box.get('showArabic', defaultValue: true),
@@ -220,7 +222,7 @@ class NotificationDhikrSettings {
   }
 
   Future<void> save() async {
-    final box = await Hive.openBox('notification_dhikr');
+    final box = await HiveBoxManager.get('notification_dhikr');
     await box.put('enabled', enabled);
     await box.put('showArabic', showArabic);
     await box.put('vibrateOnTap', vibrateOnTap);

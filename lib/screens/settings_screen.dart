@@ -14,6 +14,7 @@ import '../providers/premium_provider.dart';
 import '../providers/tafseer_edition_provider.dart';
 import '../providers/amoled_provider.dart';
 import '../providers/camel_coin_provider.dart';
+import '../providers/ramadan_provider.dart';
 import 'theme_color_picker_screen.dart';
 import 'font_picker_screen.dart';
 import 'clock_style_picker_screen.dart';
@@ -233,6 +234,8 @@ class SettingsScreen extends ConsumerWidget {
                       _buildOfflineContentItem(context, ref),
                     ],
                   ),
+                  const SizedBox(height: 24),
+                  _buildRamadanSection(context, ref),
                   const SizedBox(height: 24),
                   _buildCamelStoreSection(context, ref),
                   const SizedBox(height: 24),
@@ -457,6 +460,208 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(width: 6),
             Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.25), size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── 🌙 Ramadan Mode Section ──
+  Widget _buildRamadanSection(BuildContext context, WidgetRef ref) {
+    const moonGold = Color(0xFFC9A84C);
+    const nightBg = Color(0xFF0E0E20);
+    final ramadan = ref.watch(ramadanProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            moonGold.withValues(alpha: ramadan.isEnabled ? 0.08 : 0.03),
+            nightBg.withValues(alpha: ramadan.isEnabled ? 0.5 : 0.2),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: moonGold.withValues(alpha: ramadan.isEnabled ? 0.2 : 0.08),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('☪',
+                  style: TextStyle(
+                      fontSize: 18,
+                      color: moonGold.withValues(alpha: 0.8))),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Ramadan Mode',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      ramadan.isEnabled
+                          ? 'Day ${ramadan.currentDay} · Dashboard active'
+                          : 'Activate for special Ramadan features',
+                      style: TextStyle(
+                        color: ramadan.isEnabled
+                            ? moonGold.withValues(alpha: 0.6)
+                            : Colors.white.withValues(alpha: 0.35),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: ramadan.isEnabled,
+                activeColor: moonGold,
+                onChanged: (val) {
+                  HapticFeedback.mediumImpact();
+                  ref.read(ramadanProvider.notifier).toggleRamadanMode(val);
+                },
+              ),
+            ],
+          ),
+          // Show config when enabled
+          if (ramadan.isEnabled) ...[
+            const SizedBox(height: 14),
+            Divider(color: moonGold.withValues(alpha: 0.08)),
+            const SizedBox(height: 10),
+            // Ramadan duration
+            GestureDetector(
+              onTap: () => _showRamadanDaysDialog(context, ref),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.calendar_month_rounded,
+                        size: 18,
+                        color: Colors.white.withValues(alpha: 0.3)),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Duration',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 13,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${ramadan.totalDays} days',
+                      style: TextStyle(
+                        color: moonGold.withValues(alpha: 0.6),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.chevron_right_rounded,
+                        size: 16,
+                        color: Colors.white.withValues(alpha: 0.15)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showRamadanDaysDialog(BuildContext context, WidgetRef ref) {
+    const moonGold = Color(0xFFC9A84C);
+    final currentDays = ref.read(ramadanProvider).totalDays;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF121212),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Ramadan Duration',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildDayOption(ctx, ref, 29, currentDays, moonGold),
+                const SizedBox(width: 16),
+                _buildDayOption(ctx, ref, 30, currentDays, moonGold),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Based on moon sighting',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.3),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDayOption(BuildContext context, WidgetRef ref, int days,
+      int current, Color gold) {
+    final selected = days == current;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        ref.read(ramadanProvider.notifier).setTotalDays(days);
+        Navigator.pop(context);
+      },
+      child: Container(
+        width: 80,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? gold.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? gold.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.06),
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(
+              '$days',
+              style: TextStyle(
+                color: selected ? gold : Colors.white.withValues(alpha: 0.5),
+                fontSize: 24,
+                fontWeight: FontWeight.w300,
+              ),
+            ),
+            Text(
+              'days',
+              style: TextStyle(
+                color: selected ? gold.withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.3),
+                fontSize: 11,
+              ),
+            ),
           ],
         ),
       ),

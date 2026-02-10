@@ -10,29 +10,26 @@ import '../screens/premium_paywall_screen.dart';
 class PrayerAnalyticsWidget extends ConsumerWidget {
   const PrayerAnalyticsWidget({super.key});
 
-  static const Color _green = Color(0xFF7BAE6E);
   static const Color _gold = Color(0xFFC2A366);
-  static const Color _cardBg = Color(0xFF111111);
-  static const Color _borderColor = Color(0xFF1E1E1E);
+  static const Color _cardBg = Color(0xFF0D0D0D);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isPremium = ref.watch(premiumProvider).isPremium;
     final recordsMap = ref.watch(prayerRecordsMapProvider);
 
-    // Calculate this week's progress
+    // Calculate this week's data
     final now = DateTime.now();
     int thisWeekCount = 0;
-    int perfectDays = 0;
+    final weekDays = <int>[];
 
-    for (int i = 0; i < 7; i++) {
+    for (int i = 6; i >= 0; i--) {
       final date = now.subtract(Duration(days: i));
       final key = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
       final record = recordsMap[key];
-      if (record != null) {
-        thisWeekCount += record.completedCount;
-        if (record.completedCount == 5) perfectDays++;
-      }
+      final count = record?.completedCount ?? 0;
+      thisWeekCount += count;
+      weekDays.add(count);
     }
 
     return GestureDetector(
@@ -49,83 +46,80 @@ class PrayerAnalyticsWidget extends ConsumerWidget {
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: _cardBg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isPremium
-                ? _gold.withValues(alpha: 0.12)
-                : _borderColor,
-          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: _gold.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.mosque,
-                color: isPremium ? _gold : Colors.white.withValues(alpha: 0.3),
-                size: 18,
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Prayer Analytics',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: isPremium ? 0.85 : 0.45),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    isPremium
-                        ? '$thisWeekCount/35 this week · $perfectDays perfect days'
-                        : 'Unlock detailed prayer insights',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.35),
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Badge or arrow
-            if (!isPremium)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFC2A366), Color(0xFFA8874D)],
-                  ),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  'PRO',
+            // Header row
+            Row(
+              children: [
+                Text('Prayer Analytics',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              )
-            else
-              Icon(
-                Icons.arrow_forward_ios,
-                color: _gold.withValues(alpha: 0.4),
-                size: 14,
+                    color: Colors.white.withValues(alpha: isPremium ? 0.7 : 0.4),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  )),
+                const Spacer(),
+                if (!isPremium)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _gold.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text('PRO',
+                      style: TextStyle(color: _gold, fontSize: 9, fontWeight: FontWeight.w700)),
+                  )
+                else
+                  Text('$thisWeekCount/35',
+                    style: TextStyle(color: _gold.withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w600)),
+              ],
+            ),
+            if (isPremium) ...[
+              const SizedBox(height: 12),
+              // Mini week bar chart — 7 tiny bars
+              Row(
+                children: List.generate(7, (i) {
+                  final count = weekDays[i];
+                  final isToday = i == 6;
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(right: i < 6 ? 4 : 0),
+                      child: Column(
+                        children: [
+                          Container(
+                            height: 3 + (count / 5 * 16),
+                            decoration: BoxDecoration(
+                              color: count > 0
+                                  ? _gold.withValues(alpha: 0.25 + (count / 5 * 0.75))
+                                  : Colors.white.withValues(alpha: 0.04),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: 4, height: 4,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isToday ? _gold.withValues(alpha: 0.5) : Colors.transparent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
               ),
+            ] else ...[
+              const SizedBox(height: 4),
+              Text('Track your spiritual journey',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 11)),
+            ],
           ],
         ),
       ),

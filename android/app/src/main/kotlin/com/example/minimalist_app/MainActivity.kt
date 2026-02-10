@@ -1,6 +1,8 @@
 package com.example.minimalist_app
 
 import android.app.AppOpsManager
+import android.app.KeyguardManager
+import android.app.NotificationManager
 import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
 import android.content.Context
@@ -12,6 +14,8 @@ import android.os.Build
 import android.os.Process
 import android.provider.Settings
 import android.util.Log
+import android.view.View
+import android.view.WindowManager
 import androidx.annotation.NonNull
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -22,6 +26,7 @@ class MainActivity : FlutterActivity() {
     private val APP_SETTINGS_CHANNEL = "app_settings"
     private val USAGE_STATS_CHANNEL = "com.minimalist.launcher/usage_stats"
     private val BLOCKER_CHANNEL = "com.minimalist.launcher/app_blocker"
+    private val DND_CHANNEL = "com.minimalist.launcher/dnd"
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -99,6 +104,130 @@ class MainActivity : FlutterActivity() {
                         result.success(true)
                     } else {
                         result.success(true)
+                    }
+                }
+                // ── Zen Mode Methods ──
+                "setZenMode" -> {
+                    try {
+                        val active = call.argument<Boolean>("active") ?: false
+                        AppBlockerService.setZenMode(this, active)
+                        
+                        if (active) {
+                            // Ensure service is running for Zen Mode
+                            if (!AppBlockerService.isEnabled(this)) {
+                                AppBlockerService.start(this)
+                            }
+                            // Enable lock screen bypass
+                            enableZenLockScreen()
+                        } else {
+                            // Disable lock screen bypass
+                            disableZenLockScreen()
+                        }
+                        
+                        Log.d("AppBlocker", "Zen Mode set to: $active")
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("ZEN_ERROR", "Failed to set Zen Mode: ${e.message}", null)
+                    }
+                }
+                "enableZenLockScreen" -> {
+                    try {
+                        enableZenLockScreen()
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("LOCK_ERROR", "Failed to enable lock screen mode: ${e.message}", null)
+                    }
+                }
+                "disableZenLockScreen" -> {
+                    try {
+                        disableZenLockScreen()
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("LOCK_ERROR", "Failed to disable lock screen mode: ${e.message}", null)
+                    }
+                }
+                "enterFullImmersive" -> {
+                    try {
+                        enterFullImmersive()
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("IMMERSIVE_ERROR", e.message, null)
+                    }
+                }
+                "exitFullImmersive" -> {
+                    try {
+                        exitFullImmersive()
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("IMMERSIVE_ERROR", e.message, null)
+                    }
+                }
+                "temporaryUnpin" -> {
+                    // Temporarily unpin screen for emergency call / camera
+                    // onResume will re-pin when user returns
+                    try {
+                        stopLockTask()
+                        isZenPinned = false
+                        Log.d("ZenLock", "Temporarily UNPINNED for allowed action")
+                        result.success(true)
+                    } catch (e: Exception) {
+                        isZenPinned = false
+                        result.success(true) // Don't block the action
+                    }
+                }
+                "openCamera" -> {
+                    try {
+                        // Unpin first
+                        try { stopLockTask(); isZenPinned = false } catch (_: Exception) { isZenPinned = false }
+                        
+                        // Try to open camera with intent
+                        val cameraIntent = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
+                        if (cameraIntent.resolveActivity(packageManager) != null) {
+                            startActivity(cameraIntent)
+                            result.success(true)
+                        } else {
+                            // Fallback: try known camera packages
+                            val cameraPackages = listOf(
+                                "com.android.camera",
+                                "com.android.camera2", 
+                                "com.google.android.GoogleCamera",
+                                "com.samsung.android.camera",
+                                "com.sec.android.app.camera",
+                                "com.oneplus.camera",
+                                "com.oppo.camera",
+                                "com.coloros.camera",
+                                "com.motorola.camera",
+                                "com.realme.camera"
+                            )
+                            var launched = false
+                            for (pkg in cameraPackages) {
+                                val intent = packageManager.getLaunchIntentForPackage(pkg)
+                                if (intent != null) {
+                                    startActivity(intent)
+                                    launched = true
+                                    break
+                                }
+                            }
+                            result.success(launched)
+                        }
+                    } catch (e: Exception) {
+                        result.error("CAMERA_ERROR", e.message, null)
+                    }
+                }
+                "hasOverlayPermission" -> {
+                    result.success(Settings.canDrawOverlays(this))
+                }
+                "requestOverlayPermission" -> {
+                    try {
+                        val intent = Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:$packageName")
+                        )
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("UNAVAILABLE", "Could not open overlay settings: ${e.message}", null)
                     }
                 }
                 else -> result.notImplemented()
@@ -257,6 +386,57 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+
+        // ── DND (Do Not Disturb) channel ──
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DND_CHANNEL).setMethodCallHandler { call, result ->
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            when (call.method) {
+                "enableDND" -> {
+                    try {
+                        if (notificationManager.isNotificationPolicyAccessGranted) {
+                            notificationManager.setInterruptionFilter(
+                                NotificationManager.INTERRUPTION_FILTER_NONE  // Total silence
+                            )
+                            Log.d("DND", "DND enabled (total silence)")
+                            result.success(true)
+                        } else {
+                            result.error("PERMISSION_DENIED", "DND permission not granted", null)
+                        }
+                    } catch (e: Exception) {
+                        result.error("DND_ERROR", "Failed to enable DND: ${e.message}", null)
+                    }
+                }
+                "disableDND" -> {
+                    try {
+                        if (notificationManager.isNotificationPolicyAccessGranted) {
+                            notificationManager.setInterruptionFilter(
+                                NotificationManager.INTERRUPTION_FILTER_ALL  // All notifications
+                            )
+                            Log.d("DND", "DND disabled (all sounds restored)")
+                            result.success(true)
+                        } else {
+                            result.success(false)
+                        }
+                    } catch (e: Exception) {
+                        result.error("DND_ERROR", "Failed to disable DND: ${e.message}", null)
+                    }
+                }
+                "hasDndPermission" -> {
+                    result.success(notificationManager.isNotificationPolicyAccessGranted)
+                }
+                "requestDndPermission" -> {
+                    try {
+                        val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("UNAVAILABLE", "Could not open DND settings: ${e.message}", null)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
     }
     
     private fun hasUsageStatsPermission(): Boolean {
@@ -312,6 +492,182 @@ class MainActivity : FlutterActivity() {
         }
         
         return result.sortedByDescending { it["usageTime"] as Long }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // ZEN MODE: Lock Screen & Immersive Mode Control
+    // ════════════════════════════════════════════════════════════════
+
+    private var isZenPinned = false  // Track pinning state to avoid repeated pin/toast
+
+    /**
+     * Show Zen Mode screen OVER the lock screen.
+     * Called once when Zen Mode is activated.
+     */
+    private fun enableZenLockScreen() {
+        runOnUiThread {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                    // Show our app over lock screen (no need for setTurnScreenOn —
+                    // that causes screen to auto-wake after power button)
+                    setShowWhenLocked(true)
+                    // Do NOT call requestDismissKeyguard — it triggers PIN dialog
+                } else {
+                    @Suppress("DEPRECATION")
+                    window.addFlags(
+                        WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                    )
+                }
+                
+                // Pin screen ONLY if not already pinned (avoids "app pinned" toast spam)
+                if (!isZenPinned) {
+                    try {
+                        startLockTask()
+                        isZenPinned = true
+                        Log.d("ZenLock", "Screen PINNED — system navigation blocked")
+                    } catch (e: Exception) {
+                        Log.w("ZenLock", "Screen pinning failed: ${e.message}")
+                    }
+                }
+                
+                // Immersive mode
+                enterFullImmersive()
+                
+                Log.d("ZenLock", "Lock screen bypass ENABLED")
+            } catch (e: Exception) {
+                Log.e("ZenLock", "Error enabling lock screen mode: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Restore normal lock screen behavior when Zen Mode ends.
+     */
+    private fun disableZenLockScreen() {
+        runOnUiThread {
+            try {
+                // Unpin screen
+                if (isZenPinned) {
+                    try {
+                        stopLockTask()
+                        isZenPinned = false
+                        Log.d("ZenLock", "Screen UNPINNED")
+                    } catch (e: Exception) {
+                        Log.w("ZenLock", "Unpin error: ${e.message}")
+                    }
+                }
+                
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                    setShowWhenLocked(false)
+                } else {
+                    @Suppress("DEPRECATION")
+                    window.clearFlags(
+                        WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                    )
+                }
+                
+                exitFullImmersive()
+                
+                Log.d("ZenLock", "Lock screen bypass DISABLED")
+            } catch (e: Exception) {
+                Log.e("ZenLock", "Error disabling lock screen mode: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Full immersive mode — hides status bar, navigation bar,
+     * and blocks all swipe gestures (notification bar, recent apps).
+     */
+    private fun enterFullImmersive() {
+        runOnUiThread {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    window.insetsController?.let { controller ->
+                        controller.hide(
+                            android.view.WindowInsets.Type.statusBars() or
+                            android.view.WindowInsets.Type.navigationBars()
+                        )
+                        controller.systemBarsBehavior = 
+                            android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    window.decorView.systemUiVisibility = (
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        or View.SYSTEM_UI_FLAG_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("ZenLock", "Immersive mode error: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Exit immersive mode — restore normal status/nav bars.
+     */
+    private fun exitFullImmersive() {
+        runOnUiThread {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    window.insetsController?.let { controller ->
+                        controller.show(
+                            android.view.WindowInsets.Type.statusBars() or
+                            android.view.WindowInsets.Type.navigationBars()
+                        )
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                }
+            } catch (e: Exception) {
+                Log.e("ZenLock", "Exit immersive error: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * On resume: only re-enforce immersive mode (lightweight).
+     * DO NOT re-call enableZenLockScreen — that would re-trigger
+     * PIN dialog and "app pinned" toast.
+     */
+    override fun onResume() {
+        super.onResume()
+        if (AppBlockerService.isZenMode(this)) {
+            // Just re-enforce immersive (screen pinning persists across resume)
+            enterFullImmersive()
+            
+            // Re-pin only if we lost pinning (e.g., after temporary unpin for camera/call)
+            if (!isZenPinned) {
+                try {
+                    startLockTask()
+                    isZenPinned = true
+                    Log.d("ZenLock", "Re-pinned on resume")
+                } catch (e: Exception) {
+                    Log.w("ZenLock", "Re-pin failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    // Removed onPause re-launch — it was causing screen wake-up loop.
+    // The AppBlockerService already handles bringing user back.
+
+    /**
+     * Block back button during Zen Mode.
+     */
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        if (AppBlockerService.isZenMode(this)) {
+            // Do nothing — block exit
+            return
+        }
+        super.onBackPressed()
     }
 }
 
