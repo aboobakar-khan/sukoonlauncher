@@ -164,16 +164,20 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
   }
 
   Widget _buildAlphabetSidebar(List<InstalledApp> apps, AppThemeColor themeColor) {
-    // Get available first letters from app list
-    final availableLetters = <String>{};
+    // Only show letters that actually have apps
+    final availableLetters = <String>[];
+    final letterSet = <String>{};
     for (final app in apps) {
       if (app.appName.isNotEmpty) {
         final first = app.appName[0].toUpperCase();
-        if (RegExp(r'[A-Z]').hasMatch(first)) {
+        if (RegExp(r'[A-Z]').hasMatch(first) && letterSet.add(first)) {
           availableLetters.add(first);
         }
       }
     }
+    availableLetters.sort();
+
+    if (availableLetters.isEmpty) return const SizedBox.shrink();
 
     const allLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
@@ -184,51 +188,36 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
       child: Center(
         child: GestureDetector(
           onVerticalDragStart: (details) {
-            _handleAlphabetDrag(details.localPosition.dy, allLetters, availableLetters, apps, context);
+            _handleAlphabetDrag(details.localPosition.dy, allLetters, letterSet, apps, context);
           },
           onVerticalDragUpdate: (details) {
-            _handleAlphabetDrag(details.localPosition.dy, allLetters, availableLetters, apps, context);
+            _handleAlphabetDrag(details.localPosition.dy, allLetters, letterSet, apps, context);
           },
           onVerticalDragEnd: (_) {
             Future.delayed(const Duration(milliseconds: 400), () {
               if (mounted) setState(() => _activeAlpha = null);
             });
           },
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(14),
-            ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: allLetters.split('').map((letter) {
-                final isAvailable = availableLetters.contains(letter);
+              children: availableLetters.map((letter) {
                 final isActive = _activeAlpha == letter;
                 return GestureDetector(
-                  onTap: isAvailable ? () => _scrollToLetter(letter, apps) : null,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 120),
-                    width: isActive ? 24 : 20,
-                    height: isActive ? 24 : 18,
+                  onTap: () => _scrollToLetter(letter, apps),
+                  child: Container(
+                    width: 16,
+                    height: isActive ? 20 : 16,
                     alignment: Alignment.center,
-                    margin: const EdgeInsets.symmetric(vertical: 0.5),
-                    decoration: isActive
-                        ? BoxDecoration(
-                            color: themeColor.color.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(8),
-                          )
-                        : null,
                     child: Text(
                       letter,
                       style: TextStyle(
                         color: isActive
                             ? themeColor.color
-                            : isAvailable
-                                ? Colors.white.withValues(alpha: 0.55)
-                                : Colors.white.withValues(alpha: 0.1),
-                        fontSize: isActive ? 12 : 10,
-                        fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                            : Colors.white.withValues(alpha: 0.3),
+                        fontSize: isActive ? 11 : 9,
+                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                         height: 1.0,
                         decoration: TextDecoration.none,
                       ),
@@ -415,53 +404,7 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
         child: SafeArea(
           child: Column(
             children: [
-              // Header with app count and settings
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          '${filteredApps.length} apps',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 12,
-                            letterSpacing: 1.5,
-                            decoration: TextDecoration.none,
-                          ),
-                        ),
-                        if (isRefreshing) ...[
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            width: 10,
-                            height: 10,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white.withValues(alpha: 0.3),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const SettingsScreen(),
-                          ),
-                        );
-                      },
-                      child: Icon(
-                        Icons.settings,
-                        color: Colors.white.withValues(alpha: 0.5),
-                        size: 20,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(height: 12),
 
               // App list with A-Z sidebar
               Expanded(
@@ -500,7 +443,7 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
                         children: [
                           ListView.builder(
                             controller: _scrollController,
-                            padding: const EdgeInsets.only(left: 24, right: 28),
+                            padding: const EdgeInsets.only(left: 24, right: 22),
                             itemCount: filteredApps.length,
                             cacheExtent: 500,
                             addAutomaticKeepAlives: false,
@@ -528,77 +471,87 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
 
   Widget _buildBottomSearchBar(AppThemeColor themeColor) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.5),
-        border: Border(
-          top: BorderSide(
-            color: themeColor.color.withValues(alpha: 0.08),
-          ),
-        ),
-      ),
-      child: TextField(
-        controller: _searchController,
-        focusNode: _searchFocusNode,
-        style: TextStyle(
-          color: themeColor.color.withValues(alpha: 0.9),
-          fontSize: 17,
-          letterSpacing: 0.8,
-        ),
-        textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          hintText: 'Search apps...',
-          hintStyle: TextStyle(
-            color: Colors.white.withValues(alpha: 0.3),
-            fontSize: 17,
-            letterSpacing: 0.5,
-          ),
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.07),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: themeColor.color.withValues(alpha: 0.1)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: themeColor.color.withValues(alpha: 0.35), width: 1.5),
-          ),
-          prefixIcon: Padding(
-            padding: const EdgeInsets.only(left: 16, right: 10),
-            child: Icon(
-              Icons.search_rounded,
-              color: themeColor.color.withValues(alpha: 0.4),
-              size: 22,
+      padding: const EdgeInsets.fromLTRB(16, 10, 8, 14),
+      child: Row(
+        children: [
+          // Search field
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              style: TextStyle(
+                color: themeColor.color.withValues(alpha: 0.9),
+                fontSize: 16,
+                letterSpacing: 0.5,
+              ),
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: 'Search...',
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  fontSize: 16,
+                ),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.05),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: themeColor.color.withValues(alpha: 0.2)),
+                ),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: Colors.white.withValues(alpha: 0.25),
+                  size: 20,
+                ),
+                prefixIconConstraints: const BoxConstraints(minWidth: 44),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: Colors.white.withValues(alpha: 0.4),
+                          size: 18,
+                        ),
+                        onPressed: () {
+                          _searchController.clear();
+                          _searchFocusNode.unfocus();
+                        },
+                      )
+                    : null,
+              ),
             ),
           ),
-          prefixIconConstraints: const BoxConstraints(minWidth: 44),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: Icon(
-                    Icons.close_rounded,
-                    color: Colors.white.withValues(alpha: 0.5),
-                    size: 20,
-                  ),
-                  onPressed: () {
-                    _searchController.clear();
-                    _searchFocusNode.unfocus();
-                  },
-                )
-              : null,
-        ),
+          // Settings icon
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const SettingsScreen(),
+                ),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Icon(
+                Icons.tune_rounded,
+                color: Colors.white.withValues(alpha: 0.25),
+                size: 20,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildAppItem(InstalledApp app, AppThemeColor themeColor) {
-    final isFavorite = ref
-        .watch(favoriteAppsProvider.notifier)
-        .isFavorite(app.packageName);
     final isBlocked = ref.watch(appBlockRuleProvider.notifier).isAppBlocked(app.packageName);
 
     return RepaintBoundary(
@@ -607,44 +560,20 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
         onLongPress: () => _showAppOptions(context, app, ref),
         behavior: HitTestBehavior.opaque,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          child: Row(
-            children: [
-              // Text only - no icons
-              Expanded(
-                child: Text(
-                  app.appName,
-                  style: TextStyle(
-                    color: isBlocked 
-                        ? Colors.white.withValues(alpha: 0.2)
-                        : themeColor.color.withValues(alpha: 0.7),
-                    fontSize: 17,
-                    letterSpacing: 0.8,
-                    fontWeight: FontWeight.w300,
-                    decoration: TextDecoration.none,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              // Blocked indicator
-              if (isBlocked)
-                Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: Icon(Icons.shield_rounded, 
-                      size: 12, color: const Color(0xFFE8915A).withValues(alpha: 0.4)),
-                ),
-              // Favorite star (subtle)
-              if (isFavorite)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: Icon(
-                    Icons.star,
-                    color: Colors.white.withValues(alpha: 0.3),
-                    size: 14,
-                  ),
-                ),
-            ],
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          child: Text(
+            app.appName,
+            style: TextStyle(
+              color: isBlocked 
+                  ? Colors.white.withValues(alpha: 0.15)
+                  : themeColor.color.withValues(alpha: 0.65),
+              fontSize: 16,
+              letterSpacing: 0.3,
+              fontWeight: FontWeight.w300,
+              decoration: TextDecoration.none,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ),
