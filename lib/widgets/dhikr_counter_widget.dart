@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/tasbih_provider.dart';
 import '../providers/theme_provider.dart';
-import '../providers/sukoon_coin_provider.dart';
+
 import '../screens/dhikr_history_pro_dashboard_redesigned.dart';
 
 /// Dhikr Counter Widget — Clean Minimalist Redesign
@@ -136,11 +136,6 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
     HapticFeedback.lightImpact();
     _countAnimController.forward().then((_) => _countAnimController.reverse());
     ref.read(tasbihProvider.notifier).increment();
-    // 🪙 Award Sukoon Coins at 100 dhikr milestone
-    final tasbih = ref.read(tasbihProvider);
-    if (tasbih.currentCount == 100) {
-      ref.read(sukoonCoinProvider.notifier).awardDhikrMilestone();
-    }
   }
 
   @override

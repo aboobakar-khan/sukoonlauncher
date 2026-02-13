@@ -12,7 +12,7 @@ import '../providers/arabic_font_provider.dart';
 import '../providers/premium_provider.dart';
 import '../providers/ramadan_provider.dart';
 import '../providers/theme_provider.dart';
-import '../widgets/ambient_sound_widget.dart';
+
 
 
 /// Widget Dashboard — Minimalist Redesign
@@ -55,23 +55,18 @@ class WidgetDashboardScreen extends ConsumerWidget {
 
                   _sectionGap(),
 
-                  // ─── Prayer Tracker (UNTOUCHED) ────────────────
-                  const PrayerTrackerWidget(),
-
-                  _sectionGap(),
-
                   // ─── Dhikr Counter ─────────────────────────────
                   const DhikrCounterWidget(),
 
                   _sectionGap(),
 
-                  // ─── Daily Challenges ──────────────────────────
-                  const DailyIslamicChallengeCard(),
+                  // ─── Prayer Tracker ─────────────────────────────
+                  const PrayerTrackerWidget(),
 
                   _sectionGap(),
 
-                  // ─── Ambient Sound ─────────────────────────────
-                  const AmbientSoundWidget(),
+                  // ─── Daily Challenges ──────────────────────────
+                  const DailyIslamicChallengeCard(),
 
                   _sectionGap(),
 

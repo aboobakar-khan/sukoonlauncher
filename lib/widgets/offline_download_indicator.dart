@@ -15,8 +15,8 @@ class OfflineDownloadIndicator extends ConsumerWidget {
     final status = ref.watch(offlineContentProvider);
     final themeColor = ref.watch(themeColorProvider);
     
-    // Don't show if complete
-    if (status.isComplete) return const SizedBox.shrink();
+    // Don't show if core content complete and tafseer isn't actively downloading
+    if (status.isComplete && !status.isDownloading) return const SizedBox.shrink();
     
     // Don't show if not downloading and no error
     if (!status.isDownloading && status.error == null) {
@@ -219,13 +219,10 @@ class OfflineDownloadSheet extends ConsumerWidget {
                 : 'Downloading...',
             themeColor,
           ),
-          _buildStatusItem(
-            'Tafseer',
-            status.tafseerComplete,
-            status.tafseerComplete 
-                ? 'All 114 surahs' 
-                : '${status.tafseersDownloaded}/114 surahs',
+          _buildTafseerItem(
+            status,
             themeColor,
+            ref,
           ),
 
           const SizedBox(height: 20),
@@ -399,6 +396,111 @@ class OfflineDownloadSheet extends ConsumerWidget {
     if (diff.inDays < 1) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return '${time.day}/${time.month}/${time.year}';
+  }
+
+  /// Tafseer row with download button (user-initiated only)
+  Widget _buildTafseerItem(DownloadStatus status, AppThemeColor themeColor, WidgetRef ref) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: status.tafseerComplete 
+                  ? Colors.green.withValues(alpha: 0.2)
+                  : Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              status.tafseerComplete ? Icons.check : Icons.menu_book_rounded,
+              color: status.tafseerComplete ? Colors.green : Colors.white.withValues(alpha: 0.3),
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tafseer',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  status.tafseerComplete 
+                      ? 'All 114 surahs' 
+                      : status.tafseersDownloaded > 0 
+                          ? '${status.tafseersDownloaded}/114 surahs'
+                          : 'Not downloaded',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Download / Downloading button
+          if (!status.tafseerComplete)
+            GestureDetector(
+              onTap: status.isDownloading ? null : () {
+                ref.read(offlineContentProvider.notifier).downloadTafseerManually();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: status.isDownloading 
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : themeColor.color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: status.isDownloading 
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : themeColor.color.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (status.isDownloading)
+                      SizedBox(
+                        width: 12, height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: Colors.white.withValues(alpha: 0.5),
+                        ),
+                      )
+                    else
+                      Icon(Icons.download_rounded, color: themeColor.color, size: 14),
+                    const SizedBox(width: 6),
+                    Text(
+                      status.isDownloading ? 'Downloading...' : 'Download',
+                      style: TextStyle(
+                        color: status.isDownloading 
+                            ? Colors.white.withValues(alpha: 0.5) 
+                            : themeColor.color,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 

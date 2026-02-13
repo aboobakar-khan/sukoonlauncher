@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../providers/sukoon_coin_provider.dart';
+
 import '../screens/daily_challenges_analytics_screen.dart';
 import '../screens/dhikr_history_pro_dashboard_redesigned.dart';
 import '../screens/productivity_hub_screen.dart';
@@ -142,8 +142,6 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
         await box.put('challenge_streak', newStreak);
         setState(() => _challengeStreak = newStreak);
         
-        // 🪙 Award Sukoon Coins for completing all challenges
-        ref.read(sukoonCoinProvider.notifier).awardDailyChallenge();
         
         _showCompletionReward();
       }
@@ -226,7 +224,7 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
               ),
               const SizedBox(height: 8),
               Text(
-                '🪙 +15 Sukoon Coins earned!',
+                'MashaAllah! All done!',
                 style: TextStyle(color: _gold.withValues(alpha: 0.9), fontSize: 14, fontWeight: FontWeight.w600),
               ),
               if (_challengeStreak > 0) ...[
@@ -265,70 +263,134 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
     final progress = totalCount > 0 ? completedCount / totalCount : 0.0;
     final allComplete = completedCount == totalCount && totalCount > 0;
 
-    return Column(
-      children: [
-        // ── Header ──
-        GestureDetector(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const DailyChallengesAnalyticsScreen()),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: allComplete 
+              ? _gold.withValues(alpha: 0.25) 
+              : Colors.white.withValues(alpha: 0.06),
+        ),
+      ),
+      child: Column(
+        children: [
+          // ── Header with progress ring ──
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const DailyChallengesAnalyticsScreen()),
+              );
+            },
+            behavior: HitTestBehavior.opaque,
             child: Row(
               children: [
-                Text(
-                  'CHALLENGES',
-                  style: TextStyle(
-                    color: _gold.withValues(alpha: 0.7),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.8,
+                // Circular progress indicator
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        value: progress,
+                        strokeWidth: 2.5,
+                        backgroundColor: Colors.white.withValues(alpha: 0.06),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          allComplete ? _gold : _gold.withValues(alpha: 0.6),
+                        ),
+                      ),
+                      Text(
+                        '$completedCount',
+                        style: TextStyle(
+                          color: allComplete ? _gold : Colors.white.withValues(alpha: 0.7),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                if (_challengeStreak > 0) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    '🔥 $_challengeStreak',
-                    style: TextStyle(color: _gold.withValues(alpha: 0.6), fontSize: 10, fontWeight: FontWeight.w600),
-                  ),
-                ],
-                const Spacer(),
-                Text(
-                  '$completedCount/$totalCount',
-                  style: TextStyle(
-                    color: allComplete ? _gold.withValues(alpha: 0.8) : Colors.white.withValues(alpha: 0.3),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
+                const SizedBox(width: 12),
+                // Title
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Daily Challenges',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        allComplete ? 'All complete — MashaAllah!' : '$completedCount of $totalCount done',
+                        style: TextStyle(
+                          color: allComplete 
+                              ? _gold.withValues(alpha: 0.7) 
+                              : Colors.white.withValues(alpha: 0.3),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                // Streak badge
+                if (_challengeStreak > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _gold.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _gold.withValues(alpha: 0.2)),
+                    ),
+                    child: Text(
+                      '🔥 $_challengeStreak',
+                      style: TextStyle(
+                        color: _gold.withValues(alpha: 0.8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 const SizedBox(width: 4),
-                Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.2), size: 16),
+                Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.15), size: 18),
               ],
             ),
           ),
-        ),
 
-        // ── Challenge rows ──
-        ...List.generate(_dailyChallenges.length, (i) {
-          final challenge = _dailyChallenges[i];
-          final isComplete = _todayChallenges[challenge['id']] == true;
-          return _buildChallengeRow(challenge, isComplete);
-        }),
+          // Divider
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Divider(
+              color: Colors.white.withValues(alpha: 0.04),
+              height: 1,
+            ),
+          ),
 
-        const SizedBox(height: 4),
-      ],
+          // ── Challenge rows ──
+          ...List.generate(_dailyChallenges.length, (i) {
+            final challenge = _dailyChallenges[i];
+            final isComplete = _todayChallenges[challenge['id']] == true;
+            return _buildChallengeRow(challenge, isComplete, i == _dailyChallenges.length - 1);
+          }),
+        ],
+      ),
     );
   }
 
-  Widget _buildChallengeRow(Map<String, dynamic> challenge, bool isComplete) {
+  Widget _buildChallengeRow(Map<String, dynamic> challenge, bool isComplete, bool isLast) {
     final action = challenge['action'] as String? ?? 'none';
     final hasAction = action != 'none';
+    final emoji = challenge['icon'] as String? ?? '✨';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
       child: GestureDetector(
         onTap: () {
           if (hasAction && !isComplete) {
@@ -340,24 +402,18 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
         behavior: HitTestBehavior.opaque,
         child: Row(
           children: [
-            // Checkbox
-            GestureDetector(
-              onTap: () => _toggleChallenge(challenge['id'] as String),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 20, height: 20,
-                decoration: BoxDecoration(
-                  color: isComplete ? _gold : Colors.transparent,
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(
-                    color: isComplete ? _gold : Colors.white.withValues(alpha: 0.12),
-                    width: 1.5,
-                  ),
+            // Emoji icon
+            SizedBox(
+              width: 28,
+              child: Text(
+                emoji,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: isComplete ? Colors.white.withValues(alpha: 0.3) : null,
                 ),
-                child: isComplete ? const Icon(Icons.check_rounded, color: Color(0xFF0D0D0D), size: 13) : null,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
 
             // Title
             Expanded(
@@ -366,21 +422,50 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
                 style: TextStyle(
                   color: isComplete
                       ? Colors.white.withValues(alpha: 0.25)
-                      : Colors.white.withValues(alpha: 0.7),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
+                      : Colors.white.withValues(alpha: 0.75),
+                  fontSize: 13.5,
+                  fontWeight: isComplete ? FontWeight.w400 : FontWeight.w500,
                   decoration: isComplete ? TextDecoration.lineThrough : null,
                   decorationColor: Colors.white.withValues(alpha: 0.15),
                 ),
               ),
             ),
 
+            const SizedBox(width: 8),
+
+            // Checkbox
+            GestureDetector(
+              onTap: () => _toggleChallenge(challenge['id'] as String),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+                width: 22, height: 22,
+                decoration: BoxDecoration(
+                  color: isComplete ? _gold : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isComplete ? _gold : Colors.white.withValues(alpha: 0.12),
+                    width: 1.5,
+                  ),
+                  boxShadow: isComplete
+                      ? [BoxShadow(color: _gold.withValues(alpha: 0.25), blurRadius: 8, spreadRadius: 1)]
+                      : null,
+                ),
+                child: isComplete
+                    ? const Icon(Icons.check_rounded, color: Color(0xFF0D0D0D), size: 14)
+                    : null,
+              ),
+            ),
+
             // Subtle arrow for actionable items
-            if (hasAction && !isComplete)
-              Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.12), size: 16),
+            if (hasAction && !isComplete) ...[
+              const SizedBox(width: 6),
+              Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.1), size: 16),
+            ],
           ],
         ),
       ),
     );
   }
 }
+

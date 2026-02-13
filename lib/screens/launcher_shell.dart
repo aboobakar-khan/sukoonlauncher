@@ -116,9 +116,21 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
     // Use effective wallpaper: AMOLED forces pure black
     final effectiveWallpaper = isAmoled ? WallpaperType.black : wallpaper;
 
-    // Block system back gesture for launcher
+    // Back button: navigate to Home page. If already on Home, do nothing.
     return PopScope(
       canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          final currentPage = _pageController.page?.round() ?? _homeIndex;
+          if (currentPage != _homeIndex) {
+            _pageController.animateToPage(
+              _homeIndex,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        }
+      },
       child: Scaffold(
         body: Stack(
           children: [
@@ -154,14 +166,12 @@ class _LauncherShellState extends ConsumerState<LauncherShell>
 
   /// Subtle page indicator dots
   Widget _buildPageDots() {
-    const labels = ['Islam', 'Dashboard', 'Home', 'Apps', 'Focus'];
     final int activePage = _currentPage.round().clamp(0, _totalPages - 1);
     
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(_totalPages, (i) {
         final isActive = i == activePage;
-        // Calculate proximity for smooth animation
         final distance = (_currentPage - i).abs().clamp(0.0, 1.0);
         final dotOpacity = isActive ? 0.9 : (0.2 + (1.0 - distance) * 0.15).clamp(0.15, 0.35);
         
@@ -393,26 +403,6 @@ class _IslamicHubScreenState extends ConsumerState<IslamicHubScreen> {
                           HapticFeedback.lightImpact();
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const _IslamicSubScreen(title: 'Dua & Adhkar', child: MinimalistDuaScreen())));
                         },
-                      ),
-                    ),
-
-                    // Swipe hint
-                    Padding(
-                      padding: const EdgeInsets.only(top: 20, bottom: 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.swipe_right_rounded, size: 14, color: Colors.white.withValues(alpha: 0.15)),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Swipe right for Dashboard →',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.15),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   ],

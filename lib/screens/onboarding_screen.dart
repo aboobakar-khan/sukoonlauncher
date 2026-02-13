@@ -53,7 +53,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  static const int _totalPages = 5;
+  static const int _totalPages = 4;
 
   // Master entrance animation per page
   late AnimationController _entranceController;
@@ -118,11 +118,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     }
   }
 
-  void _activateTrialAndContinue() async {
-    HapticFeedback.mediumImpact();
-    await ref.read(premiumProvider.notifier).startFreeTrial();
-    _goToNext();
-  }
+
 
   void _setDefaultAndFinish() async {
     HapticFeedback.heavyImpact();
@@ -210,7 +206,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                       _PageHook(entrance: _entranceController),
                       _PageImpact(entrance: _entranceController),
                       _PageSolution(entrance: _entranceController),
-                      _PagePro(entrance: _entranceController),
                       _PageActivate(
                         entrance: _entranceController,
                         pulse: _pulseAnim,
@@ -302,10 +297,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
         switchInCurve: Curves.easeOut,
         switchOutCurve: Curves.easeIn,
         child: _currentPage == 3
-            ? _buildProButtons()
-            : _currentPage == 4
-                ? _buildActivationButtons()
-                : _buildNextButton(),
+            ? _buildActivationButtons()
+            : _buildNextButton(),
       ),
     );
   }
@@ -316,7 +309,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
       'Show Me the Way',
       'Discover Features',
       'Continue',
-      'Continue',
     ];
     return _PrimaryCTA(
       key: ValueKey('next_$_currentPage'),
@@ -325,21 +317,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     );
   }
 
-  Widget _buildProButtons() {
-    return Column(
-      key: const ValueKey('pro_buttons'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _PrimaryCTA(
-          label: 'Start 7-Day Free Trial',
-          onTap: _activateTrialAndContinue,
-          icon: Icons.diamond_outlined,
-        ),
-        const SizedBox(height: 10),
-        _SecondaryCTA(label: 'Maybe later', onTap: _goToNext),
-      ],
-    );
-  }
+
 
   Widget _buildActivationButtons() {
     return Column(
@@ -678,140 +656,7 @@ class _PageSolution extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  PAGE 4 — PRO UPSELL
-// ═══════════════════════════════════════════════════════════════════
-
-class _PagePro extends StatelessWidget {
-  final AnimationController entrance;
-  const _PagePro({required this.entrance});
-
-  @override
-  Widget build(BuildContext context) {
-    final h = MediaQuery.of(context).size.height;
-    final isSmall = h < 700;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: Column(
-        children: [
-          SizedBox(height: isSmall ? h * 0.03 : h * 0.06),
-
-          // Pro badge
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.0,
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    _gold.withValues(alpha: 0.14),
-                    _gold.withValues(alpha: 0.04),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(24),
-                border:
-                    Border.all(color: _gold.withValues(alpha: 0.25)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.workspace_premium_rounded,
-                      color: _gold, size: 18),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'SUKOON PRO',
-                    style: TextStyle(
-                      color: _gold,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.8,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          SizedBox(height: isSmall ? 20 : 28),
-
-          // Headline
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.10,
-            child: const Text(
-              'Unlock Your\nFull Potential',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w800,
-                color: _textPrimary,
-                height: 1.12,
-                letterSpacing: -0.3,
-              ),
-            ),
-          ),
-
-          SizedBox(height: isSmall ? 24 : 34),
-
-          // Pro features
-          ..._proFeatures.asMap().entries.map((e) {
-            final i = e.key;
-            final f = e.value;
-            return Padding(
-              padding: EdgeInsets.only(bottom: isSmall ? 12 : 15),
-              child: _StaggeredFade(
-                entrance: entrance,
-                delay: 0.18 + (i * 0.07),
-                child: _ProRow(
-                    icon: f['icon'] as IconData,
-                    text: f['text'] as String),
-              ),
-            );
-          }),
-
-          const Spacer(),
-
-          // Trust badges
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.65,
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _TrustPill(
-                    icon: Icons.lock_outline, label: 'Cancel anytime'),
-                _TrustPill(
-                    icon: Icons.credit_card_off,
-                    label: 'Free for 7 days'),
-                _TrustPill(
-                    icon: Icons.verified_outlined, label: 'Secure'),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  static const List<Map<String, dynamic>> _proFeatures = [
-    {'icon': Icons.color_lens_outlined, 'text': 'All themes & clock styles'},
-    {'icon': Icons.mosque_outlined, 'text': 'Full Dua library & Tafseer'},
-    {'icon': Icons.shield_outlined, 'text': 'Deen Mode & Hard Block'},
-    {
-      'icon': Icons.analytics_outlined,
-      'text': 'Advanced analytics & dashboards'
-    },
-    {'icon': Icons.cloud_outlined, 'text': 'Cloud backup & data export'},
-    {'icon': Icons.auto_awesome, 'text': 'Priority support & updates'},
-  ];
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  PAGE 5 — ACTIVATION
+//  PAGE 4 — ACTIVATION
 // ═══════════════════════════════════════════════════════════════════
 
 class _PageActivate extends StatelessWidget {

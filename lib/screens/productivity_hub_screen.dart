@@ -8,7 +8,7 @@ import '../providers/theme_provider.dart';
 import '../providers/installed_apps_provider.dart';
 import '../models/installed_app.dart';
 import '../providers/premium_provider.dart';
-import '../providers/sukoon_coin_provider.dart';
+
 import '../models/productivity_models.dart';
 import '../providers/ambient_sound_provider.dart';
 import '../services/native_app_blocker_service.dart';
@@ -32,15 +32,12 @@ class ProductivityHubScreen extends ConsumerStatefulWidget {
       _ProductivityHubScreenState();
 }
 
-class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen> {
   Timer? _pomodoroTimer;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
     _startPomodoroTicker();
   }
 
@@ -50,7 +47,6 @@ class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen>
       if (pomo.state != PomodoroState.idle && pomo.state != PomodoroState.paused) {
         ref.read(pomodoroProvider.notifier).tick();
       }
-      // Issue 7: Auto-manage ambient sound based on timer state
       _syncAmbientSound(pomo.state);
     });
   }
@@ -72,7 +68,6 @@ class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen>
          currentState == PomodoroState.longBreak) &&
         (prev == PomodoroState.paused || prev == PomodoroState.idle)) {
       if (!ambient.isPlaying) {
-        // If user has a sound selected, play it; otherwise auto-pick 'rain' as default
         final soundId = ambient.currentSoundId ?? 'rain';
         ambientNotifier.selectAndPlay(soundId);
       }
@@ -90,108 +85,261 @@ class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen>
   @override
   void dispose() {
     _pomodoroTimer?.cancel();
-    _tabController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final themeColor = ref.watch(themeColorProvider);
+    final accent = themeColor.color;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final pomo = ref.watch(pomodoroProvider);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: TabBarView(
-            controller: _tabController,
-            physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _PomodoroTab(),
-              _TodoTab(),
-              _DoubtsTab(),
-              _BlockerTab(),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: _buildBottomTabBar(themeColor.color),
-    );
-  }
+              SizedBox(height: screenHeight * 0.04),
 
-  Widget _buildBottomTabBar(Color accent) {
-    final icons = [
-      Icons.timer_outlined,
-      Icons.check_circle_outline,
-      Icons.help_outline,
-      Icons.shield_outlined,
-    ];
-    final labels = ['Focus', 'Tasks', 'Doubts', 'Block'];
+              // Header
+              Text(
+                'Productivity',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Stay focused — distraction-free tools',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
 
-    return AnimatedBuilder(
-      animation: _tabController,
-      builder: (ctx, _) {
-        return Container(
-          padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.9),
-            border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Row(
-              children: List.generate(4, (i) {
-                final selected = _tabController.index == i;
-                return Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      _tabController.animateTo(i);
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
+              SizedBox(height: screenHeight * 0.04),
+
+              // 4 cards — 2x2 grid layout
+              Expanded(
+                child: Column(
+                  children: [
+                    // Row 1: Focus Timer + Tasks
+                    Expanded(
+                      flex: 3,
+                      child: Row(
                         children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              icons[i],
-                              size: selected ? 26 : 22,
-                              color: selected
-                                  ? _sandGold
-                                  : Colors.white.withValues(alpha: 0.30),
+                          Expanded(
+                            child: _buildHubCard(
+                              context,
+                              icon: Icons.timer_rounded,
+                              title: 'Focus',
+                              subtitle: pomo.state != PomodoroState.idle
+                                  ? pomo.timeDisplay
+                                  : 'Pomodoro',
+                              color: _desertSunset,
+                              isActive: pomo.state != PomodoroState.idle,
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.push(context, MaterialPageRoute(
+                                  builder: (_) => _ProductivitySubScreen(
+                                    title: 'Focus Timer',
+                                    child: _PomodoroTab(),
+                                  ),
+                                ));
+                              },
                             ),
                           ),
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 200),
-                            child: selected
-                                ? Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: Text(
-                                      labels[i],
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: _sandGold,
-                                      ),
-                                    ),
-                                  )
-                                : const SizedBox(height: 4),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildHubCard(
+                              context,
+                              icon: Icons.check_circle_outline_rounded,
+                              title: 'Tasks',
+                              subtitle: 'Todo & Events',
+                              color: _oasisGreen,
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.push(context, MaterialPageRoute(
+                                  builder: (_) => _ProductivitySubScreen(
+                                    title: 'Tasks',
+                                    child: _TodoTab(),
+                                  ),
+                                ));
+                              },
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                );
-              }),
-            ),
+                    const SizedBox(height: 12),
+                    // Row 2: Doubts + App Blocker
+                    Expanded(
+                      flex: 3,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _buildHubCard(
+                              context,
+                              icon: Icons.psychology_rounded,
+                              title: 'Doubts',
+                              subtitle: 'Academic',
+                              color: _sandGold,
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.push(context, MaterialPageRoute(
+                                  builder: (_) => _ProductivitySubScreen(
+                                    title: 'Doubts',
+                                    child: _DoubtsTab(),
+                                  ),
+                                ));
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildHubCard(
+                              context,
+                              icon: Icons.shield_outlined,
+                              title: 'Block',
+                              subtitle: 'App Blocker',
+                              color: _warmBrown,
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.push(context, MaterialPageRoute(
+                                  builder: (_) => _ProductivitySubScreen(
+                                    title: 'App Blocker',
+                                    child: _BlockerTab(),
+                                  ),
+                                ));
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHubCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+    bool isActive = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: color.withValues(alpha: isActive ? 0.3 : 0.12),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: isActive ? color : Colors.white.withValues(alpha: 0.35),
+                    fontSize: 12,
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Wrapper screen for Productivity sub-screens (Focus, Tasks, Doubts, Blocker)
+class _ProductivitySubScreen extends StatelessWidget {
+  final String title;
+  final Widget child;
+  const _ProductivitySubScreen({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Minimal back header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white.withValues(alpha: 0.6),
+                      size: 22,
+                    ),
+                  ),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Child screen
+            Expanded(child: child),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1083,10 +1231,9 @@ class _PomodoroTabState extends ConsumerState<_PomodoroTab> {
     final pomo = ref.watch(pomodoroProvider);
     final todos = ref.watch(todoProvider).where((t) => !t.isCompleted).toList();
 
-    // 🪙 Award Sukoon Coins when a focus session completes (session count increases)
+    // Track session completion
     if (pomo.completedSessions > _prevSessionCount) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(sukoonCoinProvider.notifier).awardPomodoroComplete();
         setState(() => _prevSessionCount = pomo.completedSessions);
       });
     }

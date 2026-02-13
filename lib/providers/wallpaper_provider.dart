@@ -19,7 +19,7 @@ final wallpaperProvider =
     );
 
 class WallpaperNotifier extends StateNotifier<WallpaperType> {
-  WallpaperNotifier() : super(WallpaperType.black) {
+  WallpaperNotifier() : super(WallpaperType.desertGradient) {
     _loadFromHive();
   }
 
@@ -59,8 +59,8 @@ class WallpaperNotifier extends StateNotifier<WallpaperType> {
   Future<void> reset() async {
     customImagePath = null;
     await _box.delete(_imagePathKey);
-    await _box.put(_wallpaperKey, WallpaperType.black.index);
-    state = WallpaperType.black;
+    await _box.put(_wallpaperKey, WallpaperType.desertGradient.index);
+    state = WallpaperType.desertGradient;
   }
 }
 

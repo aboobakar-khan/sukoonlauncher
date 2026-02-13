@@ -67,7 +67,9 @@ class DownloadStatus {
     );
   }
 
-  bool get isComplete => tafseerComplete && hadithComplete && duaComplete;
+  /// Core content is complete when duas and hadiths are done.
+  /// Tafseer is optional and user-initiated.
+  bool get isComplete => hadithComplete && duaComplete;
   
   double get overallProgress {
     int completed = 0;
@@ -227,11 +229,8 @@ class OfflineContentManager extends StateNotifier<DownloadStatus> {
         await _downloadHadiths();
       }
       
-      // 3. Download Tafseer (all 114 surahs)
-      if (!state.tafseerComplete && !_isPaused) {
-        debugPrint('OfflineContentManager: Downloading tafseer...');
-        await _downloadTafseer();
-      }
+      // NOTE: Tafseer is NOT auto-downloaded.
+      // Users can trigger it manually via downloadTafseerManually().
       
       // Save completion time
       if (state.isComplete) {
@@ -520,6 +519,50 @@ class OfflineContentManager extends StateNotifier<DownloadStatus> {
     _isPaused = false;
     state = state.copyWith(error: null);
     await startBackgroundDownload();
+  }
+
+  /// Download tafseer on-demand (user-initiated only)
+  Future<void> downloadTafseerManually() async {
+    if (state.tafseerComplete) {
+      debugPrint('OfflineContentManager: Tafseer already complete');
+      return;
+    }
+    if (state.isDownloading) {
+      debugPrint('OfflineContentManager: Already downloading');
+      return;
+    }
+
+    // Check connectivity
+    final connectivity = await Connectivity().checkConnectivity();
+    final hasInternet = connectivity.any((r) =>
+      r == ConnectivityResult.wifi ||
+      r == ConnectivityResult.mobile ||
+      r == ConnectivityResult.ethernet
+    );
+    if (!hasInternet) {
+      state = state.copyWith(error: 'No internet connection');
+      return;
+    }
+
+    _isPaused = false;
+    state = state.copyWith(isDownloading: true, error: null);
+    debugPrint('OfflineContentManager: Manual tafseer download started');
+
+    try {
+      await _downloadTafseer();
+      state = state.copyWith(
+        isDownloading: false,
+        lastDownloadTime: DateTime.now(),
+      );
+      await _box?.put(_lastDownloadKey, DateTime.now().toIso8601String());
+      debugPrint('OfflineContentManager: Manual tafseer download complete');
+    } catch (e) {
+      debugPrint('OfflineContentManager: Manual tafseer download error: $e');
+      state = state.copyWith(
+        isDownloading: false,
+        error: 'Tafseer download failed. Tap to retry.',
+      );
+    }
   }
 
   /// Clear all and re-download

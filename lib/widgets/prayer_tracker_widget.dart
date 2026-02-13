@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/prayer_provider.dart';
 import '../providers/theme_provider.dart';
-import '../providers/sukoon_coin_provider.dart';
+
 import '../screens/prayer_history_dashboard_redesigned.dart';
 
 /// Prayer Tracker Widget - Professional Minimalist Design
@@ -507,13 +507,13 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
                 selectedDate,
                 prayer['name'],
               );
-              // 🪙 Check if all 5 prayers completed → award Sukoon Coins
+              // Check if all 5 prayers completed
               Future.delayed(const Duration(milliseconds: 100), () {
                 final todayRecord = ref.read(todayPrayerRecordProvider);
                 if (todayRecord != null &&
                     todayRecord.fajr && todayRecord.dhuhr && todayRecord.asr &&
                     todayRecord.maghrib && todayRecord.isha) {
-                  ref.read(sukoonCoinProvider.notifier).awardDailyPrayer();
+                  // All prayers completed for today!
                 }
               });
             }

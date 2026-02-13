@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/theme_provider.dart';
 import '../providers/premium_provider.dart';
-import '../providers/sukoon_coin_provider.dart';
+
 import '../screens/premium_paywall_screen.dart';
 
 /// Theme Color Picker Screen with Premium Gating
@@ -18,18 +18,6 @@ class ThemeColorPickerScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentTheme = ref.watch(themeColorProvider);
     final isPremium = ref.watch(premiumProvider).isPremium;
-    final coinState = ref.watch(sukoonCoinProvider);
-
-    // Map theme names to store item IDs
-    const themeStoreMap = {
-      'Purple': 'theme_purple',
-      'Green': 'theme_green',
-      'Blue': 'theme_blue',
-      'Orange': 'theme_orange',
-      'Pink': 'theme_pink',
-      'Cyan': 'theme_cyan',
-      'Amber': 'theme_amber',
-    };
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -53,10 +41,7 @@ class ThemeColorPickerScreen extends ConsumerWidget {
                 itemBuilder: (context, index) {
                   final theme = ThemeColors.all[index];
                   final isSelected = theme.name == currentTheme.name;
-                  // Check if this theme was purchased via Sukoon Coins
-                  final storeId = themeStoreMap[theme.name];
-                  final purchasedViaCoin = storeId != null && coinState.ownsItem(storeId);
-                  final isLocked = !isPremium && !purchasedViaCoin && index >= freeThemeCount;
+                  final isLocked = !isPremium && index >= freeThemeCount;
 
                   return _buildColorOption(
                     context, 

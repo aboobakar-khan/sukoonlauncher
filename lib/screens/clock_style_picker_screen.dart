@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/clock_style_provider.dart';
 import '../providers/premium_provider.dart';
-import '../providers/sukoon_coin_provider.dart';
+
 import 'premium_paywall_screen.dart';
 
 /// Clock Style Picker Screen
@@ -13,21 +13,10 @@ class ClockStylePickerScreen extends ConsumerWidget {
   // First 3 clock styles are free (digital, analog, minimalist)
   static const int freeClockCount = 3;
 
-  // Map clock styles to store item IDs
-  static const _clockStoreMap = {
-    'Analog': 'clock_analog',
-    'Bold': 'clock_bold',
-    'Modern': 'clock_modern',
-    'Retro': 'clock_retro',
-    'Elegant': 'clock_elegant',
-    'Binary': 'clock_binary',
-  };
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentStyle = ref.watch(clockStyleProvider);
     final isPremium = ref.watch(premiumProvider).isPremium;
-    final coinState = ref.watch(sukoonCoinProvider);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -45,9 +34,7 @@ class ClockStylePickerScreen extends ConsumerWidget {
                 itemBuilder: (context, index) {
                   final style = ClockStyle.values[index];
                   final isSelected = style == currentStyle;
-                  final storeId = _clockStoreMap[style.name];
-                  final purchasedViaCoin = storeId != null && coinState.ownsItem(storeId);
-                  final isLocked = !isPremium && !purchasedViaCoin && index >= freeClockCount;
+                  final isLocked = !isPremium && index >= freeClockCount;
 
                   return _buildClockStyleOption(
                     context,
