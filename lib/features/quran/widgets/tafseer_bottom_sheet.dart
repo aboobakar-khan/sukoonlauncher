@@ -93,15 +93,31 @@ class TafseerBottomSheet extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            selectedEdition.name,
-                            style: TextStyle(
-                              color: _richBrown.withOpacity(0.85),
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
+                          // Tafseer edition selector — tap to change
+                          GestureDetector(
+                            onTap: () => _showEditionPicker(context, ref),
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    selectedEdition.name,
+                                    style: TextStyle(
+                                      color: _richBrown.withOpacity(0.85),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  color: _gold.withOpacity(0.6),
+                                  size: 18,
+                                ),
+                              ],
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                           Text(
                             '$surahName • Ayah $ayahId',
@@ -240,5 +256,116 @@ class TafseerBottomSheet extends ConsumerWidget {
         );
       },
     );
+  }
+
+  /// Edition picker — switch tafseer right from the bottom sheet
+  void _showEditionPicker(BuildContext context, WidgetRef ref) {
+    final editionsAsync = ref.read(tafseerEditionsProvider);
+
+    editionsAsync.whenData((editions) {
+      final sortedEditions = [...editions];
+      sortedEditions.sort((a, b) {
+        if (a.language.toLowerCase() == 'english' && b.language.toLowerCase() != 'english') return -1;
+        if (a.language.toLowerCase() != 'english' && b.language.toLowerCase() == 'english') return 1;
+        return a.name.compareTo(b.name);
+      });
+
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: _creamBg,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => Consumer(
+          builder: (ctx, innerRef, _) {
+            final selected = innerRef.watch(selectedTafseerEditionProvider);
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(
+                        color: _warmBrown.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Choose Tafseer',
+                    style: TextStyle(
+                      color: _richBrown.withOpacity(0.85),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 300,
+                    child: ListView.builder(
+                      itemCount: sortedEditions.length,
+                      itemBuilder: (ctx, i) {
+                        final edition = sortedEditions[i];
+                        final isSelected = selected.slug == edition.slug;
+                        return GestureDetector(
+                          onTap: () {
+                            innerRef.read(selectedTafseerEditionProvider.notifier).setEdition(edition);
+                            Navigator.pop(ctx);
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: isSelected ? _islamicGreen.withOpacity(0.08) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected ? _islamicGreen.withOpacity(0.3) : _warmSand,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        edition.name,
+                                        style: TextStyle(
+                                          color: _richBrown.withOpacity(0.8),
+                                          fontSize: 14,
+                                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${edition.authorName} • ${edition.language}',
+                                        style: TextStyle(
+                                          color: _warmBrown.withOpacity(0.5),
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Icon(Icons.check_rounded, color: _islamicGreen, size: 20),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    });
   }
 }

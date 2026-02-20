@@ -27,29 +27,95 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
   late Animation<Offset> _slideAnimation;
   
   int _selectedPlan = 1; // Default to yearly (best value for us)
+  bool _pricesLoaded = false;
 
-  // Pricing (in INR)
-  static const Map<String, Map<String, dynamic>> _plans = {
+  // ── Dynamic pricing fetched from Google Play Console ──
+  // Fallback values shown only while loading or if store unavailable
+  static const Map<String, Map<String, dynamic>> _fallbackPlans = {
     'monthly': {
-      'price': 99,
+      'price': '...',
       'period': 'month',
       'savings': null,
       'badge': null,
     },
     'yearly': {
-      'price': 299,
+      'price': '...',
       'period': 'year',
-      'savings': '75%',
+      'savings': null,
       'badge': 'MOST POPULAR',
-      'monthlyEquivalent': 25,
+      'monthlyEquivalent': null,
     },
     'lifetime': {
-      'price': 799,
+      'price': '...',
       'period': 'once',
       'savings': null,
       'badge': 'BEST VALUE',
     },
   };
+
+  Map<String, Map<String, dynamic>> _plans = {
+    'monthly': {'price': '...', 'period': 'month', 'savings': null, 'badge': null},
+    'yearly': {'price': '...', 'period': 'year', 'savings': null, 'badge': 'MOST POPULAR', 'monthlyEquivalent': null},
+    'lifetime': {'price': '...', 'period': 'once', 'savings': null, 'badge': 'BEST VALUE'},
+  };
+
+  /// Build dynamic plans from Play Store product details
+  void _loadStoreProducts() {
+    final billing = PlayBillingService();
+    final products = billing.products;
+
+    if (products.isEmpty) {
+      _plans = Map.from(_fallbackPlans);
+      _pricesLoaded = false;
+      return;
+    }
+
+    final monthly = billing.getProduct(PlayBillingService.monthlySubId);
+    final yearly = billing.getProduct(PlayBillingService.yearlySubId);
+    final lifetime = billing.getProduct(PlayBillingService.lifetimeId);
+
+    // Calculate savings & monthly equivalent from real prices
+    String? yearlySavings;
+    String? yearlyMonthlyEquivalent;
+    if (monthly != null && yearly != null) {
+      final monthlyRaw = monthly.rawPrice;
+      final yearlyRaw = yearly.rawPrice;
+      if (monthlyRaw > 0) {
+        final yearlyIfMonthly = monthlyRaw * 12;
+        final savedPercent = ((yearlyIfMonthly - yearlyRaw) / yearlyIfMonthly * 100).round();
+        if (savedPercent > 0) yearlySavings = '$savedPercent%';
+        final perMonth = (yearlyRaw / 12).ceil();
+        yearlyMonthlyEquivalent = '$perMonth';
+      }
+    }
+
+    _plans = {
+      'monthly': {
+        'price': monthly?.price ?? '...',
+        'period': 'month',
+        'savings': null,
+        'badge': null,
+        'isStorePrice': monthly != null,
+      },
+      'yearly': {
+        'price': yearly?.price ?? '...',
+        'period': 'year',
+        'savings': yearlySavings,
+        'badge': 'MOST POPULAR',
+        'monthlyEquivalent': yearlyMonthlyEquivalent,
+        'currencySymbol': yearly?.currencySymbol ?? '',
+        'isStorePrice': yearly != null,
+      },
+      'lifetime': {
+        'price': lifetime?.price ?? '...',
+        'period': 'once',
+        'savings': null,
+        'badge': 'BEST VALUE',
+        'isStorePrice': lifetime != null,
+      },
+    };
+    _pricesLoaded = products.isNotEmpty;
+  }
 
   @override
   void initState() {
@@ -68,9 +134,20 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
     
     _animController.forward();
     
-    // Track paywall view
+    // Load real prices from Play Store
+    _loadStoreProducts();
+    
+    // Track paywall view & retry loading prices if store initializing
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(premiumProvider.notifier).trackPaywallView();
+      // Retry price loading after a short delay if products weren't ready
+      if (!_pricesLoaded) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            setState(() => _loadStoreProducts());
+          }
+        });
+      }
     });
   }
 
@@ -596,7 +673,7 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
                           Padding(
                             padding: const EdgeInsets.only(top: 2),
                             child: Text(
-                              'Just ₹${plan['monthlyEquivalent']}/month',
+                              'Just ${plan['currencySymbol'] ?? '₹'}${plan['monthlyEquivalent']}/month',
                               style: TextStyle(color: _gold.withValues(alpha: 0.7), fontSize: 11),
                             ),
                           ),
@@ -613,7 +690,8 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen>
                         textBaseline: TextBaseline.alphabetic,
                         children: [
                           Text(
-                            '₹${plan['price']}',
+                            // Play Store returns pre-formatted price (e.g. "₹99.00")
+                            '${plan['price']}',
                             style: TextStyle(
                               color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.8),
                               fontSize: 20,
@@ -938,9 +1016,10 @@ class _PremiumCelebrationPageState extends State<_PremiumCelebrationPage>
                           ],
                         ),
                         child: const Center(
-                          child: Text(
-                            '🐪',
-                            style: TextStyle(fontSize: 42),
+                          child: Icon(
+                            Icons.check_rounded,
+                            size: 42,
+                            color: _sandGold,
                           ),
                         ),
                       ),

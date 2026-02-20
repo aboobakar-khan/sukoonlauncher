@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../widgets/calendar_widget.dart';
 import '../widgets/daily_challenge_card.dart';
 import '../widgets/prayer_tracker_widget.dart';
-import '../widgets/dhikr_counter_widget.dart';
+import '../widgets/dhikr_summary_widget.dart';
 import 'premium_paywall_screen.dart';
 import 'ramadan_dashboard_screen.dart';
 import '../features/quran/providers/quran_provider.dart';
@@ -55,8 +55,8 @@ class WidgetDashboardScreen extends ConsumerWidget {
 
                   _sectionGap(),
 
-                  // ─── Dhikr Counter ─────────────────────────────
-                  const DhikrCounterWidget(),
+                  // ─── Dhikr Summary — tap to open counter ──
+                  const DhikrSummaryWidget(),
 
                   _sectionGap(),
 

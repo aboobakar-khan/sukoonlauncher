@@ -127,109 +127,398 @@ class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen> {
 
               SizedBox(height: screenHeight * 0.04),
 
-              // 4 cards — 2x2 grid layout
+              // Cards — 2x2 equal grid filling the page
               Expanded(
-                child: Column(
-                  children: [
-                    // Row 1: Focus Timer + Tasks
-                    Expanded(
-                      flex: 3,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildHubCard(
-                              context,
-                              icon: Icons.timer_rounded,
-                              title: 'Focus',
-                              subtitle: pomo.state != PomodoroState.idle
-                                  ? pomo.timeDisplay
-                                  : 'Pomodoro',
-                              color: _desertSunset,
-                              isActive: pomo.state != PomodoroState.idle,
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                Navigator.push(context, MaterialPageRoute(
-                                  builder: (_) => _ProductivitySubScreen(
-                                    title: 'Focus Timer',
-                                    child: _PomodoroTab(),
-                                  ),
-                                ));
-                              },
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Column(
+                    children: [
+                      // ── Top Row: Focus Timer + Tasks ──
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _buildGridCard(
+                                context,
+                                icon: Icons.timer_rounded,
+                                title: 'Focus Timer',
+                                subtitle: pomo.state != PomodoroState.idle
+                                    ? pomo.timeDisplay
+                                    : 'Pomodoro',
+                                color: _desertSunset,
+                                isActive: pomo.state != PomodoroState.idle,
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  Navigator.push(context, MaterialPageRoute(
+                                    builder: (_) => _ProductivitySubScreen(
+                                      title: 'Focus Timer',
+                                      child: _PomodoroTab(),
+                                    ),
+                                  ));
+                                },
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildHubCard(
-                              context,
-                              icon: Icons.check_circle_outline_rounded,
-                              title: 'Tasks',
-                              subtitle: 'Todo & Events',
-                              color: _oasisGreen,
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                Navigator.push(context, MaterialPageRoute(
-                                  builder: (_) => _ProductivitySubScreen(
-                                    title: 'Tasks',
-                                    child: _TodoTab(),
-                                  ),
-                                ));
-                              },
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildGridCard(
+                                context,
+                                icon: Icons.check_circle_outline_rounded,
+                                title: 'Tasks',
+                                subtitle: 'Todo & Events',
+                                color: _oasisGreen,
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  Navigator.push(context, MaterialPageRoute(
+                                    builder: (_) => _ProductivitySubScreen(
+                                      title: 'Tasks',
+                                      child: _TodoTab(),
+                                    ),
+                                  ));
+                                },
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Row 2: Doubts + App Blocker
-                    Expanded(
-                      flex: 3,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildHubCard(
-                              context,
-                              icon: Icons.psychology_rounded,
-                              title: 'Doubts',
-                              subtitle: 'Academic',
-                              color: _sandGold,
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                Navigator.push(context, MaterialPageRoute(
-                                  builder: (_) => _ProductivitySubScreen(
-                                    title: 'Doubts',
-                                    child: _DoubtsTab(),
-                                  ),
-                                ));
-                              },
+                      const SizedBox(height: 12),
+                      // ── Bottom Row: Doubts + App Blocker ──
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _buildGridCard(
+                                context,
+                                icon: Icons.psychology_rounded,
+                                title: 'Doubts',
+                                subtitle: 'Academic notes',
+                                color: _sandGold,
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  Navigator.push(context, MaterialPageRoute(
+                                    builder: (_) => _ProductivitySubScreen(
+                                      title: 'Doubts',
+                                      child: _DoubtsTab(),
+                                    ),
+                                  ));
+                                },
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildHubCard(
-                              context,
-                              icon: Icons.shield_outlined,
-                              title: 'Block',
-                              subtitle: 'App Blocker',
-                              color: _warmBrown,
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                Navigator.push(context, MaterialPageRoute(
-                                  builder: (_) => _ProductivitySubScreen(
-                                    title: 'App Blocker',
-                                    child: _BlockerTab(),
-                                  ),
-                                ));
-                              },
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildGridCard(
+                                context,
+                                icon: Icons.shield_outlined,
+                                title: 'Blocker',
+                                subtitle: 'Block apps',
+                                color: _warmBrown,
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  Navigator.push(context, MaterialPageRoute(
+                                    builder: (_) => _ProductivitySubScreen(
+                                      title: 'App Blocker',
+                                      child: _BlockerTab(),
+                                    ),
+                                  ));
+                                },
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Equal-sized grid card — fills available space in 2×2 grid
+  Widget _buildGridCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+    bool isActive = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: color.withValues(alpha: isActive ? 0.4 : 0.12),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Icon
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const Spacer(),
+            // Title
+            Text(
+              title,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 4),
+            // Subtitle
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: isActive ? color : Colors.white.withValues(alpha: 0.35),
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Arrow
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  color: color.withValues(alpha: 0.7),
+                  size: 16,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Tall vertical bento card — left side of the grid
+  Widget _buildTallCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+    bool isActive = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: color.withValues(alpha: isActive ? 0.4 : 0.12),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Icon
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(icon, color: color, size: 32),
+            ),
+            const Spacer(),
+            // Title
+            Text(
+              title,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Subtitle
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: isActive ? color : Colors.white.withValues(alpha: 0.35),
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Arrow
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    color: color.withValues(alpha: 0.7),
+                    size: 16,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Compact card for the right stacked column
+  Widget _buildCompactCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+    bool isActive = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: color.withValues(alpha: isActive ? 0.3 : 0.12),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: isActive ? color : Colors.white.withValues(alpha: 0.35),
+                    fontSize: 11,
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Full-width featured card — with large icon and descriptive text
+  Widget _buildFeaturedCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+    bool isActive = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: color.withValues(alpha: isActive ? 0.35 : 0.12),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(width: 18),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: isActive ? color : Colors.white.withValues(alpha: 0.35),
+                      fontSize: 12,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.white.withValues(alpha: 0.15),
+              size: 22,
+            ),
+          ],
         ),
       ),
     );
@@ -247,8 +536,8 @@ class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: double.infinity,
         padding: const EdgeInsets.all(20),
+        height: 150,
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(20),
@@ -1225,15 +1514,33 @@ class _PomodoroTab extends ConsumerStatefulWidget {
 
 class _PomodoroTabState extends ConsumerState<_PomodoroTab> {
   int _prevSessionCount = 0;
+  final List<String> _motivationalQuotes = const [
+    '"The secret of getting ahead is getting started."',
+    '"Focus on being productive, not busy."',
+    '"Small daily improvements are the key."',
+    '"Deep work is the superpower of the 21st century."',
+    '"Discipline is choosing between what you want now and what you want most."',
+    '"One hour of focused work beats three of distracted."',
+    '"You don\'t need more time — you need more focus."',
+    '"Starve your distractions, feed your focus."',
+  ];
+
+  String get _todayQuote {
+    final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year)).inDays;
+    return _motivationalQuotes[dayOfYear % _motivationalQuotes.length];
+  }
 
   @override
   Widget build(BuildContext context) {
     final pomo = ref.watch(pomodoroProvider);
     final todos = ref.watch(todoProvider).where((t) => !t.isCompleted).toList();
+    final focusCat = ref.watch(focusCategoryProvider);
+    final streak = ref.watch(focusStreakProvider);
 
-    // Track session completion
+    // Track session completion for streak
     if (pomo.completedSessions > _prevSessionCount) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(focusStreakProvider.notifier).recordSession();
         setState(() => _prevSessionCount = pomo.completedSessions);
       });
     }
@@ -1246,277 +1553,544 @@ class _PomodoroTabState extends ConsumerState<_PomodoroTab> {
       PomodoroState.paused: Colors.white.withValues(alpha: 0.4),
     };
 
-    final stateLabels = {
-      PomodoroState.idle: 'Ready to Focus',
-      PomodoroState.focusing: 'Stay Focused 🌙',
-      PomodoroState.shortBreak: 'Short Break',
-      PomodoroState.longBreak: 'Long Break',
-      PomodoroState.paused: 'Paused',
-    };
-
     final accent = stateColors[pomo.state]!;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        children: [
-          const Spacer(flex: 1),
+    final isFocusActive = pomo.state == PomodoroState.focusing;
+    final isBreakActive = pomo.state == PomodoroState.shortBreak;
+    final isLongActive = pomo.state == PomodoroState.longBreak;
 
-          // ── Preset chips (only when idle) ──
-          if (pomo.state == PomodoroState.idle) ...[
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+
+            // ── Top Row: Streak + Settings ──
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _PresetChip(
-                  label: '25 / 5',
-                  subtitle: 'Classic',
-                  isSelected: pomo.settings.focusMinutes == 25 && pomo.settings.shortBreakMinutes == 5,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    ref.read(pomodoroProvider.notifier).updateSettings(
-                      PomodoroSettings(focusMinutes: 25, shortBreakMinutes: 5, longBreakMinutes: 15, sessionsBeforeLongBreak: pomo.settings.sessionsBeforeLongBreak),
-                    );
-                  },
+                // Streak badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: _sandGold.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _sandGold.withValues(alpha: 0.15)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('🔥', style: TextStyle(fontSize: 14)),
+                      const SizedBox(width: 6),
+                      Text(
+                        '$streak day${streak != 1 ? 's' : ''}',
+                        style: TextStyle(
+                          color: _sandGold,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 8),
-                _PresetChip(
-                  label: '50 / 10',
-                  subtitle: 'Extended',
-                  isSelected: pomo.settings.focusMinutes == 50 && pomo.settings.shortBreakMinutes == 10,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    ref.read(pomodoroProvider.notifier).updateSettings(
-                      PomodoroSettings(focusMinutes: 50, shortBreakMinutes: 10, longBreakMinutes: 20, sessionsBeforeLongBreak: pomo.settings.sessionsBeforeLongBreak),
-                    );
-                  },
-                ),
-                const SizedBox(width: 8),
-                _PresetChip(
-                  label: '90',
-                  subtitle: 'Deep',
-                  isSelected: pomo.settings.focusMinutes == 90,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    ref.read(pomodoroProvider.notifier).updateSettings(
-                      PomodoroSettings(focusMinutes: 90, shortBreakMinutes: 15, longBreakMinutes: 30, sessionsBeforeLongBreak: 2),
-                    );
-                  },
-                ),
-                const SizedBox(width: 8),
-                // Custom — opens settings
+                const Spacer(),
+                // Settings gear
                 GestureDetector(
                   onTap: () => _showPomodoroSettings(context, ref, pomo.settings),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    width: 40, height: 40,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.04),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                     ),
-                    child: Icon(Icons.tune_rounded, size: 16, color: Colors.white.withValues(alpha: 0.35)),
+                    child: Icon(Icons.settings_rounded, size: 18, color: Colors.white.withValues(alpha: 0.4)),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-          ],
+            const SizedBox(height: 12),
 
-          // ── Timer Ring ──
-          SizedBox(
-            width: 220,
-            height: 220,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Background ring
-                SizedBox(
-                  width: 200,
-                  height: 200,
-                  child: CircularProgressIndicator(
-                    value: 1.0,
-                    strokeWidth: 4,
-                    color: Colors.white.withValues(alpha: 0.06),
-                  ),
-                ),
-                // Progress ring
-                SizedBox(
-                  width: 200,
-                  height: 200,
-                  child: CircularProgressIndicator(
-                    value: pomo.progress,
-                    strokeWidth: 4,
-                    color: accent,
-                    strokeCap: StrokeCap.round,
-                  ),
-                ),
-                // Time display
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      pomo.timeDisplay,
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.w200,
-                        color: Colors.white.withValues(alpha: 0.9),
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      stateLabels[pomo.state]!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: accent,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Session dots
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              pomo.settings.sessionsBeforeLongBreak,
-              (i) => Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: i < pomo.completedSessions
-                      ? _oasisGreen
-                      : Colors.white.withValues(alpha: 0.12),
-                ),
+            // ── Motivational quote ──
+            Text(
+              _todayQuote,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.25),
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                height: 1.5,
               ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${pomo.totalFocusMinutesToday} min focused today',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.white.withValues(alpha: 0.3),
-            ),
-          ),
-          const Spacer(),
-          // Controls
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // When paused: show Resume + Break
-              if (pomo.state == PomodoroState.paused) ...[
-                _CircleButton(
-                  icon: Icons.play_arrow_rounded,
-                  color: _desertSunset.withValues(alpha: 0.2),
-                  size: 64,
-                  iconSize: 32,
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    ref.read(pomodoroProvider.notifier).resume();
-                  },
-                ),
-                const SizedBox(width: 24),
-                _CircleButton(
-                  icon: Icons.coffee_rounded,
-                  color: _oasisGreen.withValues(alpha: 0.2),
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    ref.read(pomodoroProvider.notifier).startBreak();
-                  },
-                ),
-              ]
-              // When running: show Stop + Pause
-              else if (pomo.state != PomodoroState.idle) ...[
-                _CircleButton(
-                  icon: Icons.stop_rounded,
-                  color: Colors.white.withValues(alpha: 0.2),
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    ref.read(pomodoroProvider.notifier).reset();
-                  },
-                ),
-                const SizedBox(width: 24),
-                _CircleButton(
-                  icon: Icons.pause_rounded,
-                  color: accent.withValues(alpha: 0.2),
-                  size: 64,
-                  iconSize: 32,
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    ref.read(pomodoroProvider.notifier).pause();
-                  },
-                ),
-              ]
-              // When idle: show Play (+ Break if sessions > 0)
-              else ...[
-                _CircleButton(
-                  icon: Icons.play_arrow_rounded,
-                  color: accent.withValues(alpha: 0.2),
-                  size: 64,
-                  iconSize: 32,
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    ref.read(pomodoroProvider.notifier)
-                        .startFocus(todoId: pomo.activeTodoId);
-                  },
-                ),
-                if (pomo.completedSessions > 0) ...[
-                  const SizedBox(width: 24),
-                  _CircleButton(
-                    icon: Icons.coffee_rounded,
-                    color: _oasisGreen.withValues(alpha: 0.2),
+            const SizedBox(height: 20),
+
+            // ── Focus / Break / Long — Mode tabs ──
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  _buildModeTab(
+                    label: 'Focus',
+                    isActive: pomo.state == PomodoroState.idle || isFocusActive || (pomo.state == PomodoroState.paused && pomo.previousState == PomodoroState.focusing),
+                    color: _desertSunset,
                     onTap: () {
-                      HapticFeedback.lightImpact();
+                      if (pomo.state == PomodoroState.idle) {
+                        HapticFeedback.mediumImpact();
+                        ref.read(pomodoroProvider.notifier).startFocus(todoId: pomo.activeTodoId);
+                      }
+                    },
+                  ),
+                  _buildModeTab(
+                    label: 'Break',
+                    isActive: isBreakActive || (pomo.state == PomodoroState.paused && pomo.previousState == PomodoroState.shortBreak),
+                    color: _oasisGreen,
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      ref.read(pomodoroProvider.notifier).startBreak();
+                    },
+                  ),
+                  _buildModeTab(
+                    label: 'Long',
+                    isActive: isLongActive || (pomo.state == PomodoroState.paused && pomo.previousState == PomodoroState.longBreak),
+                    color: _sandGold,
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      final pn = ref.read(pomodoroProvider.notifier);
+                      // Force long break
+                      pn.updateSettings(pomo.settings); // ensure same settings
                       ref.read(pomodoroProvider.notifier).startBreak();
                     },
                   ),
                 ],
-              ],
-            ],
-          ),
-          const Spacer(),
-          // Link to todo
-          if (todos.isNotEmpty)
-            _LinkTodoRow(
-              activeTodoId: pomo.activeTodoId,
-              todos: todos,
-              onSelect: (id) {
-                ref.read(pomodoroProvider.notifier).startFocus(todoId: id);
-              },
-            ),
-          // Sound quick-toggle (only when idle or focusing)
-          if (pomo.state == PomodoroState.idle || pomo.state == PomodoroState.focusing || pomo.state == PomodoroState.paused)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Consumer(
-                builder: (ctx, sRef, _) {
-                  final sound = sRef.watch(ambientSoundProvider);
-                  final currentSound = sound.currentSoundId != null
-                      ? ambientSounds.firstWhere((s) => s.id == sound.currentSoundId, orElse: () => ambientSounds.first)
-                      : null;
-                  return GestureDetector(
-                    onTap: () => _showPomodoroSettings(context, ref, pomo.settings),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          sound.isPlaying ? '${currentSound?.emoji ?? '🎵'} ${currentSound?.name ?? 'Sound'}' : '🔇 No sound',
-                          style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.3)),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(Icons.chevron_right_rounded, size: 14, color: Colors.white.withValues(alpha: 0.2)),
-                      ],
-                    ),
-                  );
-                },
               ),
             ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 28),
+
+            // ── BIG Circular Timer ──
+            SizedBox(
+              width: 260,
+              height: 260,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Background ring
+                  SizedBox(
+                    width: 240,
+                    height: 240,
+                    child: CircularProgressIndicator(
+                      value: 1.0,
+                      strokeWidth: 6,
+                      color: Colors.white.withValues(alpha: 0.05),
+                    ),
+                  ),
+                  // Progress ring
+                  SizedBox(
+                    width: 240,
+                    height: 240,
+                    child: CircularProgressIndicator(
+                      value: pomo.progress,
+                      strokeWidth: 6,
+                      color: accent,
+                      strokeCap: StrokeCap.round,
+                    ),
+                  ),
+                  // Center content
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        pomo.timeDisplay,
+                        style: TextStyle(
+                          fontSize: 56,
+                          fontWeight: FontWeight.w200,
+                          color: Colors.white.withValues(alpha: 0.9),
+                          letterSpacing: 3,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      // Session dots inside timer
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(
+                          pomo.settings.sessionsBeforeLongBreak,
+                          (i) => Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: i < pomo.completedSessions
+                                  ? _oasisGreen
+                                  : Colors.white.withValues(alpha: 0.1),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Control Buttons ──
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (pomo.state == PomodoroState.paused) ...[
+                  // Resume
+                  _CircleButton(
+                    icon: Icons.play_arrow_rounded,
+                    color: _desertSunset.withValues(alpha: 0.2),
+                    size: 64,
+                    iconSize: 32,
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      ref.read(pomodoroProvider.notifier).resume();
+                    },
+                  ),
+                  const SizedBox(width: 20),
+                  _CircleButton(
+                    icon: Icons.stop_rounded,
+                    color: Colors.white.withValues(alpha: 0.08),
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      ref.read(pomodoroProvider.notifier).reset();
+                    },
+                  ),
+                ] else if (pomo.state != PomodoroState.idle) ...[
+                  // Pause
+                  _CircleButton(
+                    icon: Icons.pause_rounded,
+                    color: accent.withValues(alpha: 0.2),
+                    size: 64,
+                    iconSize: 32,
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      ref.read(pomodoroProvider.notifier).pause();
+                    },
+                  ),
+                  const SizedBox(width: 20),
+                  _CircleButton(
+                    icon: Icons.stop_rounded,
+                    color: Colors.white.withValues(alpha: 0.08),
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      ref.read(pomodoroProvider.notifier).reset();
+                    },
+                  ),
+                ] else ...[
+                  // Start
+                  _CircleButton(
+                    icon: Icons.play_arrow_rounded,
+                    color: _desertSunset.withValues(alpha: 0.15),
+                    size: 64,
+                    iconSize: 32,
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      ref.read(pomodoroProvider.notifier).startFocus(todoId: pomo.activeTodoId);
+                    },
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 22),
+
+            // ── Focus Category Chips ──
+            SizedBox(
+              height: 36,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  ...focusCat.categories.map((cat) {
+                    final isActive = focusCat.activeCategory == cat;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          ref.read(focusCategoryProvider.notifier).select(cat);
+                        },
+                        onLongPress: () => _showDeleteCategoryDialog(cat),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? _sandGold.withValues(alpha: 0.12)
+                                : Colors.white.withValues(alpha: 0.04),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isActive
+                                  ? _sandGold.withValues(alpha: 0.4)
+                                  : Colors.white.withValues(alpha: 0.06),
+                            ),
+                          ),
+                          child: Text(
+                            cat,
+                            style: TextStyle(
+                              color: isActive ? _sandGold : Colors.white.withValues(alpha: 0.4),
+                              fontSize: 12,
+                              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                  // Add custom
+                  GestureDetector(
+                    onTap: () => _showAddCategoryDialog(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.06), style: BorderStyle.solid),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_rounded, size: 14, color: Colors.white.withValues(alpha: 0.3)),
+                          const SizedBox(width: 4),
+                          Text('Add', style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.3))),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // ── Link to Todo ──
+            if (todos.isNotEmpty)
+              _LinkTodoRow(
+                activeTodoId: pomo.activeTodoId,
+                todos: todos,
+                onSelect: (id) {
+                  ref.read(pomodoroProvider.notifier).startFocus(todoId: id);
+                },
+              ),
+
+            const SizedBox(height: 14),
+
+            // ── Stats Bar ──
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.03),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+              ),
+              child: Row(
+                children: [
+                  // Time today
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          '${pomo.totalFocusMinutesToday}',
+                          style: TextStyle(
+                            color: _desertSunset,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'min today',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(width: 1, height: 28, color: Colors.white.withValues(alpha: 0.06)),
+                  // Sessions
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          '${pomo.completedSessions}',
+                          style: TextStyle(
+                            color: _oasisGreen,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'sessions',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(width: 1, height: 28, color: Colors.white.withValues(alpha: 0.06)),
+                  // Streak
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          '$streak',
+                          style: TextStyle(
+                            color: _sandGold,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'day streak',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Sound quick-toggle ──
+            if (pomo.state == PomodoroState.idle || pomo.state == PomodoroState.focusing || pomo.state == PomodoroState.paused)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Consumer(
+                  builder: (ctx, sRef, _) {
+                    final sound = sRef.watch(ambientSoundProvider);
+                    final currentSound = sound.currentSoundId != null
+                        ? ambientSounds.firstWhere((s) => s.id == sound.currentSoundId, orElse: () => ambientSounds.first)
+                        : null;
+                    return GestureDetector(
+                      onTap: () => _showPomodoroSettings(context, ref, pomo.settings),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            sound.isPlaying ? '${currentSound?.emoji ?? '🎵'} ${currentSound?.name ?? 'Sound'}' : '🔇 No sound',
+                            style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.3)),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.chevron_right_rounded, size: 14, color: Colors.white.withValues(alpha: 0.2)),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModeTab({
+    required String label,
+    required bool isActive,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive ? color.withValues(alpha: 0.12) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isActive ? color : Colors.white.withValues(alpha: 0.35),
+                fontSize: 13,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteCategoryDialog(String category) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Remove "$category"?', style: const TextStyle(color: Colors.white, fontSize: 16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
+          ),
+          TextButton(
+            onPressed: () {
+              ref.read(focusCategoryProvider.notifier).remove(category);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Remove', style: TextStyle(color: _desertSunset)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddCategoryDialog() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Add Focus Category', style: TextStyle(color: Colors.white, fontSize: 16)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          decoration: InputDecoration(
+            hintText: 'e.g. Studying, Design...',
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.05),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
+          ),
+          TextButton(
+            onPressed: () {
+              if (ctrl.text.trim().isNotEmpty) {
+                ref.read(focusCategoryProvider.notifier).add(ctrl.text.trim());
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Add', style: TextStyle(color: _sandGold)),
+          ),
         ],
       ),
     );
@@ -1729,6 +2303,102 @@ class _PomodoroTabState extends ConsumerState<_PomodoroTab> {
 
               const SizedBox(height: 22),
 
+              // ── Quick Presets ──
+              Row(
+                children: [
+                  Icon(Icons.timer_rounded, color: _sandGold.withValues(alpha: 0.5), size: 16),
+                  const SizedBox(width: 8),
+                  Text('Quick Presets',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14, fontWeight: FontWeight.w600)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _buildPresetButton('25 / 5', focus == 25 && shortBreak == 5, () {
+                    setBS(() { focus = 25; shortBreak = 5; longBreak = 15; });
+                  }),
+                  const SizedBox(width: 8),
+                  _buildPresetButton('50 / 10', focus == 50 && shortBreak == 10, () {
+                    setBS(() { focus = 50; shortBreak = 10; longBreak = 20; });
+                  }),
+                  const SizedBox(width: 8),
+                  _buildPresetButton('90 min', focus == 90, () {
+                    setBS(() { focus = 90; shortBreak = 15; longBreak = 30; });
+                  }),
+                ],
+              ),
+
+              const SizedBox(height: 22),
+
+              // ── Focus History ──
+              Row(
+                children: [
+                  Icon(Icons.history_rounded, color: _sandGold.withValues(alpha: 0.5), size: 16),
+                  const SizedBox(width: 8),
+                  Text('Today\'s History',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14, fontWeight: FontWeight.w600)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Consumer(
+                builder: (ctx, hRef, _) {
+                  final pomo = hRef.watch(pomodoroProvider);
+                  final streak = hRef.watch(focusStreakProvider);
+                  return Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            _buildHistoryStat('🍅', '${pomo.completedSessions}', 'Sessions'),
+                            const SizedBox(width: 16),
+                            _buildHistoryStat('⏱️', '${pomo.totalFocusMinutesToday}', 'Minutes'),
+                            const SizedBox(width: 16),
+                            _buildHistoryStat('🔥', '$streak', 'Day Streak'),
+                          ],
+                        ),
+                        if (pomo.completedSessions > 0) ...[
+                          const SizedBox(height: 12),
+                          Container(height: 1, color: Colors.white.withValues(alpha: 0.04)),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Text(
+                                'Sessions completed',
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 11),
+                              ),
+                              const Spacer(),
+                              // Session progress bar
+                              ...List.generate(pomo.settings.sessionsBeforeLongBreak, (i) {
+                                return Container(
+                                  margin: const EdgeInsets.only(left: 4),
+                                  width: 16,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(3),
+                                    color: i < pomo.completedSessions
+                                        ? _oasisGreen.withValues(alpha: 0.7)
+                                        : Colors.white.withValues(alpha: 0.06),
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 22),
+
               // ── Save Button ──
               GestureDetector(
                 onTap: () {
@@ -1801,6 +2471,68 @@ class _PomodoroTabState extends ConsumerState<_PomodoroTab> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPresetButton(String label, bool isSelected, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? _sandGold.withValues(alpha: 0.12)
+                : Colors.white.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected
+                  ? _sandGold.withValues(alpha: 0.35)
+                  : Colors.white.withValues(alpha: 0.06),
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? _sandGold : Colors.white.withValues(alpha: 0.4),
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryStat(String emoji, String value, String label) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 16)),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.3),
+              fontSize: 10,
+            ),
+          ),
+        ],
       ),
     );
   }

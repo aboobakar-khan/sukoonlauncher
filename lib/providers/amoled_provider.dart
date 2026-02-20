@@ -4,14 +4,14 @@ import 'package:hive/hive.dart';
 /// AMOLED Display Mode Provider
 /// When enabled, forces pure #000000 backgrounds everywhere
 /// for maximum battery saving on OLED/AMOLED screens.
-/// Enabled by default.
+/// Disabled by default so users see the desert gradient wallpaper.
 
 final amoledProvider = StateNotifierProvider<AmoledNotifier, bool>(
   (ref) => AmoledNotifier(),
 );
 
 class AmoledNotifier extends StateNotifier<bool> {
-  AmoledNotifier() : super(true) {
+  AmoledNotifier() : super(false) {
     _load();
   }
 

@@ -7,7 +7,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../screens/daily_challenges_analytics_screen.dart';
 import '../screens/dhikr_history_pro_dashboard_redesigned.dart';
 import '../screens/productivity_hub_screen.dart';
-import '../screens/deen_mode_entry_screen.dart';
+
 import '../screens/minimalist_duas_screen.dart';
 import '../features/quran/screens/surah_list_screen.dart';
 import '../features/quran/screens/surah_reader_screen.dart';
@@ -69,7 +69,7 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
       {'id': 'good_deed', 'type': 'lifestyle', 'title': 'Do a secret good deed', 'icon': '💝', 'points': 25, 'reward': 'Sadaqah reward', 'action': 'none'},
       {'id': 'learn_deen', 'type': 'lifestyle', 'title': 'Learn something Islamic', 'icon': '🎓', 'points': 20, 'reward': 'Knowledge seeker', 'action': 'hadith_dua'},
       {'id': 'help_someone', 'type': 'lifestyle', 'title': 'Help a fellow Muslim', 'icon': '🤝', 'points': 25, 'reward': 'Brotherhood', 'action': 'none'},
-      {'id': 'deen_mode', 'type': 'lifestyle', 'title': 'Use Deen Mode 30 min', 'icon': '🕌', 'points': 30, 'reward': 'Spiritual focus', 'action': 'deen_mode'},
+
       {'id': 'pomodoro_session', 'type': 'lifestyle', 'title': 'Complete a focus session', 'icon': '⏱️', 'points': 20, 'reward': 'Productive day', 'action': 'pomodoro'},
     ];
     
@@ -176,9 +176,7 @@ class _DailyIslamicChallengeCardState extends ConsumerState<DailyIslamicChalleng
       case 'app_blocker':
         screen = const ProductivityHubScreen();
         break;
-      case 'deen_mode':
-        screen = const DeenModeEntryScreen();
-        break;
+
       case 'pomodoro':
         screen = const ProductivityHubScreen();
         break;

@@ -19,6 +19,7 @@ import '../widgets/quick_search_overlay.dart';
 import '../widgets/offline_download_indicator.dart';
 import '../providers/ramadan_provider.dart';
 import 'app_list_screen.dart';
+import 'clock_style_picker_screen.dart';
 import 'favorite_picker_screen.dart';
 
 /// Home Clock Screen - Minimalist clock and date display
@@ -173,13 +174,24 @@ class _HomeClockScreenState extends ConsumerState<HomeClockScreen> {
                   
                   const SizedBox(height: 30),
 
-                  // Clock widget based on selected style at top center
+                  // Clock widget — tap to open clock style picker
                   Center(
-                    child: _buildClockWidget(
-                      clockStyle,
-                      themeColor,
-                      timeFormat,
-                      clockOpacity.value,
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ClockStylePickerScreen(),
+                          ),
+                        );
+                      },
+                      child: _buildClockWidget(
+                        clockStyle,
+                        themeColor,
+                        timeFormat,
+                        clockOpacity.value,
+                      ),
                     ),
                   ),
 
@@ -195,14 +207,26 @@ class _HomeClockScreenState extends ConsumerState<HomeClockScreen> {
                 ],
               ),
 
-              // Favorite apps at the bottom (or empty state for first-time users)
+              // Favorite apps at the bottom — tap anywhere to open picker
               Positioned(
                 left: 20,
                 right: 20,
                 bottom: 59 + MediaQuery.of(context).padding.bottom,
-                child: favorites.isNotEmpty
-                    ? _buildFavoriteApps(themeColor)
-                    : _buildEmptyFavoritesHint(themeColor),
+                child: GestureDetector(
+                  onLongPress: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const FavoritePickerScreen(),
+                      ),
+                    );
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: favorites.isNotEmpty
+                      ? _buildFavoriteApps(themeColor)
+                      : _buildEmptyFavoritesHint(themeColor),
+                ),
               ),
 
               // Quick action buttons at the corners bottom

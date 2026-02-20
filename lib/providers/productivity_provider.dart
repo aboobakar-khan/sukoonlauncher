@@ -730,3 +730,136 @@ final appBlockRuleProvider =
     StateNotifierProvider<AppBlockRuleNotifier, List<AppBlockRule>>(
   (ref) => AppBlockRuleNotifier(),
 );
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🏷️ FOCUS CATEGORY PROVIDER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class FocusCategoryState {
+  final List<String> categories;
+  final String? activeCategory;
+
+  const FocusCategoryState({
+    this.categories = const ['Studying', 'Prototyping', 'Homework', 'Reading', 'Work'],
+    this.activeCategory,
+  });
+
+  FocusCategoryState copyWith({
+    List<String>? categories,
+    String? activeCategory,
+    bool clearActive = false,
+  }) {
+    return FocusCategoryState(
+      categories: categories ?? this.categories,
+      activeCategory: clearActive ? null : (activeCategory ?? this.activeCategory),
+    );
+  }
+}
+
+class FocusCategoryNotifier extends StateNotifier<FocusCategoryState> {
+  FocusCategoryNotifier() : super(const FocusCategoryState()) {
+    _init();
+  }
+
+  Future<void> _init() async {
+    final box = await Hive.openBox<List>('focus_categories');
+    final saved = box.get('categories');
+    if (saved != null && saved.isNotEmpty) {
+      state = state.copyWith(categories: saved.cast<String>());
+    }
+    final active = box.get('activeCategory');
+    if (active != null && active.isNotEmpty) {
+      state = state.copyWith(activeCategory: active.first as String);
+    }
+  }
+
+  Future<void> _save() async {
+    final box = await Hive.openBox<List>('focus_categories');
+    await box.put('categories', state.categories);
+    await box.put('activeCategory',
+        state.activeCategory != null ? [state.activeCategory] : []);
+  }
+
+  void select(String category) {
+    state = state.copyWith(
+      activeCategory: category,
+      clearActive: state.activeCategory == category,
+    );
+    _save();
+  }
+
+  Future<void> add(String category) async {
+    if (category.isEmpty || state.categories.contains(category)) return;
+    state = state.copyWith(categories: [...state.categories, category]);
+    await _save();
+  }
+
+  Future<void> remove(String category) async {
+    state = state.copyWith(
+      categories: state.categories.where((c) => c != category).toList(),
+      clearActive: state.activeCategory == category,
+    );
+    await _save();
+  }
+}
+
+final focusCategoryProvider =
+    StateNotifierProvider<FocusCategoryNotifier, FocusCategoryState>(
+  (ref) => FocusCategoryNotifier(),
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🏆 FOCUS STREAK PROVIDER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class FocusStreakNotifier extends StateNotifier<int> {
+  FocusStreakNotifier() : super(0) {
+    _init();
+  }
+
+  Future<void> _init() async {
+    final box = await Hive.openBox('focus_streak');
+    final lastDate = box.get('lastFocusDate') as String?;
+    final streak = box.get('streak') as int? ?? 0;
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month}-${today.day}';
+    final yesterday = today.subtract(const Duration(days: 1));
+    final yesterdayStr = '${yesterday.year}-${yesterday.month}-${yesterday.day}';
+
+    if (lastDate == todayStr) {
+      state = streak;
+    } else if (lastDate == yesterdayStr) {
+      state = streak; // hasn't focused today yet, but streak preserved
+    } else {
+      state = 0; // streak broken
+      await box.put('streak', 0);
+    }
+  }
+
+  Future<void> recordSession() async {
+    final box = await Hive.openBox('focus_streak');
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month}-${today.day}';
+    final lastDate = box.get('lastFocusDate') as String?;
+
+    if (lastDate != todayStr) {
+      // First session today — increment streak
+      final yesterday = today.subtract(const Duration(days: 1));
+      final yesterdayStr = '${yesterday.year}-${yesterday.month}-${yesterday.day}';
+      final currentStreak = box.get('streak') as int? ?? 0;
+
+      if (lastDate == yesterdayStr || lastDate == null) {
+        state = currentStreak + 1;
+      } else {
+        state = 1; // streak was broken, start fresh
+      }
+      await box.put('streak', state);
+      await box.put('lastFocusDate', todayStr);
+    }
+  }
+}
+
+final focusStreakProvider =
+    StateNotifierProvider<FocusStreakNotifier, int>(
+  (ref) => FocusStreakNotifier(),
+);

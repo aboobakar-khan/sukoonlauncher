@@ -17,7 +17,7 @@ import 'launcher_shell.dart';
 ///  • Staggered micro-animations — elements appear with choreographed timing
 ///  • Parallax depth — background layers move at different speeds
 ///  • Psychology-based UX — hook → pain → solution → value → commitment
-///  • Consistent sukoon/desert brand tokens throughout
+///  • Consistent sukoon brand tokens throughout
 ///  • Responsive layout — adapts to any screen size
 ///  • Haptic feedback on every interaction
 ///
@@ -196,7 +196,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                 Expanded(
                   child: PageView(
                     controller: _pageController,
-                    physics: const ClampingScrollPhysics(),
+                    physics: const NeverScrollableScrollPhysics(),
                     onPageChanged: (i) {
                       setState(() => _currentPage = i);
                       _entranceController.reset();
@@ -373,10 +373,10 @@ class _PageHook extends StatelessWidget {
             entrance: entrance,
             delay: 0.15,
             child: const Text(
-              'Your Phone.\nYour Rules.',
+              'Assalamu Alaikum',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 38,
+                fontSize: 36,
                 fontWeight: FontWeight.w800,
                 color: _textPrimary,
                 height: 1.12,
@@ -392,7 +392,7 @@ class _PageHook extends StatelessWidget {
             entrance: entrance,
             delay: 0.30,
             child: Text(
-              'Join thousands of mindful Muslims\nwho reclaimed their focus and time.',
+              'A mindful launcher designed for\nMuslims who value their time.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 15.5,
@@ -854,7 +854,7 @@ class _StaggeredFade extends StatelessWidget {
   }
 }
 
-/// Brand icon with ambient glow
+/// Brand icon with Islamic crescent motif and ambient glow
 class _BrandIcon extends StatelessWidget {
   final double size;
   const _BrandIcon({required this.size});
@@ -875,8 +875,30 @@ class _BrandIcon extends StatelessWidget {
         ],
       ),
       child: Center(
-        child: Text(
-            '\u{1F42A}', style: TextStyle(fontSize: size)),
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                _gold.withValues(alpha: 0.15),
+                _gold.withValues(alpha: 0.05),
+              ],
+            ),
+            border: Border.all(
+              color: _gold.withValues(alpha: 0.2),
+              width: 1.5,
+            ),
+          ),
+          child: Icon(
+            Icons.nightlight_round,
+            size: size * 0.5,
+            color: _gold,
+          ),
+        ),
       ),
     );
   }

@@ -540,7 +540,7 @@ class _AppListScreenState extends ConsumerState<AppListScreen>
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Icon(
-                Icons.tune_rounded,
+                Icons.settings_rounded,
                 color: Colors.white.withValues(alpha: 0.25),
                 size: 20,
               ),

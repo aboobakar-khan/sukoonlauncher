@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'models/note.dart';
-import 'models/deen_mode.dart';
 import 'models/favorite_app.dart';
 import 'models/installed_app.dart';
 import 'models/prayer_record.dart';
@@ -22,7 +21,6 @@ void main() async {
   await Hive.initFlutter();
 
   Hive.registerAdapter(NoteAdapter());
-  Hive.registerAdapter(DeenModeSettingsAdapter()); // Deen Mode
   Hive.registerAdapter(FavoriteAppAdapter());
   Hive.registerAdapter(InstalledAppAdapter());
   Hive.registerAdapter(PrayerRecordAdapter()); // Prayer tracking
