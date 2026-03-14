@@ -1,32 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../utils/review_helper.dart';
 import '../providers/theme_provider.dart';
 import '../providers/font_provider.dart';
 import '../providers/font_size_provider.dart';
 import '../providers/clock_style_provider.dart';
 import '../providers/time_format_provider.dart';
-import '../providers/clock_opacity_provider.dart';
 import '../providers/wallpaper_provider.dart';
-import '../providers/arabic_font_provider.dart';
-import '../providers/premium_provider.dart';
-import '../providers/tafseer_edition_provider.dart';
 import '../providers/amoled_provider.dart';
-
-import '../providers/ramadan_provider.dart';
+import '../providers/swipe_gesture_provider.dart';
+import '../providers/double_tap_provider.dart';
+import '../providers/installed_apps_provider.dart';
+import '../providers/keyboard_auto_open_provider.dart';
 import 'theme_color_picker_screen.dart';
 import 'font_picker_screen.dart';
 import 'clock_style_picker_screen.dart';
 import 'wallpaper_picker_screen.dart';
-import 'premium_paywall_screen.dart';
+import 'donation_screen.dart';
 import 'favorite_picker_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'credits_screen.dart';
 
-import '../services/offline_content_manager.dart';
-import '../widgets/offline_download_indicator.dart';
 import '../widgets/swipe_back_wrapper.dart';
+import 'screen_time_settings_screen.dart';
+import 'notification_feed_screen.dart';
+import 'weekly_spiritual_report_screen.dart';
+import '../providers/notification_filter_provider.dart';
+import '../providers/tasbih_provider.dart';
+import '../providers/prayer_provider.dart';
+import '../providers/note_provider.dart';
+import '../providers/saved_verses_provider.dart';
+import '../providers/dhikr_history_provider.dart';
+import '../providers/ramadan_provider.dart';
+import '../providers/display_settings_provider.dart';
+import '../providers/productivity_provider.dart';
+import '../providers/zen_mode_provider.dart';
+import '../providers/screen_time_provider.dart';
+import '../providers/fasting_provider.dart';
+import '../services/backup_restore_service.dart';
+import '../utils/smooth_page_route.dart';
 
 /// Settings Screen - Customization options
 class SettingsScreen extends ConsumerWidget {
@@ -39,11 +53,11 @@ class SettingsScreen extends ConsumerWidget {
     final currentFontSize = ref.watch(fontSizeProvider);
     final currentClockStyle = ref.watch(clockStyleProvider);
     final currentTimeFormat = ref.watch(timeFormatProvider);
-    final currentClockOpacity = ref.watch(clockOpacityProvider);
     final currentWallpaper = ref.watch(wallpaperProvider);
-    final currentArabicFont = ref.watch(arabicFontProvider);
-    final isPremium = ref.watch(premiumProvider);
     final isAmoled = ref.watch(amoledProvider);
+    final isLight = currentTheme.isLight;
+    final bgColor = isLight ? const Color(0xFFF5F5F5) : Colors.black;
+    final primaryText = isLight ? const Color(0xFF0D0D0D) : Colors.white;
 
     // Find current font size preset name
     final fontSizePreset = fontSizePresets.firstWhere(
@@ -53,97 +67,106 @@ class SettingsScreen extends ConsumerWidget {
 
     return SwipeBackWrapper(
       child: Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Column(
           children: [
             // Header
-            _buildHeader(context),
+            _buildHeader(context, isLight: isLight, primaryText: primaryText),
 
             // Settings list
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  // Premium banner (only show if not premium)
-                  if (!isPremium.isPremium) ...[
-                    _buildPremiumBanner(
-                      context,
-                      AppThemeColor(
-                        color: Colors.amber,
-                        name: 'Amber',
-                        accentColor: Colors.amberAccent,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
+                  // Support Sukoon banner — gentle donation encouragement
+                  _buildSupportBanner(context, currentTheme),
+                  const SizedBox(height: 10),
+
+                  // Rate Sukoon — in-app review
+                  _buildRateUsBanner(currentTheme.color, isLight: isLight),
+                  const SizedBox(height: 24),
 
                   _buildSettingsSection(
                     title: 'APPEARANCE',
+                    accentColor: currentTheme.color,
                     items: [
                       _buildSettingsItem(
-                        icon: Icons.font_download,
-                        title: 'Font Style',
-                        subtitle: '${currentFont.name} · ${AppFonts.categoryName(currentFont.category)}',
+                        icon: Icons.palette,
+                        title: 'Theme Color',
+                        subtitle: currentTheme.name,
+                        accentColor: currentTheme.color,
                         onTap: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const FontPickerScreen(),
+                            SmoothForwardRoute(
+                              child: const ThemeColorPickerScreen(),
                             ),
                           );
                         },
-                      ),
-                      _buildSettingsItem(
-                        icon: Icons.format_size,
-                        title: 'Font Size',
-                        subtitle: fontSizePreset.name,
-                        onTap: () {
-                          _showFontSizeDialog(context, ref);
-                        },
+                      
+                        isLight: isLight,
                       ),
                       _buildSettingsItem(
                         icon: Icons.wallpaper,
                         title: 'Wallpaper',
                         subtitle: currentWallpaper.name,
+                        accentColor: currentTheme.color,
                         onTap: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const WallpaperPickerScreen(),
+                            SmoothForwardRoute(
+                              child: const WallpaperPickerScreen(),
                             ),
                           );
                         },
+                      
+                        isLight: isLight,
                       ),
                       _buildSettingsItem(
-                        icon: Icons.palette,
-                        title: 'Theme Color',
-                        subtitle: currentTheme.name,
+                        icon: Icons.font_download,
+                        title: 'Font Style',
+                        subtitle: '${currentFont.name} · ${AppFonts.categoryName(currentFont.category)}',
+                        accentColor: currentTheme.color,
                         onTap: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const ThemeColorPickerScreen(),
+                            SmoothForwardRoute(
+                              child: const FontPickerScreen(),
                             ),
                           );
                         },
+                      
+                        isLight: isLight,
+                      ),
+                      _buildSettingsItem(
+                        icon: Icons.format_size,
+                        title: 'Font Size',
+                        subtitle: fontSizePreset.name,
+                        accentColor: currentTheme.color,
+                        onTap: () {
+                          _showFontSizeDialog(context, ref);
+                        },
+                      
+                        isLight: isLight,
                       ),
                       _buildSettingsItem(
                         icon: Icons.access_time,
                         title: 'Clock Style',
                         subtitle: currentClockStyle.name,
+                        accentColor: currentTheme.color,
                         onTap: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const ClockStylePickerScreen(),
+                            SmoothForwardRoute(
+                              child: const ClockStylePickerScreen(),
                             ),
                           );
                         },
+                      
+                        isLight: isLight,
                       ),
                       _buildSettingsItem(
                         icon: Icons.schedule,
                         title: 'Time Format',
                         subtitle: currentTimeFormat.name,
+                        accentColor: currentTheme.color,
                         onTap: () {
                           _showTimeFormatDialog(
                             context,
@@ -151,145 +174,261 @@ class SettingsScreen extends ConsumerWidget {
                             currentTimeFormat,
                           );
                         },
-                      ),
-                      _buildSettingsItem(
-                        icon: Icons.opacity,
-                        title: 'Clock Opacity',
-                        subtitle: currentClockOpacity.name,
-                        onTap: () {
-                          _showClockOpacityDialog(
-                            context,
-                            ref,
-                            currentClockOpacity,
-                          );
-                        },
+                      
+                        isLight: isLight,
                       ),
                       _buildAmoledToggle(context, ref, isAmoled),
                     ],
                   ),
                   const SizedBox(height: 24),
-                  _buildSettingsSection(
-                    title: 'QURAN',
-                    items: [
-                      _buildSettingsItem(
-                        icon: Icons.text_fields,
-                        title: 'Arabic Font',
-                        subtitle: currentArabicFont.name,
-                        onTap: () {
-                          _showArabicFontDialog(context, ref);
-                        },
-                      ),
-                      Consumer(
-                        builder: (context, ref, _) {
-                          final selectedEdition = ref.watch(selectedTafseerEditionProvider);
-                          return _buildSettingsItem(
-                            icon: Icons.menu_book,
-                            title: 'Tafseer Edition',
-                            subtitle: selectedEdition.name,
-                            onTap: () {
-                              _showTafseerEditionDialog(context, ref);
-                            },
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                  _buildGesturesSection(context, ref),
                   const SizedBox(height: 24),
                   _buildSettingsSection(
                     title: 'WIDGETS',
+                    accentColor: currentTheme.color,
                     items: [
                       _buildSettingsItem(
                         icon: Icons.star_rounded,
                         title: 'Manage Favorites',
                         subtitle: 'Choose up to 7 favorite apps',
+                        accentColor: currentTheme.color,
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const FavoritePickerScreen(),
+                            SmoothForwardRoute(
+                              child: const FavoritePickerScreen(),
                             ),
                           );
                         },
+                      
+                        isLight: isLight,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSettingsSection(
+                    title: 'INSIGHTS',
+                    accentColor: currentTheme.color,
+                    items: [
+                      _buildSettingsItem(
+                        icon: Icons.insights_rounded,
+                        title: 'Weekly Spiritual Report',
+                        subtitle: 'Prayer, dhikr & Ramadan summary',
+                        accentColor: currentTheme.color,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            SmoothForwardRoute(
+                              child: const WeeklySpiritualReportScreen(),
+                            ),
+                          );
+                        },
+                      
+                        isLight: isLight,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSettingsSection(
+                    title: 'DIGITAL WELLBEING',
+                    accentColor: currentTheme.color,
+                    items: [
+                      _buildSettingsItem(
+                        icon: Icons.timer_outlined,
+                        title: 'In-app time reminder',
+                        subtitle: 'Set in-app time reminders for apps',
+                        accentColor: currentTheme.color,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            SmoothForwardRoute(
+                              child: const ScreenTimeSettingsScreen(),
+                            ),
+                          );
+                        },
+                      
+                        isLight: isLight,
+                      ),
+                      _buildSettingsItem(
+                        icon: Icons.notifications_outlined,
+                        title: 'Notifications',
+                        subtitle: 'Filter & view app notifications',
+                        accentColor: currentTheme.color,
+                        badge: ref.watch(notificationFilterProvider).totalCount,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            SmoothForwardRoute(
+                              child: const NotificationFeedScreen(),
+                            ),
+                          );
+                        },
+                      
+                        isLight: isLight,
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
                   _buildSettingsSection(
                     title: 'SYSTEM',
+                    accentColor: currentTheme.color,
                     items: [
                       _buildSettingsItem(
                         icon: Icons.home,
                         title: 'Change Default Launcher',
                         subtitle: 'Set as default home app',
+                        accentColor: currentTheme.color,
                         onTap: () {
                           _openHomeLauncherSettings(context);
                         },
+                      
+                        isLight: isLight,
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
                   _buildSettingsSection(
-                    title: 'CONTENT',
-                    items: [
-                      _buildOfflineContentItem(context, ref),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  _buildRamadanSection(context, ref),
-                  const SizedBox(height: 24),
-                  _buildSettingsSection(
-                    title: 'PREMIUM',
+                    title: 'SUPPORT',
+                    accentColor: currentTheme.color,
                     items: [
                       _buildSettingsItem(
-                        icon: isPremium.isPremium ? Icons.workspace_premium : Icons.stars,
-                        title: isPremium.isPremium
-                            ? 'Premium Active ✓'
-                            : 'Unlock Pro Version',
-                        subtitle: isPremium.isPremium
-                            ? 'All features unlocked'
-                            : 'Get access to all premium features',
-                        onTap: () {
-                          showPremiumPaywall(context);
-                        },
+                        icon: Icons.chat_rounded,
+                        title: 'Request Feature / Contact Admin',
+                        subtitle: 'Chat with us on WhatsApp',
+                        accentColor: currentTheme.color,
+                        onTap: () => _openWhatsAppContact(context),
+                      
+                        isLight: isLight,
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
                   _buildSettingsSection(
+                    title: 'DATA',
+                    accentColor: currentTheme.color,
+                    items: [
+                      _buildSettingsItem(
+                        icon: Icons.download_for_offline_rounded,
+                        title: 'Export All Data',
+                        subtitle: 'Save backup file to Downloads folder',
+                        accentColor: currentTheme.color,
+                        onTap: () => _exportData(context),
+                      
+                        isLight: isLight,
+                      ),
+                      _buildSettingsItem(
+                        icon: Icons.download_rounded,
+                        title: 'Import Data',
+                        subtitle: 'Restore from a backup file',
+                        accentColor: currentTheme.color,
+                        onTap: () => _importData(context, ref),
+                      
+                        isLight: isLight,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  _buildSettingsSection(
                     title: 'ABOUT',
+                    accentColor: currentTheme.color,
                     items: [
                       _buildSettingsItem(
                         icon: Icons.info_outline,
                         title: 'Version',
-                        subtitle: '1.0.0',
+                        subtitle: '1.1.2',
+                        accentColor: currentTheme.color,
                         onTap: null,
-                      ),
-                      _buildSettingsItem(
-                        icon: Icons.menu_book,
-                        title: 'Credits & Licenses',
-                        subtitle: 'Qur\'an sources and attributions',
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const CreditsScreen(),
-                            ),
-                          );
-                        },
+                      
+                        isLight: isLight,
                       ),
                       _buildSettingsItem(
                         icon: Icons.privacy_tip_outlined,
                         title: 'Privacy Policy',
                         subtitle: 'How we handle your data',
+                        accentColor: currentTheme.color,
                         onTap: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const PrivacyPolicyScreen(),
+                            SmoothForwardRoute(
+                              child: const PrivacyPolicyScreen(),
                             ),
                           );
                         },
+                      
+                        isLight: isLight,
+                      ),
+                      _buildSettingsItem(
+                        icon: Icons.menu_book,
+                        title: 'Credits & Licenses',
+                        subtitle: 'Qur\'an sources and attributions',
+                        accentColor: currentTheme.color,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            SmoothForwardRoute(
+                              child: const CreditsScreen(),
+                            ),
+                          );
+                        },
+                      
+                        isLight: isLight,
+                      ),
+                      _buildSettingsItem(
+                        icon: Icons.source_outlined,
+                        title: 'Open-Source Licenses',
+                        subtitle: 'Third-party package licenses',
+                        accentColor: currentTheme.color,
+                        onTap: () {
+                          showLicensePage(
+                            context: context,
+                            applicationName: 'Sukoon Launcher',
+                            applicationVersion: '1.1.2',
+                            applicationLegalese: '© 2026 Sukoon Launcher. All rights reserved.',
+                          );
+                        },
+                      
+                        isLight: isLight,
                       ),
                     ],
                   ),
+
+                  // ── Bottom branding footer ──────────────────────
+                  const SizedBox(height: 36),
+                  Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.asset(
+                            'assets/app_icon.png',
+                            width: 22,
+                            height: 22,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Sukoon Launcher',
+                          style: TextStyle(
+                            color: primaryText.withValues(alpha: 0.3),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '· v1.1.2',
+                          style: TextStyle(
+                            color: primaryText.withValues(alpha: 0.18),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -297,209 +436,6 @@ class SettingsScreen extends ConsumerWidget {
         ),
       ),
     ),
-    );
-  }
-
-
-  // ── 🌙 Ramadan Mode Section ──
-  Widget _buildRamadanSection(BuildContext context, WidgetRef ref) {
-    const moonGold = Color(0xFFC9A84C);
-    const nightBg = Color(0xFF0E0E20);
-    final ramadan = ref.watch(ramadanProvider);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            moonGold.withValues(alpha: ramadan.isEnabled ? 0.08 : 0.03),
-            nightBg.withValues(alpha: ramadan.isEnabled ? 0.5 : 0.2),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: moonGold.withValues(alpha: ramadan.isEnabled ? 0.2 : 0.08),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text('☪',
-                  style: TextStyle(
-                      fontSize: 18,
-                      color: moonGold.withValues(alpha: 0.8))),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Ramadan Mode',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      ramadan.isEnabled
-                          ? 'Day ${ramadan.currentDay} · Dashboard active'
-                          : 'Activate for special Ramadan features',
-                      style: TextStyle(
-                        color: ramadan.isEnabled
-                            ? moonGold.withValues(alpha: 0.6)
-                            : Colors.white.withValues(alpha: 0.35),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch.adaptive(
-                value: ramadan.isEnabled,
-                activeColor: moonGold,
-                onChanged: (val) {
-                  HapticFeedback.mediumImpact();
-                  ref.read(ramadanProvider.notifier).toggleRamadanMode(val);
-                },
-              ),
-            ],
-          ),
-          // Show config when enabled
-          if (ramadan.isEnabled) ...[
-            const SizedBox(height: 14),
-            Divider(color: moonGold.withValues(alpha: 0.08)),
-            const SizedBox(height: 10),
-            // Ramadan duration
-            GestureDetector(
-              onTap: () => _showRamadanDaysDialog(context, ref),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Icon(Icons.calendar_month_rounded,
-                        size: 18,
-                        color: Colors.white.withValues(alpha: 0.3)),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Duration',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
-                        fontSize: 13,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${ramadan.totalDays} days',
-                      style: TextStyle(
-                        color: moonGold.withValues(alpha: 0.6),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(Icons.chevron_right_rounded,
-                        size: 16,
-                        color: Colors.white.withValues(alpha: 0.15)),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  void _showRamadanDaysDialog(BuildContext context, WidgetRef ref) {
-    const moonGold = Color(0xFFC9A84C);
-    final currentDays = ref.read(ramadanProvider).totalDays;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF121212),
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Ramadan Duration',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildDayOption(ctx, ref, 29, currentDays, moonGold),
-                const SizedBox(width: 16),
-                _buildDayOption(ctx, ref, 30, currentDays, moonGold),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Based on moon sighting',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.3),
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDayOption(BuildContext context, WidgetRef ref, int days,
-      int current, Color gold) {
-    final selected = days == current;
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        ref.read(ramadanProvider.notifier).setTotalDays(days);
-        Navigator.pop(context);
-      },
-      child: Container(
-        width: 80,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: selected ? gold.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? gold.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.06),
-          ),
-        ),
-        child: Column(
-          children: [
-            Text(
-              '$days',
-              style: TextStyle(
-                color: selected ? gold : Colors.white.withValues(alpha: 0.5),
-                fontSize: 24,
-                fontWeight: FontWeight.w300,
-              ),
-            ),
-            Text(
-              'days',
-              style: TextStyle(
-                color: selected ? gold.withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.3),
-                fontSize: 11,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -520,7 +456,237 @@ class SettingsScreen extends ConsumerWidget {
     }
   }
 
-  Widget _buildHeader(BuildContext context) {
+  void _openWhatsAppContact(BuildContext context) async {
+    const phone = '918171114186';
+    const message = 'Hi! I\'m using Sukoon Launcher and I have a feature request / feedback:';
+    final uri = Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent(message)}');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Could not open WhatsApp. Please install WhatsApp first.'),
+              backgroundColor: Colors.red.shade700,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  void _exportData(BuildContext context) async {
+    // Show data summary first
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return FutureBuilder<Map<String, int>>(
+          future: BackupRestoreService.getDataSummary(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return AlertDialog(
+                backgroundColor: const Color(0xFF1A1A1A),
+                title: const Text('Preparing Export...', style: TextStyle(color: Colors.white)),
+                content: const SizedBox(
+                  height: 60,
+                  child: Center(child: CircularProgressIndicator(color: Colors.white70)),
+                ),
+              );
+            }
+
+            final summary = snapshot.data!;
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1A1A1A),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Export Data', style: TextStyle(color: Colors.white, fontSize: 18)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Your data to export:',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  const SizedBox(height: 12),
+                  ...summary.entries.where((e) => e.value > 0).map((e) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(e.key, style: const TextStyle(color: Colors.white60, fontSize: 13)),
+                        Text('${e.value}', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  )),
+                  if (summary.values.every((v) => v == 0))
+                    const Text('No data found yet.', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'All settings, preferences, and history will be included.',
+                    style: TextStyle(color: Colors.white38, fontSize: 12),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    Navigator.of(ctx).pop();
+                    // Show progress
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Saving backup to Downloads...'),
+                        duration: Duration(seconds: 3),
+                        backgroundColor: Color(0xFF2A2A2A),
+                      ),
+                    );
+
+                    final savedPath = await BackupRestoreService.exportData();
+
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).clearSnackBars();
+
+                    final success = savedPath.isNotEmpty;
+                    final isDownloads = savedPath.contains('/Download');
+                    final location = isDownloads
+                        ? 'Saved to Downloads folder'
+                        : 'Saved to app storage';
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(success
+                            ? '$location\n$savedPath'
+                            : 'Export failed. Please try again.'),
+                        backgroundColor: success ? Colors.green.shade700 : Colors.red.shade700,
+                        duration: const Duration(seconds: 5),
+                      ),
+                    );
+                  },
+                  child: const Text('Save to Downloads', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _importData(BuildContext context, WidgetRef ref) async {
+    // Confirm before import
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Import Data', style: TextStyle(color: Colors.white, fontSize: 18)),
+        content: const Text(
+          'This will replace ALL current data with the backup.\n\n'
+          'Your existing data will be overwritten.\n\n'
+          'The app will need to be restarted after import.',
+          style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Choose File', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Importing data...'),
+        duration: Duration(seconds: 10),
+        backgroundColor: Color(0xFF2A2A2A),
+      ),
+    );
+
+    final result = await BackupRestoreService.importData();
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+
+    if (result == 'cancelled') return;
+
+    final isError = result.startsWith('Error');
+
+    if (!isError) {
+      // ── Invalidate ALL providers so UI refreshes immediately ──
+      ref.invalidate(tasbihProvider);
+      ref.invalidate(prayerRecordListProvider);
+      ref.invalidate(noteBoxProvider);
+      ref.invalidate(noteListProvider);
+      ref.invalidate(savedVersesProvider);
+      ref.invalidate(dhikrHistoryProvider);
+      ref.invalidate(ramadanProvider);
+      ref.invalidate(displaySettingsProvider);
+      ref.invalidate(todoProvider);
+      ref.invalidate(productivityEventProvider);
+      ref.invalidate(academicDoubtProvider);
+      ref.invalidate(appBlockRuleProvider);
+      ref.invalidate(focusCategoryProvider);
+      ref.invalidate(focusStreakProvider);
+      ref.invalidate(zenModeProvider);
+      ref.invalidate(screenTimeProvider);
+      ref.invalidate(notificationFilterProvider);
+      ref.invalidate(fastingProvider);
+      ref.invalidate(themeColorProvider);
+      ref.invalidate(wallpaperProvider);
+      ref.invalidate(clockStyleProvider);
+      ref.invalidate(fontProvider);
+      ref.invalidate(fontSizeProvider);
+      ref.invalidate(amoledProvider);
+      ref.invalidate(timeFormatProvider);
+      ref.invalidate(keyboardAutoOpenProvider);
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          isError ? 'Import Failed' : 'Import Complete',
+          style: const TextStyle(color: Colors.white, fontSize: 18),
+        ),
+        content: Text(
+          isError ? result : '${result.replaceAll('ok:', '')}\n\nAll data has been refreshed.',
+          style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, {required bool isLight, required Color primaryText}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       child: Row(
@@ -530,12 +696,12 @@ class SettingsScreen extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.04),
+                color: primaryText.withValues(alpha: 0.04),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 Icons.arrow_back_ios_new,
-                color: Colors.white.withValues(alpha: 0.5),
+                color: primaryText.withValues(alpha: 0.5),
                 size: 18,
               ),
             ),
@@ -549,14 +715,14 @@ class SettingsScreen extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white.withValues(alpha: 0.9),
+                  color: primaryText.withValues(alpha: 0.9),
                 ),
               ),
               Text(
                 'Customize your experience',
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.35),
+                  color: primaryText.withValues(alpha: 0.35),
                 ),
               ),
             ],
@@ -569,7 +735,9 @@ class SettingsScreen extends ConsumerWidget {
   Widget _buildSettingsSection({
     required String title,
     required List<Widget> items,
+    Color? accentColor,
   }) {
+    final accent = accentColor ?? const Color(0xFFC2A366);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -581,7 +749,7 @@ class SettingsScreen extends ConsumerWidget {
                 width: 3,
                 height: 14,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFC2A366).withValues(alpha: 0.5),
+                  color: accent.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -592,7 +760,7 @@ class SettingsScreen extends ConsumerWidget {
                   fontSize: 11,
                   letterSpacing: 1.5,
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFFC2A366).withValues(alpha: 0.6),
+                  color: accent.withValues(alpha: 0.6),
                 ),
               ),
             ],
@@ -604,6 +772,7 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   void _showFontSizeDialog(BuildContext context, WidgetRef ref) {
+    final accent = ref.read(themeColorProvider).color;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -611,7 +780,7 @@ class SettingsScreen extends ConsumerWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color: const Color(0xFFC2A366).withValues(alpha: 0.15),
+            color: accent.withValues(alpha: 0.15),
           ),
         ),
         title: const Text(
@@ -635,9 +804,9 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
               trailing: isSelected
-                  ? const Icon(
+                  ? Icon(
                       Icons.check_rounded,
-                      color: Color(0xFFC2A366),
+                      color: accent,
                     )
                   : null,
               onTap: () {
@@ -651,188 +820,621 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showArabicFontDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF141414),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: const Color(0xFFC2A366).withValues(alpha: 0.15),
-          ),
-        ),
-        title: const Text(
-          'Arabic Font',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: ArabicFonts.all.length,
-            itemBuilder: (context, index) {
-              final font = ArabicFonts.all[index];
-              final isSelected =
-                  ref.watch(arabicFontProvider).name == font.name;
+  // ── Gestures section ──
 
-              return ListTile(
-                title: Text(
-                  font.name,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.6),
-                    fontSize: 14,
-                  ),
-                ),
-                subtitle: Text(
-                  'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
-                  textDirection: TextDirection.rtl,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    fontSize: 16,
-                    fontFamily: font.fontFamily,
-                  ),
-                ),
-                trailing: isSelected
-                    ? const Icon(
-                        Icons.check_rounded,
-                        color: Color(0xFFC2A366),
-                      )
-                    : null,
-                onTap: () {
-                  ref.read(arabicFontProvider.notifier).setFont(font);
-                  Navigator.of(context).pop();
-                },
-              );
-            },
+  Widget _buildGesturesSection(BuildContext context, WidgetRef ref) {
+    final swipeConfig = ref.watch(swipeGestureProvider);
+    final doubleTapConfig = ref.watch(doubleTapProvider);
+    final allApps = ref.watch(installedAppsProvider);
+    final themeColor = ref.read(themeColorProvider);
+    final accent = themeColor.color;
+    final isLight = themeColor.isLight;
+
+    // Helper to get app name from package
+    String subtitleFor(SwipeAction action, String? pkg) {
+      if (action == SwipeAction.openApp && pkg != null) {
+        final match = allApps.where((a) => a.packageName == pkg);
+        if (match.isNotEmpty) return '${action.label} · ${match.first.appName}';
+      }
+      return action.label;
+    }
+
+    String doubleTapSubtitle() {
+      if (doubleTapConfig.action == DoubleTapAction.openApp && doubleTapConfig.appPackage != null) {
+        final match = allApps.where((a) => a.packageName == doubleTapConfig.appPackage);
+        if (match.isNotEmpty) return '${doubleTapConfig.action.label} · ${match.first.appName}';
+      }
+      return doubleTapConfig.action.label;
+    }
+
+    return _buildSettingsSection(
+      title: 'GESTURES',
+      accentColor: accent,
+      items: [
+        _buildSettingsItem(
+          icon: Icons.arrow_downward_rounded,
+          title: 'Swipe Down',
+          subtitle: subtitleFor(swipeConfig.swipeDown, swipeConfig.swipeDownApp),
+          accentColor: accent,
+          onTap: () => _showSwipeActionPicker(
+            context, ref,
+            direction: 'Swipe Down',
+            current: swipeConfig.swipeDown,
+            onSelect: (a, {String? appPackage}) =>
+                ref.read(swipeGestureProvider.notifier).setSwipeDown(a, appPackage: appPackage),
           ),
+        
+          isLight: isLight,
         ),
-      ),
+        _buildSettingsItem(
+          icon: Icons.arrow_upward_rounded,
+          title: 'Swipe Up',
+          subtitle: subtitleFor(swipeConfig.swipeUp, swipeConfig.swipeUpApp),
+          accentColor: accent,
+          onTap: () => _showSwipeActionPicker(
+            context, ref,
+            direction: 'Swipe Up',
+            current: swipeConfig.swipeUp,
+            onSelect: (a, {String? appPackage}) =>
+                ref.read(swipeGestureProvider.notifier).setSwipeUp(a, appPackage: appPackage),
+          ),
+        
+          isLight: isLight,
+        ),
+        _buildSettingsItem(
+          icon: Icons.touch_app_rounded,
+          title: 'Double Tap',
+          subtitle: doubleTapSubtitle(),
+          accentColor: accent,
+          onTap: () => _showDoubleTapActionPicker(context, ref),
+        
+          isLight: isLight,
+        ),
+        _buildKeyboardAutoOpenToggle(context, ref, accent),
+      ],
     );
   }
 
-  void _showTafseerEditionDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
+  void _showSwipeActionPicker(
+    BuildContext context,
+    WidgetRef ref, {
+    required String direction,
+    required SwipeAction current,
+    required void Function(SwipeAction, {String? appPackage}) onSelect,
+  }) {
+    final gold = ref.read(themeColorProvider).color;
+    showModalBottomSheet(
       context: context,
-      builder: (context) => Consumer(
-        builder: (context, ref, _) {
-          final editionsAsync = ref.watch(tafseerEditionsProvider);
-          final selectedEdition = ref.watch(selectedTafseerEditionProvider);
-
-          return AlertDialog(
-            backgroundColor: const Color(0xFF141414),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(
-                color: const Color(0xFFC2A366).withValues(alpha: 0.15),
-              ),
-            ),
-            title: const Text(
-              'Tafseer Edition',
+      backgroundColor: const Color(0xFF121212),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final bottomPad = MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom + 16;
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, 24, 20, bottomPad),
+          child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Title
+            Text(
+              direction,
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 17,
+                color: Colors.white.withValues(alpha: 0.85),
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            content: SizedBox(
-              width: double.maxFinite,
-              height: 400,
-              child: editionsAsync.when(
-                data: (editions) {
-                  // Filter to show English editions first, then others
-                  final sortedEditions = [...editions];
-                  sortedEditions.sort((a, b) {
-                    if (a.language.toLowerCase() == 'english' && b.language.toLowerCase() != 'english') {
-                      return -1;
-                    } else if (a.language.toLowerCase() != 'english' && b.language.toLowerCase() == 'english') {
-                      return 1;
-                    }
-                    return a.name.compareTo(b.name);
-                  });
-
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: sortedEditions.length,
-                    itemBuilder: (context, index) {
-                      final edition = sortedEditions[index];
-                      final isSelected = selectedEdition.slug == edition.slug;
-
-                      return ListTile(
-                        title: Text(
-                          edition.name,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            fontSize: 14,
-                          ),
-                        ),
-                        subtitle: Text(
-                          '${edition.authorName} • ${edition.language}',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 12,
-                          ),
-                        ),
-                        trailing: isSelected
-                            ? const Icon(
-                                Icons.check,
-                                color: Color(0xFFC2A366),
-                              )
-                            : null,
-                        onTap: () {
-                          ref.read(selectedTafseerEditionProvider.notifier).setEdition(edition);
-                          Navigator.of(context).pop();
-                        },
-                      );
-                    },
-                  );
-                },
-                loading: () => const Center(
-                  child: CircularProgressIndicator(color: Color(0xFFC2A366)),
-                ),
-                error: (_, __) => Center(
-                  child: Text(
-                    'Could not load editions',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-                  ),
-                ),
+            const SizedBox(height: 6),
+            Text(
+              'Choose what happens when you $direction on the home screen',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.35),
+                fontSize: 12,
               ),
             ),
-          );
-        },
+            const SizedBox(height: 20),
+            // Options
+            ...SwipeAction.values.map((action) {
+              final selected = action == current;
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  if (action == SwipeAction.openApp) {
+                    Navigator.pop(ctx);
+                    _showAppPickerForSwipe(context, ref, onSelect: onSelect);
+                  } else {
+                    onSelect(action);
+                    Navigator.pop(ctx);
+                  }
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? gold.withValues(alpha: 0.12)
+                        : Colors.white.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: selected
+                          ? gold.withValues(alpha: 0.35)
+                          : Colors.white.withValues(alpha: 0.05),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? gold.withValues(alpha: 0.12)
+                              : Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(action.icon, size: 18,
+                            color: selected ? gold : Colors.white.withValues(alpha: 0.55)),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              action.label,
+                              style: TextStyle(
+                                color: selected ? gold : Colors.white.withValues(alpha: 0.8),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              action.description,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.35),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (selected)
+                        Icon(Icons.check_circle_rounded,
+                            color: gold.withValues(alpha: 0.8), size: 20),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+        );
+      },
+    );
+  }
+
+  void _showAppPickerForSwipe(
+    BuildContext context,
+    WidgetRef ref, {
+    required void Function(SwipeAction, {String? appPackage}) onSelect,
+  }) {
+    final allApps = ref.read(installedAppsProvider);
+    final searchController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF121212),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            final query = searchController.text.toLowerCase();
+            final filtered = query.isEmpty
+                ? allApps
+                : allApps.where((a) => a.appName.toLowerCase().contains(query)).toList();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.65,
+              minChildSize: 0.4,
+              maxChildSize: 0.85,
+              expand: false,
+              builder: (_, scrollController) => Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                child: Column(
+                  children: [
+                    // Title
+                    Text(
+                      'Choose App',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Select which app to open on swipe',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.35),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Search field
+                    TextField(
+                      controller: searchController,
+                      onChanged: (_) => setState(() {}),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Search apps...',
+                        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25)),
+                        prefixIcon: Icon(Icons.search, color: Colors.white.withValues(alpha: 0.3), size: 20),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // App list
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: filtered.length,
+                        itemBuilder: (_, i) {
+                          final app = filtered[i];
+                          return GestureDetector(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              onSelect(SwipeAction.openApp, appPackage: app.packageName);
+                              Navigator.pop(ctx);
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.03),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                app.appName,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ── Double Tap picker ──
+
+  void _showDoubleTapActionPicker(BuildContext context, WidgetRef ref) {
+    final gold = ref.read(themeColorProvider).color;
+    final current = ref.read(doubleTapProvider).action;
+
+    final emojiMap = <DoubleTapAction, IconData>{
+      DoubleTapAction.lockScreen: Icons.lock_outline_rounded,
+      DoubleTapAction.flashlight: Icons.flashlight_on_rounded,
+      DoubleTapAction.openCamera: Icons.camera_alt_outlined,
+      DoubleTapAction.openApp: Icons.launch_rounded,
+      DoubleTapAction.expandNotifications: Icons.notifications_outlined,
+      DoubleTapAction.quickAccess: Icons.bolt_rounded,
+      DoubleTapAction.none: Icons.do_not_disturb_alt_rounded,
+    };
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF121212),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final bottomPad = MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom + 16;
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, 24, 20, bottomPad),
+          child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Double Tap',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.85),
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Choose what happens when you double-tap on the home screen',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.35),
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ...DoubleTapAction.values.map((action) {
+              final selected = action == current;
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  if (action == DoubleTapAction.openApp) {
+                    Navigator.pop(ctx);
+                    _showAppPickerForDoubleTap(context, ref);
+                  } else {
+                    ref.read(doubleTapProvider.notifier).setAction(action);
+                    Navigator.pop(ctx);
+                  }
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? gold.withValues(alpha: 0.12)
+                        : Colors.white.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: selected
+                          ? gold.withValues(alpha: 0.35)
+                          : Colors.white.withValues(alpha: 0.05),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? gold.withValues(alpha: 0.12)
+                              : Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(emojiMap[action] ?? Icons.touch_app_rounded,
+                            size: 18,
+                            color: selected ? gold : Colors.white.withValues(alpha: 0.55)),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              action.label,
+                              style: TextStyle(
+                                color: selected ? gold : Colors.white.withValues(alpha: 0.8),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              action.description,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.35),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (selected)
+                        Icon(Icons.check_circle_rounded,
+                            color: gold.withValues(alpha: 0.8), size: 20),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+        );
+      },
+    );
+  }
+
+  void _showAppPickerForDoubleTap(BuildContext context, WidgetRef ref) {
+    final allApps = ref.read(installedAppsProvider);
+    final searchController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF121212),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            final query = searchController.text.toLowerCase();
+            final filtered = query.isEmpty
+                ? allApps
+                : allApps.where((a) => a.appName.toLowerCase().contains(query)).toList();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.65,
+              minChildSize: 0.4,
+              maxChildSize: 0.85,
+              expand: false,
+              builder: (_, scrollController) => Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                child: Column(
+                  children: [
+                    Text(
+                      'Choose App',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Select which app to open on double-tap',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.35),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: searchController,
+                      onChanged: (_) => setState(() {}),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Search apps...',
+                        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25)),
+                        prefixIcon: Icon(Icons.search, color: Colors.white.withValues(alpha: 0.3), size: 20),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: filtered.length,
+                        itemBuilder: (_, i) {
+                          final app = filtered[i];
+                          return GestureDetector(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              ref.read(doubleTapProvider.notifier).setAction(
+                                DoubleTapAction.openApp,
+                                appPackage: app.packageName,
+                              );
+                              Navigator.pop(ctx);
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.03),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                app.appName,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
   Widget _buildSettingsItem({
-    required IconData icon,
+    IconData? icon,
+    Widget? iconWidget,
     required String title,
     required String subtitle,
     VoidCallback? onTap,
+    Color? accentColor,
+    int badge = 0,
+    bool isLight = false,
   }) {
+    final accent = accentColor ?? const Color(0xFFC2A366);
+    final primaryText = isLight ? const Color(0xFF0D0D0D) : Colors.white;
+    final itemBg = isLight
+        ? Colors.black.withValues(alpha: 0.04)
+        : Colors.white.withValues(alpha: 0.03);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 4),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.03),
+          color: itemBg,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: const Color(0xFFC2A366).withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: const Color(0xFFC2A366).withValues(alpha: 0.6), size: 18),
+            // Icon with optional badge
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: iconWidget != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(9),
+                          child: iconWidget,
+                        )
+                      : Icon(icon ?? Icons.circle_outlined,
+                          color: accent.withValues(alpha: 0.6), size: 18),
+                ),
+                if (badge > 0)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: accent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Center(
+                        child: Text(
+                          badge > 99 ? '99+' : '$badge',
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -842,7 +1444,7 @@ class SettingsScreen extends ConsumerWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
+                      color: primaryText.withValues(alpha: 0.85),
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
@@ -851,7 +1453,7 @@ class SettingsScreen extends ConsumerWidget {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.35),
+                      color: primaryText.withValues(alpha: 0.35),
                       fontSize: 12,
                     ),
                   ),
@@ -861,7 +1463,7 @@ class SettingsScreen extends ConsumerWidget {
             if (onTap != null)
               Icon(
                 Icons.chevron_right,
-                color: Colors.white.withValues(alpha: 0.2),
+                color: primaryText.withValues(alpha: 0.2),
                 size: 18,
               ),
           ],
@@ -871,11 +1473,22 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Widget _buildAmoledToggle(BuildContext context, WidgetRef ref, bool isEnabled) {
+    final themeColor = ref.watch(themeColorProvider);
+    final accent = themeColor.color;
+    final isLight = themeColor.isLight;
+    final primaryText = isLight ? const Color(0xFF0D0D0D) : Colors.white;
+    final itemBg = isLight
+        ? Colors.black.withValues(alpha: 0.04)
+        : Colors.white.withValues(alpha: 0.03);
+    final toggleTrackOff = isLight
+        ? Colors.black.withValues(alpha: 0.12)
+        : Colors.white.withValues(alpha: 0.1);
+    final toggleThumbOff = isLight ? Colors.black.withValues(alpha: 0.3) : Colors.white38;
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
+        color: itemBg,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -884,11 +1497,11 @@ class SettingsScreen extends ConsumerWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: const Color(0xFFC2A366).withValues(alpha: 0.08),
+              color: accent.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(Icons.brightness_1,
-                color: const Color(0xFFC2A366).withValues(alpha: 0.6), size: 18),
+                color: accent.withValues(alpha: 0.6), size: 18),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -898,7 +1511,7 @@ class SettingsScreen extends ConsumerWidget {
                 Text(
                   'AMOLED Mode',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85),
+                    color: primaryText.withValues(alpha: 0.85),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -907,7 +1520,7 @@ class SettingsScreen extends ConsumerWidget {
                 Text(
                   isEnabled ? 'Pure black · Saves battery' : 'Disabled',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.35),
+                    color: primaryText.withValues(alpha: 0.35),
                     fontSize: 12,
                   ),
                 ),
@@ -927,8 +1540,8 @@ class SettingsScreen extends ConsumerWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 color: isEnabled
-                    ? const Color(0xFFC2A366).withValues(alpha: 0.3)
-                    : Colors.white.withValues(alpha: 0.1),
+                    ? accent.withValues(alpha: 0.3)
+                    : toggleTrackOff,
               ),
               child: AnimatedAlign(
                 duration: const Duration(milliseconds: 200),
@@ -938,7 +1551,7 @@ class SettingsScreen extends ConsumerWidget {
                   height: 20,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: isEnabled ? const Color(0xFFC2A366) : Colors.white38,
+                    color: isEnabled ? accent : toggleThumbOff,
                   ),
                 ),
               ),
@@ -949,113 +1562,91 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildOfflineContentItem(BuildContext context, WidgetRef ref) {
-    final status = ref.watch(offlineContentProvider);
-    
-    IconData icon;
-    Color iconColor;
-    String subtitle;
-    
-    if (status.isComplete) {
-      icon = Icons.cloud_done;
-      iconColor = Colors.green;
-      subtitle = status.detailText;
-    } else if (status.isDownloading) {
-      icon = Icons.cloud_download;
-      iconColor = Colors.blue;
-      subtitle = '${(status.progress * 100).toInt()}% - ${status.currentItem ?? "Downloading..."}';
-    } else {
-      icon = Icons.cloud_off;
-      iconColor = Colors.orange;
-      subtitle = 'Tap to manage offline content';
-    }
-
-    return GestureDetector(
-      onTap: () {
-        showModalBottomSheet(
-          context: context,
-          backgroundColor: const Color(0xFF161B22),
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  Widget _buildKeyboardAutoOpenToggle(BuildContext context, WidgetRef ref, Color accent) {
+    final isEnabled = ref.watch(keyboardAutoOpenProvider);
+    final isLight = ref.watch(themeColorProvider).isLight;
+    final primaryText = isLight ? const Color(0xFF0D0D0D) : Colors.white;
+    final itemBg = isLight
+        ? Colors.black.withValues(alpha: 0.04)
+        : Colors.white.withValues(alpha: 0.03);
+    final toggleTrackOff = isLight
+        ? Colors.black.withValues(alpha: 0.12)
+        : Colors.white.withValues(alpha: 0.1);
+    final toggleThumbOff = isLight ? Colors.black.withValues(alpha: 0.3) : Colors.white38;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: itemBg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.keyboard_rounded,
+                color: accent.withValues(alpha: 0.6), size: 18),
           ),
-          builder: (context) => const OfflineDownloadSheet(),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Auto-Open Keyboard',
+                  style: TextStyle(
+                    color: primaryText.withValues(alpha: 0.85),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  isEnabled ? 'Opens when App List appears' : 'Tap search bar to type',
+                  style: TextStyle(
+                    color: primaryText.withValues(alpha: 0.35),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              ref.read(keyboardAutoOpenProvider.notifier).toggle();
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 44,
+              height: 24,
+              padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
+                color: isEnabled
+                    ? accent.withValues(alpha: 0.3)
+                    : toggleTrackOff,
               ),
-              child: status.isDownloading
-                  ? Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            value: status.progress,
-                            strokeWidth: 2.5,
-                            color: iconColor,
-                            backgroundColor: Colors.white.withValues(alpha: 0.1),
-                          ),
-                        ),
-                        Text(
-                          '${(status.progress * 100).toInt()}',
-                          style: TextStyle(
-                            color: iconColor,
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    )
-                  : Icon(icon, color: iconColor, size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Offline Content',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+              child: AnimatedAlign(
+                duration: const Duration(milliseconds: 200),
+                alignment: isEnabled ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isEnabled ? accent : toggleThumbOff,
                   ),
-                  const SizedBox(height: 1),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.35),
-                      fontSize: 12,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                ),
               ),
             ),
-            Icon(
-              Icons.chevron_right,
-              color: Colors.white.withValues(alpha: 0.3),
-              size: 20,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1065,6 +1656,7 @@ class SettingsScreen extends ConsumerWidget {
     WidgetRef ref,
     TimeFormat currentFormat,
   ) {
+    final accent = ref.read(themeColorProvider).color;
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1073,7 +1665,7 @@ class SettingsScreen extends ConsumerWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(
-              color: const Color(0xFFC2A366).withValues(alpha: 0.15),
+              color: accent.withValues(alpha: 0.15),
             ),
           ),
           title: const Text(
@@ -1117,7 +1709,7 @@ class SettingsScreen extends ConsumerWidget {
     TimeFormat currentFormat,
   ) {
     final isSelected = format == currentFormat;
-    const gold = Color(0xFFC2A366);
+    final gold = ref.read(themeColorProvider).color;
     return InkWell(
       onTap: () {
         ref.read(timeFormatProvider.notifier).setTimeFormat(format);
@@ -1163,150 +1755,24 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showClockOpacityDialog(
-    BuildContext context,
-    WidgetRef ref,
-    ClockOpacity currentOpacity,
-  ) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF141414),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(
-              color: const Color(0xFFC2A366).withValues(alpha: 0.15),
-            ),
-          ),
-          title: const Text(
-            'Clock Opacity',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 17,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildClockOpacityOption(
-                context,
-                ref,
-                ClockOpacity.low,
-                currentOpacity,
-              ),
-              const SizedBox(height: 8),
-              _buildClockOpacityOption(
-                context,
-                ref,
-                ClockOpacity.medium,
-                currentOpacity,
-              ),
-              const SizedBox(height: 8),
-              _buildClockOpacityOption(
-                context,
-                ref,
-                ClockOpacity.high,
-                currentOpacity,
-              ),
-              const SizedBox(height: 8),
-              _buildClockOpacityOption(
-                context,
-                ref,
-                ClockOpacity.veryHigh,
-                currentOpacity,
-              ),
-              const SizedBox(height: 8),
-              _buildClockOpacityOption(
-                context,
-                ref,
-                ClockOpacity.ultraHigh,
-                currentOpacity,
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildClockOpacityOption(
-    BuildContext context,
-    WidgetRef ref,
-    ClockOpacity opacity,
-    ClockOpacity currentOpacity,
-  ) {
-    final isSelected = opacity == currentOpacity;
-    const gold = Color(0xFFC2A366);
+  Widget _buildRateUsBanner(Color accent, {required bool isLight}) {
+    final primaryText = isLight ? const Color(0xFF0D0D0D) : Colors.white;
+    final bannerBg = isLight
+        ? Colors.black.withValues(alpha: 0.02)
+        : Colors.white.withValues(alpha: 0.02);
     return InkWell(
-      onTap: () {
-        ref.read(clockOpacityProvider.notifier).setOpacity(opacity);
-        Navigator.of(context).pop();
-      },
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? gold.withValues(alpha: 0.08)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? gold.withValues(alpha: 0.3)
-                : Colors.white.withValues(alpha: 0.06),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: isSelected
-                  ? gold
-                  : Colors.white.withValues(alpha: 0.3),
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              opacity.name,
-              style: TextStyle(
-                color: isSelected
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: 0.6),
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPremiumBanner(BuildContext context, AppThemeColor currentTheme) {
-    const gold = Color(0xFFC2A366);
-    
-    return InkWell(
-      onTap: () {
-        Navigator.of(context).push(
-          PageRouteBuilder(
-            opaque: false,
-            pageBuilder: (context, _, __) => const PremiumPaywallScreen(),
-            transitionsBuilder: (context, anim, _, child) {
-              return FadeTransition(opacity: anim, child: child);
-            },
-          ),
-        );
+      onTap: () async {
+        HapticFeedback.lightImpact();
+        await requestSukoonReview();
       },
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: gold.withValues(alpha: 0.06),
+          color: bannerBg,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: gold.withValues(alpha: 0.18),
+            color: Colors.amber.withValues(alpha: 0.10),
             width: 1,
           ),
         ),
@@ -1316,29 +1782,110 @@ class SettingsScreen extends ConsumerWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: gold.withValues(alpha: 0.12),
+                color: Colors.amber.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.15)),
               ),
-              child: const Icon(Icons.workspace_premium_rounded, color: gold, size: 22),
+              child: Icon(
+                Icons.star_rounded,
+                size: 22,
+                color: Colors.amber.withValues(alpha: 0.8),
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Upgrade to Premium',
+                  Text(
+                    'Rate Sukoon',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: primaryText.withValues(alpha: 0.9),
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    'Unlock all themes, Deen Mode & more',
+                    'Your review helps other Muslims find us',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
+                      color: primaryText.withValues(alpha: 0.4),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // 3 mini stars
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(3, (_) => Padding(
+                padding: const EdgeInsets.only(left: 1),
+                child: Icon(Icons.star_rounded,
+                    size: 14, color: Colors.amber.withValues(alpha: 0.5)),
+              )),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSupportBanner(BuildContext context, AppThemeColor currentTheme) {
+    final accent = currentTheme.color;
+    final isLight = currentTheme.isLight;
+    final primaryText = isLight ? const Color(0xFF0D0D0D) : Colors.white;
+
+    return InkWell(
+      onTap: () => showDonationScreen(context),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: accent.withValues(alpha: 0.12),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(9),
+                child: Image.asset(
+                  'assets/app_icon.png',
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Support Sukoon',
+                    style: TextStyle(
+                      color: primaryText.withValues(alpha: 0.9),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'All features free — donate as sadaqah jariyah',
+                    style: TextStyle(
+                      color: primaryText.withValues(alpha: 0.4),
                       fontSize: 12,
                     ),
                   ),
@@ -1347,7 +1894,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
             Icon(
               Icons.arrow_forward_ios_rounded,
-              color: gold.withValues(alpha: 0.5),
+              color: accent.withValues(alpha: 0.5),
               size: 16,
             ),
           ],

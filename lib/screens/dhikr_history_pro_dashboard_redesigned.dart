@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../providers/tasbih_provider.dart';
+import '../utils/hive_box_manager.dart';
 import '../providers/premium_provider.dart';
+import '../widgets/year_dots_analytics.dart';
 import 'premium_paywall_screen.dart';
 import '../widgets/swipe_back_wrapper.dart';
 
@@ -34,7 +36,7 @@ class _DhikrHistoryProDashboardState extends ConsumerState<DhikrHistoryProDashbo
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this, initialIndex: widget.initialTab);
+    _tabController = TabController(length: 4, vsync: this, initialIndex: widget.initialTab);
   }
 
   @override
@@ -61,8 +63,10 @@ class _DhikrHistoryProDashboardState extends ConsumerState<DhikrHistoryProDashbo
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
+                  physics: const ClampingScrollPhysics(),
                   children: [
                     _OverviewTab(state: tasbihState),
+                    _DhikrCalendarTab(state: tasbihState),
                     _AdhkarTab(initialSection: widget.initialAdhkarSection),
                     _AchievementsTab(state: tasbihState),
                   ],
@@ -203,9 +207,10 @@ class _DhikrHistoryProDashboardState extends ConsumerState<DhikrHistoryProDashbo
         dividerColor: Colors.transparent,
         labelColor: _gold,
         unselectedLabelColor: Colors.white38,
-        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         tabs: const [
           Tab(text: 'Overview'),
+          Tab(text: 'Calendar'),
           Tab(text: 'Adhkar'),
           Tab(text: 'Achievements'),
         ],
@@ -255,32 +260,32 @@ class _OverviewTab extends StatelessWidget {
 
   Widget _buildMetricsGrid() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: _cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _gold.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              _buildMetric('${_formatNumber(state.totalAllTime)}', 'Total Dhikr'),
-              const SizedBox(width: 16),
-              _buildMetric('${state.todayCount}', 'Today'),
+              _buildMetric(_formatNumber(state.totalAllTime), 'TOTAL DHIKR', Icons.all_inclusive_rounded),
+              Container(width: 1, height: 48, color: Colors.white.withValues(alpha: 0.06)),
+              _buildMetric('${state.todayCount}', 'TODAY', Icons.today_rounded),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Container(
             height: 1,
-            color: Colors.white.withValues(alpha: 0.04),
+            color: Colors.white.withValues(alpha: 0.05),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Row(
             children: [
-              _buildMetric('${state.monthlyTotal}', 'This Month'),
-              const SizedBox(width: 16),
-              _buildMetric('${state.completedTargets}', 'Goals Met'),
+              _buildMetric('${state.monthlyTotal}', 'THIS MONTH', Icons.calendar_month_rounded),
+              Container(width: 1, height: 48, color: Colors.white.withValues(alpha: 0.06)),
+              _buildMetric('${state.completedTargets}', 'GOALS MET', Icons.task_alt_rounded),
             ],
           ),
         ],
@@ -288,27 +293,35 @@ class _OverviewTab extends StatelessWidget {
     );
   }
 
-  Widget _buildMetric(String value, String label) {
+  Widget _buildMetric(String value, String label, IconData icon) {
     return Expanded(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: _gold.withValues(alpha: 0.5), size: 14),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           Text(
             value,
             style: const TextStyle(
-              color: _gold,
+              color: Colors.white,
               fontSize: 28,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w800,
               letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.4),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -321,37 +334,48 @@ class _OverviewTab extends StatelessWidget {
     final atRisk = state.todayCount == 0 && streak > 0;
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: atRisk ? const Color(0xFFFF6B35).withValues(alpha: 0.06) : _cardBg,
-        borderRadius: BorderRadius.circular(16),
+        color: atRisk ? const Color(0xFFFF6B35).withValues(alpha: 0.04) : _cardBg,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: atRisk 
               ? const Color(0xFFFF6B35).withValues(alpha: 0.2)
               : streak > 0 
-                  ? _gold.withValues(alpha: 0.2)
-                  : Colors.white.withValues(alpha: 0.04),
+                  ? _gold.withValues(alpha: 0.15)
+                  : Colors.white.withValues(alpha: 0.05),
         ),
       ),
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
               color: streak > 0 
-                  ? (atRisk ? const Color(0xFFFF6B35) : _gold).withValues(alpha: 0.12)
-                  : Colors.white.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text(
-                streak > 0 ? '🔥' : '⭐',
-                style: const TextStyle(fontSize: 24),
+                  ? (atRisk ? const Color(0xFFFF6B35) : _gold).withValues(alpha: 0.1)
+                  : Colors.white.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: streak > 0 
+                    ? (atRisk ? const Color(0xFFFF6B35) : _gold).withValues(alpha: 0.2)
+                    : Colors.white.withValues(alpha: 0.05),
               ),
             ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(
+                  streak > 0 ? Icons.local_fire_department_rounded : Icons.star_outline_rounded,
+                  color: streak > 0 
+                      ? (atRisk ? const Color(0xFFFF6B35) : _gold)
+                      : Colors.white.withValues(alpha: 0.3),
+                  size: 28,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -362,17 +386,19 @@ class _OverviewTab extends StatelessWidget {
                       '$streak',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
                         letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Text(
-                      'day streak',
+                      'DAY STREAK',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        fontSize: 14,
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.0,
                       ),
                     ),
                   ],
@@ -380,10 +406,11 @@ class _OverviewTab extends StatelessWidget {
                 if (atRisk) ...[
                   const SizedBox(height: 6),
                   Text(
-                    'Don\'t lose your streak! Count some dhikr today',
+                    'Count dhikr today to save your streak',
                     style: TextStyle(
                       color: const Color(0xFFFF6B35).withValues(alpha: 0.9),
-                      fontSize: 11,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -402,14 +429,14 @@ class _OverviewTab extends StatelessWidget {
     final isComplete = state.todayCount >= state.targetCount;
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isComplete ? _gold.withValues(alpha: 0.06) : _cardBg,
-        borderRadius: BorderRadius.circular(16),
+        color: isComplete ? _gold.withValues(alpha: 0.04) : _cardBg,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isComplete 
-              ? _gold.withValues(alpha: 0.2)
-              : Colors.white.withValues(alpha: 0.04),
+              ? _gold.withValues(alpha: 0.15)
+              : Colors.white.withValues(alpha: 0.05),
         ),
       ),
       child: Row(
@@ -419,42 +446,48 @@ class _OverviewTab extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isComplete ? 'Daily Goal Complete' : 'Daily Goal',
+                  isComplete ? 'DAILY GOAL COMPLETED' : 'DAILY GOAL',
                   style: TextStyle(
                     color: isComplete 
                         ? _gold 
                         : Colors.white.withValues(alpha: 0.4),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
                   children: [
                     Text(
                       '${state.todayCount}',
                       style: TextStyle(
                         color: isComplete ? _gold : Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
                       ),
                     ),
                     Text(
                       ' / ${state.targetCount}',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.4),
-                        fontSize: 24,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
                 if (!isComplete && state.targetCount > state.todayCount) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
-                    '${state.targetCount - state.todayCount} more to go',
+                    '${state.targetCount - state.todayCount} remaining today',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      fontSize: 11,
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -462,27 +495,38 @@ class _OverviewTab extends StatelessWidget {
             ),
           ),
           SizedBox(
-            width: 56,
-            height: 56,
+            width: 64,
+            height: 64,
             child: Stack(
               alignment: Alignment.center,
               children: [
                 CircularProgressIndicator(
-                  value: progress,
-                  strokeWidth: 5,
-                  backgroundColor: Colors.white.withValues(alpha: 0.06),
+                  value: 1.0,
+                  strokeWidth: 4,
                   valueColor: AlwaysStoppedAnimation(
-                    isComplete ? _gold : _gold.withValues(alpha: 0.6),
+                    Colors.white.withValues(alpha: 0.05),
                   ),
                 ),
-                Text(
-                  '${(progress * 100).toInt()}%',
-                  style: TextStyle(
-                    color: isComplete ? _gold : Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 4,
+                  strokeCap: StrokeCap.round,
+                  backgroundColor: Colors.transparent,
+                  valueColor: AlwaysStoppedAnimation(
+                    isComplete ? _gold : _gold.withValues(alpha: 0.8),
                   ),
                 ),
+                if (isComplete)
+                  const Icon(Icons.check_rounded, color: _gold, size: 24)
+                else
+                  Text(
+                    '${(progress * 100).toInt()}%',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -498,41 +542,37 @@ class _OverviewTab extends StatelessWidget {
     final avgPerDay = daysInMonth > 0 ? (state.monthlyTotal / daysInMonth) : 0.0;
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: _cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _gold.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
           _buildWeeklyStat(
             '${state.todayCount}',
-            'Today',
+            'TODAY',
             isPrimary: true,
           ),
-          const SizedBox(width: 12),
           Container(
             width: 1,
-            height: 40,
+            height: 48,
             color: Colors.white.withValues(alpha: 0.06),
           ),
-          const SizedBox(width: 12),
           _buildWeeklyStat(
             '~${(avgPerDay * 7).toStringAsFixed(0)}',
-            'Weekly Est',
+            'WEEKLY EST',
             isPrimary: false,
           ),
-          const SizedBox(width: 12),
           Container(
             width: 1,
-            height: 40,
+            height: 48,
             color: Colors.white.withValues(alpha: 0.06),
           ),
-          const SizedBox(width: 12),
           _buildWeeklyStat(
             avgPerDay.toStringAsFixed(1),
-            'Daily Avg',
+            'DAILY AVG',
             isPrimary: false,
           ),
         ],
@@ -547,17 +587,20 @@ class _OverviewTab extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              color: isPrimary ? _gold : Colors.white.withValues(alpha: 0.7),
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
+              color: isPrimary ? _gold : Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
             label,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.4),
               fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.0,
             ),
           ),
         ],
@@ -585,11 +628,11 @@ class _OverviewTab extends StatelessWidget {
     final maxCount = sorted.isNotEmpty ? sorted.first.value : 1;
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: _cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _gold.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: sorted.take(6).map((entry) {
@@ -599,7 +642,7 @@ class _OverviewTab extends StatelessWidget {
           final pct = maxCount > 0 ? entry.value / maxCount : 0.0;
           
           return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               children: [
                 Expanded(
@@ -607,38 +650,63 @@ class _OverviewTab extends StatelessWidget {
                   child: Text(
                     name,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 Expanded(
                   flex: 4,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: pct,
-                      backgroundColor: Colors.white.withValues(alpha: 0.04),
-                      valueColor: AlwaysStoppedAnimation(
-                        _gold.withValues(alpha: 0.3 + (pct * 0.7)),
-                      ),
-                      minHeight: 6,
+                  child: Container(
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: (pct * 1000).toInt(),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  _gold.withValues(alpha: 0.4),
+                                  _gold,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _gold.withValues(alpha: 0.2),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                )
+                              ],
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 1000 - (pct * 1000).toInt(),
+                          child: const SizedBox(),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 SizedBox(
-                  width: 40,
+                  width: 48,
                   child: Text(
                     '${entry.value}',
                     textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: _gold.withValues(alpha: 0.8),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -664,32 +732,41 @@ class _OverviewTab extends StatelessWidget {
     final remaining = next - state.totalAllTime;
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: _cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _gold.withValues(alpha: 0.15)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _gold.withValues(alpha: 0.1)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            _cardBg,
+            _gold.withValues(alpha: 0.02),
+          ],
+        ),
       ),
       child: Column(
         children: [
           Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
-                  color: _gold.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  color: _gold.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _gold.withValues(alpha: 0.2)),
                 ),
                 child: Center(
                   child: Icon(
                     Icons.flag_rounded,
                     color: _gold,
-                    size: 22,
+                    size: 28,
                   ),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 20),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -698,15 +775,19 @@ class _OverviewTab extends StatelessWidget {
                       _formatNumber(next),
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
                       ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
-                      'Dhikr',
+                      'DHIKR MILESTONE',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.4),
-                        fontSize: 12,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.5,
                       ),
                     ),
                   ],
@@ -714,33 +795,36 @@ class _OverviewTab extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 24),
           ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
               value: progress.clamp(0.0, 1.0),
-              backgroundColor: Colors.white.withValues(alpha: 0.06),
+              backgroundColor: Colors.white.withValues(alpha: 0.05),
               valueColor: const AlwaysStoppedAnimation(_gold),
-              minHeight: 6,
+              minHeight: 8,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${(progress * 100).toInt()}%',
+                '${(progress * 100).toInt()}% COMPLETED',
                 style: TextStyle(
-                  color: _gold.withValues(alpha: 0.8),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+                  color: _gold.withValues(alpha: 0.9),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
                 ),
               ),
               Text(
-                '${_formatNumber(remaining)} to go',
+                '${_formatNumber(remaining)} REMAINING',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.4),
-                  fontSize: 11,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
                 ),
               ),
             ],
@@ -752,15 +836,220 @@ class _OverviewTab extends StatelessWidget {
 
   Widget _buildSectionLabel(String text) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4),
+      padding: const EdgeInsets.only(left: 4, top: 8),
       child: Text(
-        text,
+        text.toUpperCase(),
         style: TextStyle(
           color: Colors.white.withValues(alpha: 0.4),
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.5,
         ),
+      ),
+    );
+  }
+
+  String _formatNumber(int n) {
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
+    return n.toString();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DHIKR CALENDAR TAB - 365-dot year grid
+// ═══════════════════════════════════════════════════════════════════════════════
+class _DhikrCalendarTab extends StatefulWidget {
+  final TasbihState state;
+  const _DhikrCalendarTab({required this.state});
+
+  @override
+  State<_DhikrCalendarTab> createState() => _DhikrCalendarTabState();
+}
+
+class _DhikrCalendarTabState extends State<_DhikrCalendarTab> {
+  static const _gold = Color(0xFFC2A366);
+  static const _cardBg = Color(0xFF0D0D0D);
+  static const _hiveKey = 'dhikr_dots_color';
+
+  DotsColorTheme _colorTheme = DotsColorTheme.emerald;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadColorPref();
+  }
+
+  Future<void> _loadColorPref() async {
+    final box = await Hive.openBox('settings');
+    final idx = box.get(_hiveKey, defaultValue: 2) as int; // default emerald (index 2)
+    if (idx >= 0 && idx < DotsColorTheme.values.length) {
+      setState(() => _colorTheme = DotsColorTheme.values[idx]);
+    }
+  }
+
+  Future<void> _saveColorPref(DotsColorTheme theme) async {
+    final box = await Hive.openBox('settings');
+    await box.put(_hiveKey, theme.index);
+  }
+
+  // Determine intensity bucket for dhikr daily count
+  // Use adaptive thresholds based on user's target
+  DayDotData _dhikrDataForDay(int dayOfYear) {
+    final year = DateTime.now().year;
+    final date = DateTime(year, 1, 1).add(Duration(days: dayOfYear - 1));
+    final key = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final count = widget.state.dailyHistory[key] ?? 0;
+
+    // Intensity thresholds: 0, 1-33, 34-99, 100+
+    double intensity;
+    if (count == 0) {
+      intensity = 0.0;
+    } else if (count <= 33) {
+      intensity = 0.25;
+    } else if (count <= 99) {
+      intensity = 0.55;
+    } else {
+      intensity = 1.0;
+    }
+    return DayDotData(intensity: intensity, rawCount: count);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final year = DateTime.now().year;
+    final history = widget.state.dailyHistory;
+
+    // Calculate year stats
+    int activeDays = 0;
+    int yearTotal = 0;
+    int bestDay = 0;
+    history.forEach((key, count) {
+      if (key.startsWith('$year-')) {
+        if (count > 0) activeDays++;
+        yearTotal += count;
+        if (count > bestDay) bestDay = count;
+      }
+    });
+
+    return Container(
+      color: Colors.black, // High contrast pure black background
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+        physics: const ClampingScrollPhysics(),
+        children: [
+          // ══ HERO: Year 365 dots — ~80% of first screen ══
+          YearDotsAnalyticsGrid(
+            year: year,
+            colorTheme: _colorTheme,
+            dataForDay: _dhikrDataForDay,
+            subtitle: 'Dhikr • $year',
+            legendLabels: const ['0', '1-33', '34-99', '100+'],
+          ),
+          const SizedBox(height: 14),
+          // Color picker — inline, minimal
+          DotsColorPicker(
+            selected: _colorTheme,
+            onChanged: (theme) {
+              setState(() => _colorTheme = theme);
+              _saveColorPref(theme);
+            },
+          ),
+
+          // ══ scroll indicator ══
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Row(
+              children: [
+                Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.06))),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'Year Stats',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+                Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.06))),
+              ],
+            ),
+          ),
+
+          // ══ Year stats (below fold) ══
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: _cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+            ),
+            child: Row(
+              children: [
+                _buildStatItem('$activeDays', 'Active Days'),
+                Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.06)),
+                _buildStatItem(_formatNumber(yearTotal), 'Year Total'),
+                Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.06)),
+                _buildStatItem(_formatNumber(bestDay), 'Best Day'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // ── tip card ──
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: _colorTheme.color.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _colorTheme.color.withValues(alpha: 0.08)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.circle, color: _colorTheme.color.withValues(alpha: 0.4), size: 10),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Brighter dot = more dhikr that day. Count daily to fill your year.',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.32),
+                      fontSize: 11,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String value, String label) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              color: _gold,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.4),
+              fontSize: 10,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -801,7 +1090,7 @@ class _AdhkarTabState extends State<_AdhkarTab> {
 
   Future<void> _loadProgress() async {
     try {
-      final box = await Hive.openBox('adhkar_data');
+      final box = await HiveBoxManager.get('adhkar_data');
       final today = DateTime.now().toIso8601String().split('T')[0];
       final saved = box.get('adhkar_progress_$today');
       if (saved != null && saved is Map) {
@@ -814,7 +1103,7 @@ class _AdhkarTabState extends State<_AdhkarTab> {
 
   Future<void> _saveProgress() async {
     try {
-      final box = await Hive.openBox('adhkar_data');
+      final box = await HiveBoxManager.get('adhkar_data');
       final today = DateTime.now().toIso8601String().split('T')[0];
       await box.put('adhkar_progress_$today', _adhkarProgress);
       await box.put('names_learned', _namesLearned);
@@ -1207,22 +1496,22 @@ class _AdhkarTabState extends State<_AdhkarTab> {
   // ─── DATA ───
   List<Map<String, dynamic>> _getMorningAdhkar() {
     return [
-      {'key': 'morning_ayatul_kursi', 'arabic': '\u0627\u0644\u0644\u0651\u064E\u0647\u064F \u0644\u0627 \u0625\u0650\u0644\u0670\u0647\u064E \u0625\u0650\u0644\u0651\u064E\u0627 \u0647\u064F\u0648\u064E \u0627\u0644\u0652\u062D\u064E\u064A\u0651\u064F \u0627\u0644\u0652\u0642\u064E\u064A\u0651\u064F\u0648\u0645\u064F', 'translation': 'Allah, there is no god but He, the Living, the Self-Subsisting', 'count': 1},
+      {'key': 'morning_ayatul_kursi', 'arabic': '\u0627\u0644\u0644\u0651\u064E\u0647\u064F \u0644\u0627 \u0625\u0650\u0644\u0670\u0648\u0644\u064E \u0625\u0650\u0644\u0651\u064E\u0627 \u0647\u064F\u0648\u064E \u0627\u0644\u0652\u062D\u064E\u064A\u0651\u064F \u0627\u0644\u0652\u0642\u064E\u064A\u0651\u064F\u0648\u0645\u064F', 'translation': 'Allah, there is no god but He, the Living, the Self-Subsisting', 'count': 1},
       {'key': 'morning_ikhlas', 'arabic': '\u0642\u064F\u0644\u0652 \u0647\u064F\u0648\u064E \u0627\u0644\u0644\u0651\u064E\u0647\u064F \u0623\u064E\u062D\u064E\u062F\u064C', 'translation': 'Say: He is Allah, the One', 'count': 3},
-      {'key': 'morning_falaq', 'arabic': '\u0642\u064F\u0644\u0652 \u0623\u064E\u0639\u064F\u0648\u0630\u064F \u0628\u0650\u0631\u064E\u0628\u0651\u0650 \u0627\u0644\u0652\u0641\u064E\u0644\u064E\u0642\u0650', 'translation': 'Say: I seek refuge in the Lord of daybreak', 'count': 3},
-      {'key': 'morning_naas', 'arabic': '\u0642\u064F\u0644\u0652 \u0623\u064E\u0639\u064F\u0648\u0630\u064F \u0628\u0650\u0631\u064E\u0628\u0651\u0650 \u0627\u0644\u0646\u0651\u064E\u0627\u0633\u0650', 'translation': 'Say: I seek refuge in the Lord of mankind', 'count': 3},
-      {'key': 'morning_master', 'arabic': '\u0627\u0644\u0644\u0651\u064E\u0647\u064F\u0645\u0651\u064E \u0623\u064E\u0646\u0652\u062A\u064E \u0631\u064E\u0628\u0651\u0650\u064A \u0644\u0627 \u0625\u0650\u0644\u0670\u0647\u064E \u0625\u0650\u0644\u0651\u064E\u0627 \u0623\u064E\u0646\u0652\u062A\u064E', 'translation': 'O Allah, You are my Lord, none has the right to be worshipped but You', 'count': 1},
+      {'key': 'morning_falaq', 'arabic': '\u0642\u064F\u0644\u0652 \u0623\u064E\u0639\u064F\u0648\u0632\u064F \u0628\u0650\u0631\u064E\u0628\u0651\u0650 \u0627\u0644\u0652\u0641\u064E\u0644\u064E\u0642\u0650', 'translation': 'Say: I seek refuge in the Lord of daybreak', 'count': 3},
+      {'key': 'morning_naas', 'arabic': '\u0642\u064F\u0644\u0652 \u0623\u064E\u0639\u064F\u0648\u0632\u064F \u0628\u0650\u0631\u064E\u0628\u0651\u0650 \u0627\u0644\u0646\u0651\u064E\u0627\u0633\u0650', 'translation': 'Say: I seek refuge in the Lord of mankind', 'count': 3},
+      {'key': 'morning_master', 'arabic': '\u0627\u0644\u0644\u0651\u064E\u0647\u064F\u0645\u0651\u064E \u0623\u064E\u0646\u0652\u062A\u064E \u0631\u064E\u0628\u0651\u0650\u064A \u0644\u0627 \u0625\u0650\u0644\u0670\u0648\u0644\u064E \u0625\u0650\u0644\u0651\u064E\u0627 \u0623\u064E\u0646\u0652\u062A\u064E', 'translation': 'O Allah, You are my Lord, none has the right to be worshipped but You', 'count': 1},
       {'key': 'morning_subhanallah', 'arabic': '\u0633\u064F\u0628\u0652\u062D\u064E\u0627\u0646\u064E \u0627\u0644\u0644\u0651\u064E\u0647\u0650 \u0648\u064E\u0628\u0650\u062D\u064E\u0645\u0652\u062F\u0650\u0647\u0650', 'translation': 'Glory and praise be to Allah', 'count': 100},
     ];
   }
 
   List<Map<String, dynamic>> _getEveningAdhkar() {
     return [
-      {'key': 'evening_ayatul_kursi', 'arabic': '\u0627\u0644\u0644\u0651\u064E\u0647\u064F \u0644\u0627 \u0625\u0650\u0644\u0670\u0647\u064E \u0625\u0650\u0644\u0651\u064E\u0627 \u0647\u064F\u0648\u064E \u0627\u0644\u0652\u062D\u064E\u064A\u0651\u064F \u0627\u0644\u0652\u0642\u064E\u064A\u0651\u064F\u0648\u0645\u064F', 'translation': 'Allah, there is no god but He, the Living, the Self-Subsisting', 'count': 1},
+      {'key': 'evening_ayatul_kursi', 'arabic': '\u0627\u0644\u0644\u0651\u064E\u0647\u064F \u0644\u0627 \u0625\u0650\u0644\u0670\u0648\u0644\u064E \u0625\u0650\u0644\u0651\u064E\u0627 \u0647\u064F\u0648\u064E \u0627\u0644\u0652\u062D\u064E\u064A\u0651\u064F \u0627\u0644\u0652\u0642\u064E\u064A\u0651\u064F\u0648\u0645\u064F', 'translation': 'Allah, there is no god but He, the Living, the Self-Subsisting', 'count': 1},
       {'key': 'evening_ikhlas', 'arabic': '\u0642\u064F\u0644\u0652 \u0647\u064F\u0648\u064E \u0627\u0644\u0644\u0651\u064E\u0647\u064F \u0623\u064E\u062D\u064E\u062F\u064C', 'translation': 'Say: He is Allah, the One', 'count': 3},
-      {'key': 'evening_falaq', 'arabic': '\u0642\u064F\u0644\u0652 \u0623\u064E\u0639\u064F\u0648\u0630\u064F \u0628\u0650\u0631\u064E\u0628\u0651\u0650 \u0627\u0644\u0652\u0641\u064E\u0644\u064E\u0642\u0650', 'translation': 'Say: I seek refuge in the Lord of daybreak', 'count': 3},
-      {'key': 'evening_naas', 'arabic': '\u0642\u064F\u0644\u0652 \u0623\u064E\u0639\u064F\u0648\u0630\u064F \u0628\u0650\u0631\u064E\u0628\u0651\u0650 \u0627\u0644\u0646\u0651\u064E\u0627\u0633\u0650', 'translation': 'Say: I seek refuge in the Lord of mankind', 'count': 3},
-      {'key': 'evening_protection', 'arabic': '\u0623\u064E\u0639\u064F\u0648\u0630\u064F \u0628\u0650\u0643\u064E\u0644\u0650\u0645\u064E\u0627\u062A\u0650 \u0627\u0644\u0644\u0651\u064E\u0647\u0650 \u0627\u0644\u062A\u0651\u064E\u0627\u0645\u0651\u064E\u0627\u062A\u0650 \u0645\u0650\u0646 \u0634\u064E\u0631\u0651\u0650 \u0645\u064E\u0627 \u062E\u064E\u0644\u064E\u0642\u064E', 'translation': 'I seek refuge in the perfect words of Allah from the evil of what He created', 'count': 3},
+      {'key': 'evening_falaq', 'arabic': '\u0642\u064F\u0644\u0652 \u0623\u064E\u0639\u064F\u0648\u0632\u064F \u0628\u0650\u0631\u064E\u0628\u0651\u0650 \u0627\u0644\u0652\u0641\u064E\u0644\u064E\u0642\u0650', 'translation': 'Say: I seek refuge in the Lord of daybreak', 'count': 3},
+      {'key': 'evening_naas', 'arabic': '\u0642\u064F\u0644\u0652 \u0623\u064E\u0639\u064F\u0648\u0632\u064F \u0628\u0650\u0631\u064E\u0628\u0651\u0650 \u0627\u0644\u0646\u0651\u064E\u0627\u0633\u0650', 'translation': 'Say: I seek refuge in the Lord of mankind', 'count': 3},
+      {'key': 'evening_protection', 'arabic': '\u0623\u064E\u0639\u064F\u0648\u0632\u064F \u0628\u0650\u0643\u064E\u0644\u0650\u0645\u064E\u0627\u062A\u0650 \u0627\u0644\u0644\u0651\u064E\u0647\u0650 \u0627\u0644\u062A\u0651\u064E\u062A\u0641\u064E\u0645\u0650 \u0645\u0650\u0646 \u0634\u064E\u0631\u0651\u0650 \u0645\u064E\u0627 \u062E\u064E\u0644\u064E\u0642\u064E', 'translation': 'I seek refuge in the perfect words of Allah from the evil of what He created', 'count': 3},
       {'key': 'evening_subhanallah', 'arabic': '\u0633\u064F\u0628\u0652\u062D\u064E\u0627\u0646\u064E \u0627\u0644\u0644\u0651\u064E\u0647\u0650 \u0648\u064E\u0628\u0650\u062D\u064E\u0645\u0652\u062F\u0650\u0647\u0650', 'translation': 'Glory and praise be to Allah', 'count': 100},
     ];
   }
@@ -1253,7 +1542,7 @@ class _AdhkarTabState extends State<_AdhkarTab> {
       {'arabic': '\u0627\u0644\u0652\u062E\u064E\u0627\u0641\u0650\u0636\u064F', 'english': 'The Abaser'},
       {'arabic': '\u0627\u0644\u0631\u0651\u064E\u0627\u0641\u0650\u0639\u064F', 'english': 'The Exalter'},
       {'arabic': '\u0627\u0644\u0652\u0645\u064F\u0639\u0650\u0632\u0651\u064F', 'english': 'The Honorer'},
-      {'arabic': '\u0627\u0644\u0645\u064F\u0630\u0650\u0644\u0651\u064F', 'english': 'The Humiliator'},
+      {'arabic': '\u0627\u0644\u0645\u064F\u0632\u0650\u0644\u0651\u064F', 'english': 'The Humiliator'},
       {'arabic': '\u0627\u0644\u0633\u0651\u064E\u0645\u0650\u064A\u0639\u064F', 'english': 'The All-Hearing'},
       {'arabic': '\u0627\u0644\u0652\u0628\u064E\u0635\u0650\u064A\u0631\u064F', 'english': 'The All-Seeing'},
       {'arabic': '\u0627\u0644\u0652\u062D\u064E\u0643\u064E\u0645\u064F', 'english': 'The Judge'},
@@ -1264,11 +1553,9 @@ class _AdhkarTabState extends State<_AdhkarTab> {
 
   List<Map<String, String>> _getPropheticDuas() {
     return [
-      {'arabic': '\u0631\u064E\u0628\u0651\u064E\u0646\u064E\u0627 \u0622\u062A\u0650\u0646\u064E\u0627 \u0641\u0650\u064A \u0627\u0644\u062F\u0651\u064F\u0646\u0652\u064A\u064E\u0627 \u062D\u064E\u0633\u064E\u0646\u064E\u0629\u064B \u0648\u064E\u0641\u0650\u064A \u0627\u0644\u0652\u0622\u062E\u0650\u0631\u064E\u0629\u0650 \u062D\u064E\u0633\u064E\u0646\u064E\u0629\u064B \u0648\u064E\u0642\u0650\u0646\u064E\u0627 \u0639\u064E\u0630\u064E\u0627\u0628\u064E \u0627\u0644\u0646\u0651\u064E\u0627\u0631\u0650', 'translation': 'Our Lord, give us good in this world and good in the Hereafter, and protect us from the punishment of the Fire.', 'source': 'Al-Baqarah 2:201'},
-      {'arabic': '\u0627\u0644\u0644\u0651\u064E\u0647\u064F\u0645\u0651\u064E \u0625\u0650\u0646\u0651\u0650\u064A \u0623\u064E\u0639\u064F\u0648\u0630\u064F \u0628\u0650\u0643\u064E \u0645\u0650\u0646\u064E \u0627\u0644\u0652\u0647\u064E\u0645\u0651\u0650 \u0648\u064E\u0627\u0644\u0652\u062D\u064E\u0632\u064E\u0646\u0650', 'translation': 'O Allah, I seek refuge in You from worry and grief.', 'source': 'Bukhari'},
-      {'arabic': '\u0631\u064E\u0628\u0651\u0650 \u0627\u0634\u0652\u0631\u064E\u062D\u0652 \u0644\u0650\u064A \u0635\u064E\u062F\u0652\u0631\u0650\u064A \u0648\u064E\u064A\u064E\u0633\u0651\u0650\u0631\u0652 \u0644\u0650\u064A \u0623\u064E\u0645\u0652\u0631\u0650\u064A', 'translation': 'My Lord, expand for me my chest and ease for me my task.', 'source': 'Ta-Ha 20:25-26'},
-      {'arabic': '\u0627\u0644\u0644\u0651\u064E\u0647\u064F\u0645\u0651\u064E \u0623\u064E\u0639\u0650\u0646\u0651\u0650\u064A \u0639\u064E\u0644\u064E\u0649 \u0630\u0650\u0643\u0652\u0631\u0650\u0643\u064E \u0648\u064E\u0634\u064F\u0643\u0652\u0631\u0650\u0643\u064E \u0648\u064E\u062D\u064F\u0633\u0652\u0646\u0650 \u0639\u0650\u0628\u064E\u0627\u062F\u064E\u062A\u0650\u0643\u064E', 'translation': 'O Allah, help me to remember You, thank You, and worship You well.', 'source': 'Abu Dawud'},
-      {'arabic': '\u0631\u064E\u0628\u0651\u064E\u0646\u064E\u0627 \u0644\u0627 \u062A\u064F\u0632\u0650\u063A\u0652 \u0642\u064F\u0644\u064F\u0648\u0628\u064E\u0646\u064E\u0627 \u0628\u064E\u0639\u0652\u062F\u064E \u0625\u0650\u0630\u0652 \u0647\u064E\u062F\u064E\u064A\u0652\u062A\u064E\u0646\u064E\u0627', 'translation': 'Our Lord, do not let our hearts deviate after You have guided us.', 'source': 'Aal Imran 3:8'},
+      {'arabic': '\u0631\u064E\u0628\u0651\u064E\u0646\u064E\u0627 \u0622\u062A\u0650\u0646\u064E\u0627 \u0641\u0650\u064A \u0627\u0644\u062F\u0651\u064F\u0646\u0652\u064A\u064E\u0627 \u062D\u064E\u0633\u064E\u0646\u064E\u0629\u064B \u0648\u064E\u0641\u0650\u064A \u0627\u0644\u0652\u0622\u062E\u0650\u0631\u064E\u0629\u0650 \u062D\u064E\u0633\u064E\u0646\u064E\u0629\u064B \u0648\u064E\u0642\u0650\u0646\u064E\u0627 \u0639\u064E\u0632\u064E\u0628\u064E \u0627\u0644\u0646\u0651\u064E\u0627\u0631\u0650', 'translation': 'Our Lord, give us good in this world and good in the Hereafter, and protect us from the punishment of the Fire.', 'source': 'Al-Baqarah 2:201'},
+      {'arabic': '\u0644\u064E\u0627 \u062A\u062E\u0632\u064A\u0646\u064A \u0628\u064A\u0646\u064A \u0648\u0628\u064A\u0646\u0643َ شَرًّا', 'translation': 'Do not place between me and them (my enemies) any barrier of evil.', 'source': 'Al-Mumtahanah 60:5'},
+      {'arabic': '\u0631\u064E\u0628\u0651\u064E\u0646\u064E\u0627 \u0644\u0627 \u062A\u064F\u0632\u0650\u063A\u0652 \u0642\u064F\u0644\u064F\u0648\u0628\u064E\u0646\u064E\u0627 \u0628\u064E\u0639\u0652\u062F\u064E \u0625\u0650\u0632\u0652 \u0647\u064E\u062F\u064E\u064A\u0652\u062A\u064E\u0646\u064E\u0627', 'translation': 'Our Lord, do not let our hearts deviate after You have guided us.', 'source': 'Aal Imran 3:8'},
     ];
   }
 }
@@ -1293,32 +1580,34 @@ class _AchievementsTab extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: _cardBg,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(color: _gold.withValues(alpha: 0.15)),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
-                      color: _gold.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
+                      color: _gold.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: _gold.withValues(alpha: 0.2)),
                     ),
                     child: Center(
                       child: Icon(
                         Icons.emoji_events_rounded,
                         color: _gold,
-                        size: 24,
+                        size: 28,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1327,15 +1616,19 @@ class _AchievementsTab extends StatelessWidget {
                           '$unlocked of ${achievements.length}',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
                           ),
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           'Achievements unlocked',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.4),
+                            color: Colors.white.withValues(alpha: 0.5),
                             fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.2,
                           ),
                         ),
                       ],
@@ -1343,22 +1636,34 @@ class _AchievementsTab extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 20),
               ClipRRect(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(8),
                 child: LinearProgressIndicator(
                   value: unlocked / achievements.length,
-                  backgroundColor: Colors.white.withValues(alpha: 0.06),
+                  backgroundColor: Colors.white.withValues(alpha: 0.05),
                   valueColor: const AlwaysStoppedAnimation(_gold),
-                  minHeight: 6,
+                  minHeight: 8,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'MILESTONES',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.4),
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.5,
+            ),
+          ),
+        ),
         ...achievements.map((a) => Padding(
-          padding: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.only(bottom: 12),
           child: _buildAchievementCard(a),
         )),
       ],
@@ -1372,37 +1677,43 @@ class _AchievementsTab extends StatelessWidget {
     final tierColor = _getTierColor(tier);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: unlocked 
-            ? tierColor.withValues(alpha: 0.06)
+            ? tierColor.withValues(alpha: 0.04)
             : _cardBg,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: unlocked 
               ? tierColor.withValues(alpha: 0.2)
-              : Colors.white.withValues(alpha: 0.04),
+              : Colors.white.withValues(alpha: 0.05),
         ),
       ),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               color: unlocked 
-                  ? tierColor.withValues(alpha: 0.12)
-                  : Colors.white.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(10),
+                  ? tierColor.withValues(alpha: 0.1)
+                  : Colors.white.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: unlocked 
+                    ? tierColor.withValues(alpha: 0.2)
+                    : Colors.white.withValues(alpha: 0.05),
+              ),
             ),
             child: Center(
-              child: Text(
-                achievement['icon'] as String,
-                style: const TextStyle(fontSize: 22),
+              child: Icon(
+                achievement['icon'] as IconData,
+                color: unlocked ? tierColor : Colors.white.withValues(alpha: 0.2),
+                size: 24,
               ),
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1414,61 +1725,64 @@ class _AchievementsTab extends StatelessWidget {
                       style: TextStyle(
                         color: unlocked 
                             ? Colors.white 
-                            : Colors.white.withValues(alpha: 0.4),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                            : Colors.white.withValues(alpha: 0.5),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: tierColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(4),
+                        color: tierColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        tier,
+                        tier.toUpperCase(),
                         style: TextStyle(
                           color: tierColor,
                           fontSize: 9,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   achievement['description'] as String,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.35),
+                    color: Colors.white.withValues(alpha: 0.4),
                     fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 if (!unlocked && progress > 0) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(2),
+                          borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
                             value: progress,
-                            backgroundColor: Colors.white.withValues(alpha: 0.06),
+                            backgroundColor: Colors.white.withValues(alpha: 0.05),
                             valueColor: AlwaysStoppedAnimation(
-                              tierColor.withValues(alpha: 0.5),
+                              tierColor.withValues(alpha: 0.6),
                             ),
-                            minHeight: 4,
+                            minHeight: 6,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 12),
                       Text(
                         '${(progress * 100).toInt()}%',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: Colors.white.withValues(alpha: 0.4),
                           fontSize: 10,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
@@ -1477,24 +1791,24 @@ class _AchievementsTab extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           unlocked
               ? Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: tierColor.withValues(alpha: 0.15),
+                    color: tierColor.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.check_rounded,
                     color: tierColor,
-                    size: 16,
+                    size: 18,
                   ),
                 )
               : Icon(
-                  Icons.lock_outline,
-                  color: Colors.white.withValues(alpha: 0.15),
-                  size: 20,
+                  Icons.lock_outline_rounded,
+                  color: Colors.white.withValues(alpha: 0.1),
+                  size: 22,
                 ),
         ],
       ),
@@ -1523,7 +1837,7 @@ class _AchievementsTab extends StatelessWidget {
 
     return [
       {
-        'icon': '🌱',
+        'icon': Icons.spa_rounded,
         'title': 'First Step',
         'description': 'Complete your first dhikr',
         'unlocked': total > 0,
@@ -1531,7 +1845,7 @@ class _AchievementsTab extends StatelessWidget {
         'progress': total > 0 ? 1.0 : 0.0,
       },
       {
-        'icon': '💯',
+        'icon': Icons.grade_rounded,
         'title': 'Century Club',
         'description': 'Reach 100 total dhikr',
         'unlocked': total >= 100,
@@ -1539,7 +1853,7 @@ class _AchievementsTab extends StatelessWidget {
         'progress': (total / 100).clamp(0.0, 1.0),
       },
       {
-        'icon': '🔥',
+        'icon': Icons.local_fire_department_rounded,
         'title': 'Week Warrior',
         'description': 'Maintain a 7-day streak',
         'unlocked': streak >= 7,
@@ -1547,7 +1861,7 @@ class _AchievementsTab extends StatelessWidget {
         'progress': (streak / 7).clamp(0.0, 1.0),
       },
       {
-        'icon': '🎯',
+        'icon': Icons.ads_click_rounded,
         'title': 'Goal Getter',
         'description': 'Complete daily target 10 times',
         'unlocked': targets >= 10,
@@ -1555,7 +1869,7 @@ class _AchievementsTab extends StatelessWidget {
         'progress': (targets / 10).clamp(0.0, 1.0),
       },
       {
-        'icon': '📿',
+        'icon': Icons.brightness_auto_rounded,
         'title': 'Devoted',
         'description': 'Reach 1,000 total dhikr',
         'unlocked': total >= 1000,
@@ -1563,7 +1877,7 @@ class _AchievementsTab extends StatelessWidget {
         'progress': (total / 1000).clamp(0.0, 1.0),
       },
       {
-        'icon': '🌙',
+        'icon': Icons.nightlight_round,
         'title': 'Month Master',
         'description': 'Maintain a 30-day streak',
         'unlocked': streak >= 30,
@@ -1571,7 +1885,7 @@ class _AchievementsTab extends StatelessWidget {
         'progress': (streak / 30).clamp(0.0, 1.0),
       },
       {
-        'icon': '⭐',
+        'icon': Icons.auto_awesome_rounded,
         'title': 'Rising Star',
         'description': 'Reach 10,000 total dhikr',
         'unlocked': total >= 10000,
@@ -1579,7 +1893,7 @@ class _AchievementsTab extends StatelessWidget {
         'progress': (total / 10000).clamp(0.0, 1.0),
       },
       {
-        'icon': '👑',
+        'icon': Icons.diamond_rounded,
         'title': 'Dhikr Master',
         'description': 'Reach 100,000 total dhikr',
         'unlocked': total >= 100000,

@@ -33,7 +33,7 @@ class BlockedAppScreen extends StatefulWidget {
           child: child,
         );
       },
-      pageBuilder: (ctx, _, __) => BlockedAppScreen(appName: appName),
+      pageBuilder: (ctx, _, _) => BlockedAppScreen(appName: appName),
     );
   }
 
@@ -114,7 +114,7 @@ class _BlockedAppScreenState extends State<BlockedAppScreen>
                   // ── Pulsing block icon ──
                   AnimatedBuilder(
                     animation: _pulseAnim,
-                    builder: (_, __) => Container(
+                    builder: (_, _) => Container(
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(

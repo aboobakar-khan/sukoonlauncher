@@ -36,6 +36,7 @@ class TasbihState {
   final List<String> unlockedAchievements;
   final bool soundEnabled;
   final int completedTargets; // How many times target was reached
+  final Map<String, int> dailyHistory; // dateKey (YYYY-MM-DD) → total count that day
 
   TasbihState({
     Map<int, int>? dhikrCounts,
@@ -48,10 +49,12 @@ class TasbihState {
     this.streakDays = 0,
     this.lastStreakDate = '',
     List<String>? unlockedAchievements,
+    Map<String, int>? dailyHistory,
     this.soundEnabled = false,
     this.completedTargets = 0,
   }) : dhikrCounts = dhikrCounts ?? {},
-       unlockedAchievements = unlockedAchievements ?? [];
+       unlockedAchievements = unlockedAchievements ?? [],
+       dailyHistory = dailyHistory ?? {};
 
   // Get current count for selected dhikr
   int get currentCount => dhikrCounts[selectedDhikrIndex] ?? 0;
@@ -86,6 +89,7 @@ class TasbihState {
     List<String>? unlockedAchievements,
     bool? soundEnabled,
     int? completedTargets,
+    Map<String, int>? dailyHistory,
   }) {
     return TasbihState(
       dhikrCounts: dhikrCounts ?? this.dhikrCounts,
@@ -100,6 +104,7 @@ class TasbihState {
       unlockedAchievements: unlockedAchievements ?? this.unlockedAchievements,
       soundEnabled: soundEnabled ?? this.soundEnabled,
       completedTargets: completedTargets ?? this.completedTargets,
+      dailyHistory: dailyHistory ?? this.dailyHistory,
     );
   }
 
@@ -116,6 +121,7 @@ class TasbihState {
     'unlockedAchievements': unlockedAchievements,
     'soundEnabled': soundEnabled,
     'completedTargets': completedTargets,
+    'dailyHistory': dailyHistory,
   };
 
   factory TasbihState.fromJson(Map<String, dynamic> json) {
@@ -131,6 +137,13 @@ class TasbihState {
       final oldIndex = json['selectedDhikrIndex'] as int? ?? 0;
       counts[oldIndex] = oldCount;
     }
+
+    // Parse dailyHistory
+    Map<String, int> history = {};
+    if (json['dailyHistory'] != null) {
+      final rawHistory = json['dailyHistory'] as Map<String, dynamic>;
+      history = rawHistory.map((k, v) => MapEntry(k, v as int));
+    }
     
     return TasbihState(
       dhikrCounts: counts,
@@ -145,6 +158,7 @@ class TasbihState {
       unlockedAchievements: (json['unlockedAchievements'] as List<dynamic>?)?.cast<String>() ?? [],
       soundEnabled: json['soundEnabled'] as bool? ?? false,
       completedTargets: json['completedTargets'] as int? ?? 0,
+      dailyHistory: history,
     );
   }
 }
@@ -283,7 +297,7 @@ class TasbihNotifier extends StateNotifier<TasbihState> {
   }
 
   Future<void> _init() async {
-    _box = await Hive.openBox<String>(_boxName);
+    _box = await HiveBoxManager.get<String>(_boxName);
     final saved = _box?.get(_key);
     if (saved != null) {
       try {
@@ -330,7 +344,7 @@ class TasbihNotifier extends StateNotifier<TasbihState> {
   }
 
   Future<void> _save() async {
-    _box ??= await Hive.openBox<String>(_boxName);
+    _box ??= await HiveBoxManager.get<String>(_boxName);
     await _box?.put(_key, jsonEncode(state.toJson()));
   }
 
@@ -358,6 +372,10 @@ class TasbihNotifier extends StateNotifier<TasbihState> {
     if (newCount == state.targetCount) {
       completedTargets++;
     }
+
+    // Update daily history (dateKey → total dhikr count that day)
+    final newHistory = Map<String, int>.from(state.dailyHistory);
+    newHistory[today] = (newHistory[today] ?? 0) + 1;
     
     state = state.copyWith(
       dhikrCounts: newCounts,
@@ -368,6 +386,7 @@ class TasbihNotifier extends StateNotifier<TasbihState> {
       streakDays: newStreak,
       lastStreakDate: today,
       completedTargets: completedTargets,
+      dailyHistory: newHistory,
     );
     
     // Check and unlock achievements

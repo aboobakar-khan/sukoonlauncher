@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'dart:math';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../providers/zen_mode_provider.dart';
 
@@ -28,6 +26,7 @@ class _ZenModeActiveScreenState extends ConsumerState<ZenModeActiveScreen>
   Timer? _immersiveEnforcer;
   late AnimationController _breatheCtrl;
   int _quoteIndex = 0;
+  Timer? _quoteTimer;
   
   // Audio
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -37,10 +36,10 @@ class _ZenModeActiveScreenState extends ConsumerState<ZenModeActiveScreen>
   static const _blockerChannel = MethodChannel('com.sukoon.launcher/app_blocker');
 
   static const _sounds = [
-    {'name': 'Gentle Water', 'file': 'sounds/gentlewater warm.mp3'},
+    {'name': 'Gentle Water', 'file': 'sounds/gentle_water.mp3'},
     {'name': 'Rain', 'file': 'sounds/rain.mp3'},
-    {'name': 'Stream', 'file': 'sounds/stremafall.mp3'},
-    {'name': 'Waterfall', 'file': 'sounds/waterfall(chosic.com).mp3'},
+    {'name': 'Stream', 'file': 'sounds/streamfall.mp3'},
+    {'name': 'Waterfall', 'file': 'sounds/waterfall.mp3'},
   ];
 
   static const _quotes = [
@@ -92,7 +91,7 @@ class _ZenModeActiveScreenState extends ConsumerState<ZenModeActiveScreen>
     });
 
     // Rotate quotes every 8 seconds
-    Timer.periodic(const Duration(seconds: 8), (_) {
+    _quoteTimer = Timer.periodic(const Duration(seconds: 8), (_) {
       if (mounted) {
         setState(() {
           _quoteIndex = (_quoteIndex + 1) % _quotes.length;
@@ -102,8 +101,10 @@ class _ZenModeActiveScreenState extends ConsumerState<ZenModeActiveScreen>
 
     _quoteIndex = DateTime.now().second % _quotes.length;
     
-    // Re-enforce immersive mode every 3 seconds
-    _immersiveEnforcer = Timer.periodic(const Duration(seconds: 3), (_) {
+    // Re-enforce immersive mode every 10 seconds.
+    // Native service re-applies it on each foreground-app check (200ms),
+    // so 10s here is a lightweight safety net only.
+    _immersiveEnforcer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (!mounted) return;
       _enforceImmersive();
     });
@@ -128,10 +129,10 @@ class _ZenModeActiveScreenState extends ConsumerState<ZenModeActiveScreen>
   Future<void> _toggleMelody() async {
     if (_isMelodyPlaying) {
       await _audioPlayer.pause();
-      setState(() => _isMelodyPlaying = false);
+      if (mounted) setState(() => _isMelodyPlaying = false);
     } else {
       await _audioPlayer.resume();
-      setState(() => _isMelodyPlaying = true);
+      if (mounted) setState(() => _isMelodyPlaying = true);
     }
     HapticFeedback.lightImpact();
   }
@@ -140,7 +141,7 @@ class _ZenModeActiveScreenState extends ConsumerState<ZenModeActiveScreen>
     _selectedSoundIndex = index;
     await _audioPlayer.stop();
     await _audioPlayer.play(AssetSource(_sounds[index]['file']!));
-    setState(() => _isMelodyPlaying = true);
+    if (mounted) setState(() => _isMelodyPlaying = true);
     HapticFeedback.lightImpact();
   }
   
@@ -165,26 +166,42 @@ class _ZenModeActiveScreenState extends ConsumerState<ZenModeActiveScreen>
     } catch (_) {}
   }
 
+  // Track whether audio has already been released to prevent double-dispose crash.
+  bool _audioReleased = false;
+
+  void _releaseAudio() {
+    if (_audioReleased) return;
+    _audioReleased = true;
+    _audioPlayer.stop();
+    _audioPlayer.dispose();
+  }
+
   void _onTimerComplete() {
     _timer?.cancel();
     _immersiveEnforcer?.cancel();
-    _audioPlayer.stop();
-    _audioPlayer.dispose();
+    _releaseAudio();
+
+    // End Zen Mode — calls setZenMode(false) on native side,
+    // which also dismisses ZenLockScreenActivity and restores DND.
     ref.read(zenModeProvider.notifier).endZenMode();
-    
-    _disableNativeLockdown();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    
-    if (mounted) {
-      HapticFeedback.heavyImpact();
-      Navigator.of(context).pop();
-    }
+
+    // Disable native lockdown THEN restore UI, then pop.
+    // Use then() so native calls are fire-and-forget but ordered.
+    _disableNativeLockdown().then((_) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      if (mounted) {
+        HapticFeedback.heavyImpact();
+        Navigator.of(context).pop();
+      }
+    });
   }
-  
+
   Future<void> _disableNativeLockdown() async {
+    // Disable lock screen bypass and screen pinning
     try {
       await _blockerChannel.invokeMethod('disableZenLockScreen');
     } catch (_) {}
+    // Exit full immersive mode (restore status/nav bars)
     try {
       await _blockerChannel.invokeMethod('exitFullImmersive');
     } catch (_) {}
@@ -193,10 +210,10 @@ class _ZenModeActiveScreenState extends ConsumerState<ZenModeActiveScreen>
   @override
   void dispose() {
     _timer?.cancel();
+    _quoteTimer?.cancel();
     _immersiveEnforcer?.cancel();
     _breatheCtrl.dispose();
-    _audioPlayer.stop();
-    _audioPlayer.dispose();
+    _releaseAudio(); // safe — guards against double-dispose
     _disableNativeLockdown();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -238,7 +255,7 @@ class _ZenModeActiveScreenState extends ConsumerState<ZenModeActiveScreen>
                 // Subtle animated wave/gradient overlay
                 AnimatedBuilder(
                   animation: _breatheCtrl,
-                  builder: (_, __) => CustomPaint(
+                  builder: (_, _) => CustomPaint(
                     size: MediaQuery.of(context).size,
                     painter: _WavePainter(
                       progress: _breatheCtrl.value,
@@ -289,25 +306,15 @@ class _ZenModeActiveScreenState extends ConsumerState<ZenModeActiveScreen>
 
                         const Spacer(flex: 2),
 
-                        // ─── Bottom: Emergency call + Camera ───
+                        // ─── Bottom: Camera ───
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 32),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              // Emergency call
-                              _buildBottomButton(
-                                icon: Icons.phone_outlined,
-                                label: 'Emergency',
-                                onTap: () => _showEmergencyCallDialog(),
-                              ),
-                              // Camera
-                              _buildBottomButton(
-                                icon: Icons.camera_alt_outlined,
-                                label: 'Camera',
-                                onTap: () => _openCamera(),
-                              ),
-                            ],
+                          child: Center(
+                            child: _buildBottomButton(
+                              icon: Icons.camera_alt_outlined,
+                              label: 'Camera',
+                              onTap: () => _openCamera(),
+                            ),
                           ),
                         ),
 
@@ -331,7 +338,7 @@ class _ZenModeActiveScreenState extends ConsumerState<ZenModeActiveScreen>
         // Play/Pause button with breathing animation
         AnimatedBuilder(
           animation: _breatheCtrl,
-          builder: (_, __) {
+          builder: (_, _) {
             final scale = _isMelodyPlaying ? (0.85 + _breatheCtrl.value * 0.3) : 1.0;
             final opacity = _isMelodyPlaying ? (0.2 + _breatheCtrl.value * 0.15) : 0.1;
             return GestureDetector(
@@ -437,111 +444,15 @@ class _ZenModeActiveScreenState extends ConsumerState<ZenModeActiveScreen>
     );
   }
 
-  // ─── Emergency Call Dialog ───
-  void _showEmergencyCallDialog() {
-    final zen = ref.read(zenModeProvider);
-    final contacts = zen.emergencyContacts;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF111827),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Emergency Call',
-          style: TextStyle(color: Colors.white, fontSize: 16),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Emergency number
-            _emergencyButton(
-              '🚨 Emergency (112)',
-              () => _makeCall('tel:112'),
-            ),
-            if (contacts.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              ...contacts.map((c) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: _emergencyButton(
-                      '📞 $c',
-                      () => _makeCall('tel:$c'),
-                    ),
-                  )),
-            ],
-            if (contacts.isEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Add emergency contacts before\nstarting Zen Mode',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.4),
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel',
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5))),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _emergencyButton(String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.8),
-            fontSize: 14,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _makeCall(String uri) async {
-    // Temporarily unpin screen so phone app can open
-    try {
-      await _blockerChannel.invokeMethod('temporaryUnpin');
-    } catch (_) {}
-    
-    final url = Uri.parse(uri);
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    }
-  }
-
   Future<void> _openCamera() async {
     HapticFeedback.lightImpact();
     try {
       // Use native method that handles unpin + camera launch
       await _blockerChannel.invokeMethod('openCamera');
-    } catch (_) {
-      // Fallback via URL
-      try {
-        await _blockerChannel.invokeMethod('temporaryUnpin');
-        const channel = MethodChannel('com.sukoon.launcher/apps');
-        await channel.invokeMethod('launchApp', {
-          'package': 'com.android.camera',
-        });
-      } catch (_) {}
+    } catch (e) {
+      debugPrint('Zen camera fallback: $e');
+      // The native handler already has a full list of camera packages,
+      // so a failure here likely means no camera app at all — nothing to do.
     }
   }
 }

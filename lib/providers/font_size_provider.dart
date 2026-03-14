@@ -1,20 +1,23 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
+import '../utils/hive_box_manager.dart';
 
 class FontSizeNotifier extends StateNotifier<double> {
   FontSizeNotifier() : super(1.0) {
     _loadFontSize();
   }
 
+  Box? _box;
+
   Future<void> _loadFontSize() async {
-    final box = await Hive.openBox('settings');
-    final savedSize = box.get('fontSize', defaultValue: 1.0) as double;
+    _box = await HiveBoxManager.get('settings');
+    final savedSize = _box!.get('fontSize', defaultValue: 1.0) as double;
     state = savedSize;
   }
 
   Future<void> setFontSize(double size) async {
-    final box = await Hive.openBox('settings');
-    await box.put('fontSize', size);
+    _box ??= await HiveBoxManager.get('settings');
+    _box!.put('fontSize', size);
     state = size;
   }
 }

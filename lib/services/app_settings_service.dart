@@ -39,6 +39,20 @@ class AppSettingsService {
     }
   }
 
+  /// Expand the system notification / status-bar panel
+  static Future<bool> expandNotifications() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('expandNotifications');
+      return result ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Launch Google Pay using native Android intents
   /// Tries multiple package names and falls back to web version
   /// Returns true if Google Pay was launched successfully

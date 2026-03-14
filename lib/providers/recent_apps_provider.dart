@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import '../utils/hive_box_manager.dart';
 
 /// Recent Apps Provider - Tracks recently launched apps
 /// Stores package names in order of most recent first
@@ -14,7 +14,7 @@ class RecentAppsNotifier extends StateNotifier<List<String>> {
 
   Future<void> _load() async {
     try {
-      final box = await Hive.openBox(_boxName);
+      final box = await HiveBoxManager.get(_boxName);
       final saved = box.get(_key);
       if (saved != null) {
         state = List<String>.from(saved);
@@ -26,7 +26,7 @@ class RecentAppsNotifier extends StateNotifier<List<String>> {
 
   Future<void> _save() async {
     try {
-      final box = await Hive.openBox(_boxName);
+      final box = await HiveBoxManager.get(_boxName);
       await box.put(_key, state);
     } catch (e) {
       // Silent fail

@@ -7,24 +7,28 @@ import '../models/tafseer.dart';
 import '../services/quran_service.dart';
 import '../services/tafseer_service.dart';
 import '../../../providers/tafseer_edition_provider.dart';
+import '../../../utils/hive_box_manager.dart';
+import 'quran_settings_provider.dart';
 
 // Service providers
 final quranServiceProvider = Provider((ref) => QuranService());
 final tafseerServiceProvider = Provider((ref) => TafseerService());
 
-// Surahs provider
+// Surahs provider — language-aware
 final surahsProvider = FutureProvider<List<Surah>>((ref) async {
   final service = ref.read(quranServiceProvider);
-  return await service.loadSurahs();
+  final settings = ref.watch(quranSettingsProvider);
+  return await service.loadSurahs(lang: settings.translationLang);
 });
 
-// Verses provider for a specific surah
+// Verses provider for a specific surah — language-aware
 final versesProvider = FutureProvider.family<List<Verse>, int>((
   ref,
   surahId,
 ) async {
   final service = ref.read(quranServiceProvider);
-  return await service.loadVerses(surahId);
+  final settings = ref.watch(quranSettingsProvider);
+  return await service.loadVerses(surahId, lang: settings.translationLang);
 });
 
 // Selected surah provider
@@ -148,7 +152,7 @@ class ReadingProgressNotifier extends StateNotifier<ReadingProgressState> {
 
   Future<void> _init() async {
     try {
-      _box = await Hive.openBox<String>(_boxName);
+      _box = await HiveBoxManager.get<String>(_boxName);
       await _loadProgress();
     } catch (e) {
       state = state.copyWith(isLoading: false);
@@ -192,7 +196,7 @@ class ReadingProgressNotifier extends StateNotifier<ReadingProgressState> {
     state = state.copyWith(lastPosition: position);
 
     try {
-      _box ??= await Hive.openBox<String>(_boxName);
+      _box ??= await HiveBoxManager.get<String>(_boxName);
       await _box!.put('last_position', jsonEncode(position.toJson()));
     } catch (e) {
       // Silently fail

@@ -1,0 +1,40 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build Release APK",
+			"type": "shell",
+			"command": "cd '/Users/aboobakar/Study Content/minimalist_app-main' && flutter build apk --release"
+		},
+		{
+			"label": "Install APK",
+			"type": "shell",
+			"command": "adb install -r '/Users/aboobakar/Study Content/minimalist_app-main/build/app/outputs/flutter-apk/app-release.apk'"
+		},
+		{
+			"label": "Build Release APK",
+			"type": "shell",
+			"command": "cd '/Users/aboobakar/Study Content/minimalist_app-main' && flutter build apk --release"
+		},
+		{
+			"label": "Install APK",
+			"type": "shell",
+			"command": "adb install -r '/Users/aboobakar/Study Content/minimalist_app-main/build/app/outputs/flutter-apk/app-release.apk'"
+		},
+		{
+			"label": "Build Release APK",
+			"type": "shell",
+			"command": "cd '/Users/aboobakar/Study Content/minimalist_app-main' && flutter build apk --release"
+		},
+		{
+			"label": "Install APK",
+			"type": "shell",
+			"command": "adb install -r '/Users/aboobakar/Study Content/minimalist_app-main/build/app/outputs/flutter-apk/app-release.apk'"
+		},
+		{
+			"label": "Build Release AAB",
+			"type": "shell",
+			"command": "cd '/Users/aboobakar/Study Content/minimalist_app-main' && flutter build appbundle --release"
+		}
+	]
+}

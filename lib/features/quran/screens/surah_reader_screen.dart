@@ -3,18 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/surah.dart';
 import '../providers/quran_provider.dart';
+import '../providers/quran_settings_provider.dart';
+import '../providers/quran_audio_provider.dart';
 import '../widgets/tafseer_bottom_sheet.dart';
 import '../../../providers/arabic_font_provider.dart';
-import '../../../providers/tafseer_edition_provider.dart';
-
-// ─── Warm Reading Palette ────────────────────────────────────────────────────
-const Color _creamBg = Color(0xFFFDF6EC);
-const Color _warmSand = Color(0xFFF5E6C8);
-const Color _richBrown = Color(0xFF2C1810);
-const Color _warmBrown = Color(0xFF5C4033);
-const Color _goldAccent = Color(0xFFC2A366);
-const Color _islamicGreen = Color(0xFF2E7D32);
-const Color _lightGreen = Color(0xFF43A047);
+import '../../../providers/islamic_theme_provider.dart';
+import '../../../widgets/swipe_back_wrapper.dart';
+import 'quran_settings_screen.dart';
 
 class SurahReaderScreen extends ConsumerStatefulWidget {
   final Surah surah;
@@ -31,8 +26,6 @@ class SurahReaderScreen extends ConsumerStatefulWidget {
 }
 
 class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
-  bool _isDownloading = false;
-  bool _isDownloaded = false;
   final ScrollController _scrollController = ScrollController();
   
   // For tracking visible verse
@@ -45,7 +38,6 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
   @override
   void initState() {
     super.initState();
-    _checkDownloadStatus();
     _scrollController.addListener(_onScroll);
   }
 
@@ -59,43 +51,6 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
   void _onScroll() {
     // Debounce scroll events to avoid excessive saves
     // We'll save progress when a new ayah comes into view
-  }
-
-  Future<void> _checkDownloadStatus() async {
-    final service = ref.read(tafseerServiceProvider);
-    final edition = ref.read(selectedTafseerEditionProvider);
-    final downloaded = await service.isSurahDownloaded(widget.surah.id, edition: edition.slug);
-    if (mounted) {
-      setState(() => _isDownloaded = downloaded);
-    }
-  }
-
-  Future<void> _downloadTafseer() async {
-    setState(() => _isDownloading = true);
-
-    final service = ref.read(tafseerServiceProvider);
-    final edition = ref.read(selectedTafseerEditionProvider);
-    final success = await service.downloadSurahTafseer(
-      widget.surah.id,
-      widget.surah.totalVerses,
-      edition: edition.slug,
-    );
-
-    if (mounted) {
-      setState(() {
-        _isDownloading = false;
-        _isDownloaded = success;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(success
-              ? '${edition.name} downloaded for offline'
-              : 'Failed to download tafseer'),
-          backgroundColor: success ? const Color(0xFFA67B5B) : Colors.red,
-        ),
-      );
-    }
   }
 
   void _saveReadingProgress(int ayahNumber) {
@@ -138,22 +93,26 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
   Widget build(BuildContext context) {
     final versesAsync = ref.watch(versesProvider(widget.surah.id));
     final arabicFont = ref.watch(arabicFontProvider);
+    final tc = ref.watch(islamicThemeColorsProvider);
+    final settings = ref.watch(quranSettingsProvider);
+    final audioState = ref.watch(quranAudioProvider);
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: _creamBg,
-        statusBarIconBrightness: Brightness.dark,
-        systemNavigationBarColor: _creamBg,
-        systemNavigationBarIconBrightness: Brightness.dark,
+    return SwipeBackWrapper(
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: tc.background,
+        statusBarIconBrightness: tc.statusBarBrightness,
+        systemNavigationBarColor: tc.background,
+        systemNavigationBarIconBrightness: tc.statusBarBrightness,
       ),
       child: Scaffold(
-        backgroundColor: _creamBg,
+        backgroundColor: tc.background,
         body: SafeArea(
           child: versesAsync.when(
             data: (verses) {
               if (verses.isEmpty) {
-                return const Center(
-                  child: Text('No verses available', style: TextStyle(color: _warmBrown)),
+                return Center(
+                  child: Text('No verses available', style: TextStyle(color: tc.textSecondary)),
                 );
               }
               if (widget.initialAyah != null && !_hasScrolledToInitial) {
@@ -162,11 +121,13 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
               return Column(
                 children: [
                   // ── Top Bar ──
-                  _buildTopBar(),
+                  _buildTopBar(tc),
+                  // ── Audio Player Bar ──
+                  _buildAudioBar(tc, settings, audioState),
                   // ── Sub-header ──
-                  _buildSubHeader(),
+                  _buildSubHeader(tc),
                   // ── Progress bar ──
-                  _buildProgressBar(),
+                  _buildProgressBar(tc),
                   // ── Verses ──
                   Expanded(
                     child: NotificationListener<ScrollNotification>(
@@ -189,19 +150,17 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
                       },
                       child: ListView.builder(
                         controller: _scrollController,
-                        physics: const BouncingScrollPhysics(
-                          decelerationRate: ScrollDecelerationRate.fast,
-                        ),
+                        physics: const ClampingScrollPhysics(),
                         cacheExtent: 800,
                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                         itemCount: verses.length + 1,
                         itemBuilder: (context, index) {
-                          if (index == 0) return _buildSurahBanner();
+                          if (index == 0) return _buildSurahBanner(tc);
                           final verse = verses[index - 1];
                           final isHighlighted = widget.initialAyah != null &&
                               verse.id == widget.initialAyah;
                           final isLast = index == verses.length;
-                          return _buildVerseItem(verse, arabicFont, isHighlighted, isLast);
+                          return _buildVerseItem(verse, arabicFont, isHighlighted, isLast, tc, settings);
                         },
                       ),
                     ),
@@ -209,8 +168,8 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
                 ],
               );
             },
-            loading: () => const Center(
-              child: CircularProgressIndicator(color: _goldAccent, strokeWidth: 2),
+            loading: () => Center(
+              child: CircularProgressIndicator(color: tc.accent, strokeWidth: 2),
             ),
             error: (error, stack) => Center(
               child: Text('Error: $error', style: const TextStyle(color: Colors.red)),
@@ -218,186 +177,278 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
           ),
         ),
       ),
+    ),  // SwipeBackWrapper
     );
   }
 
   // ── Top Bar — warm cream, matching reference ──
-  Widget _buildTopBar() {
+  Widget _buildTopBar(IslamicThemeColors tc) {
     return Container(
       padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
-      color: _creamBg,
+      color: tc.background,
       child: Row(
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back, color: _richBrown, size: 22),
+            icon: Icon(Icons.arrow_back, color: tc.text, size: 22),
           ),
           Expanded(
             child: Text(
               widget.surah.transliteration,
-              style: const TextStyle(color: _richBrown, fontSize: 18, fontWeight: FontWeight.w600),
+              style: TextStyle(color: tc.text, fontSize: 18, fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           IconButton(
-            onPressed: _isDownloading ? null : _downloadTafseer,
-            icon: _isDownloading
-                ? const SizedBox(width: 18, height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 1.5, color: _goldAccent))
-                : Icon(
-                    _isDownloaded ? Icons.cloud_done_rounded : Icons.info_outline_rounded,
-                    color: _isDownloaded ? _islamicGreen : _warmBrown, size: 22),
-          ),
-          IconButton(
-            onPressed: () => _showReaderSettings(),
-            icon: Icon(Icons.settings_outlined, color: _warmBrown.withOpacity(0.7), size: 22),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const QuranSettingsScreen()),
+              );
+            },
+            icon: Icon(Icons.tune_rounded, color: tc.textSecondary.withValues(alpha: 0.7), size: 22),
           ),
         ],
       ),
     );
   }
 
-  // ── Reader Settings — font & tafseer ──
-  void _showReaderSettings() {
-    final arabicFont = ref.read(arabicFontProvider);
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: _creamBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  // ── Audio Player Bar ──
+  Widget _buildAudioBar(IslamicThemeColors tc, QuranSettings settings, QuranAudioPlaybackState audioState) {
+    // Only show when playing, paused, or loading for the current surah
+    if (audioState.isIdle && audioState.currentSurahId != widget.surah.id) {
+      // Show a compact play button instead
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        color: tc.background,
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: () => _playAudio(),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: tc.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: tc.green.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.play_circle_filled, color: tc.green.withValues(alpha: 0.7), size: 20),
+                    const SizedBox(width: 6),
+                    Text('Play Recitation',
+                      style: TextStyle(color: tc.green.withValues(alpha: 0.8), fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Full audio bar when active
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: tc.surface.withValues(alpha: 0.6),
+        border: Border(
+          bottom: BorderSide(color: tc.surface.withValues(alpha: 0.8), width: 1),
+        ),
       ),
-      isScrollControlled: true,
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.55,
-        minChildSize: 0.3,
-        maxChildSize: 0.8,
-        expand: false,
-        builder: (ctx, scrollCtrl) => Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
             children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 36, height: 4,
-                  decoration: BoxDecoration(
-                    color: _warmBrown.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(2),
+              // Play/Pause/Loading
+              if (audioState.isLoading)
+                SizedBox(
+                  width: 32, height: 32,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: tc.green),
+                )
+              else
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    if (audioState.isPlaying) {
+                      ref.read(quranAudioProvider.notifier).pause();
+                    } else if (audioState.isPaused) {
+                      ref.read(quranAudioProvider.notifier).resume();
+                    } else {
+                      _playAudio();
+                    }
+                  },
+                  child: Icon(
+                    audioState.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                    color: tc.green,
+                    size: 34,
                   ),
                 ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Icon(Icons.text_fields_rounded, color: _warmBrown.withOpacity(0.6), size: 20),
-                  const SizedBox(width: 8),
-                  Text('Reading Settings',
-                    style: TextStyle(color: _richBrown, fontSize: 17, fontWeight: FontWeight.w600)),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Font section
-              Text('Arabic Font',
-                style: TextStyle(color: _warmBrown.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
-              const SizedBox(height: 10),
+              const SizedBox(width: 10),
+              // Reciter name + surah
               Expanded(
-                child: ListView.builder(
-                  controller: scrollCtrl,
-                  itemCount: ArabicFonts.all.length,
-                  itemBuilder: (ctx, i) {
-                    final font = ArabicFonts.all[i];
-                    final isSelected = arabicFont.name == font.name;
-                    return GestureDetector(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        ref.read(arabicFontProvider.notifier).setFont(font);
-                        Navigator.pop(ctx);
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        decoration: BoxDecoration(
-                          color: isSelected ? _goldAccent.withOpacity(0.1) : _warmSand.withOpacity(0.4),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected ? _goldAccent.withOpacity(0.4) : _warmSand.withOpacity(0.6),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(font.name,
-                                    style: TextStyle(
-                                      color: isSelected ? _richBrown : _warmBrown,
-                                      fontSize: 14,
-                                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                                    )),
-                                  const SizedBox(height: 4),
-                                  Text('بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
-                                    style: TextStyle(
-                                      color: _richBrown.withOpacity(0.6),
-                                      fontSize: 18,
-                                      fontFamily: font.fontFamily,
-                                    ),
-                                    textDirection: TextDirection.rtl,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (isSelected)
-                              Icon(Icons.check_circle_rounded, color: _islamicGreen.withOpacity(0.7), size: 20),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      audioState.currentReciter ?? settings.selectedReciterName,
+                      style: TextStyle(color: tc.text, fontSize: 12, fontWeight: FontWeight.w600),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      widget.surah.transliteration,
+                      style: TextStyle(color: tc.textSecondary.withValues(alpha: 0.6), fontSize: 11),
+                    ),
+                  ],
                 ),
+              ),
+              // Stop button
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  ref.read(quranAudioProvider.notifier).stop();
+                },
+                child: Icon(Icons.stop_circle_outlined, color: tc.textSecondary.withValues(alpha: 0.5), size: 28),
               ),
             ],
           ),
-        ),
+          // Seek bar
+          if (audioState.duration.inSeconds > 0) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Text(
+                  _formatDuration(audioState.position),
+                  style: TextStyle(color: tc.textSecondary.withValues(alpha: 0.5), fontSize: 10),
+                ),
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 2,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                      activeTrackColor: tc.green.withValues(alpha: 0.6),
+                      inactiveTrackColor: tc.surface,
+                      thumbColor: tc.green,
+                      overlayColor: tc.green.withValues(alpha: 0.1),
+                    ),
+                    child: Slider(
+                      value: audioState.progress,
+                      onChanged: (v) {
+                        final newPos = Duration(
+                          milliseconds: (v * audioState.duration.inMilliseconds).round(),
+                        );
+                        ref.read(quranAudioProvider.notifier).seek(newPos);
+                      },
+                    ),
+                  ),
+                ),
+                Text(
+                  _formatDuration(audioState.duration),
+                  style: TextStyle(color: tc.textSecondary.withValues(alpha: 0.5), fontSize: 10),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
 
+  String _formatDuration(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    if (d.inHours > 0) {
+      return '${d.inHours}:$m:$s';
+    }
+    return '$m:$s';
+  }
+
+  /// Load audio for current surah and play it
+  Future<void> _playAudio() async {
+    final settings = ref.read(quranSettingsProvider);
+    final apiService = ref.read(alQuranApiServiceProvider);
+
+    try {
+      // Fetch the surah detail to get audio URLs
+      final surahDetail = await apiService.getSurah(
+        widget.surah.id,
+        lang: settings.translationLang,
+      );
+
+      if (surahDetail == null || surahDetail.audio.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Audio not available for this surah'),
+              backgroundColor: Colors.red.withValues(alpha: 0.8),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Find the selected reciter's audio
+      final reciterKey = settings.selectedReciterKey;
+      final audioEntry = surahDetail.audio[reciterKey] ?? surahDetail.audio.values.first;
+      final reciterName = audioEntry.reciter;
+      final audioUrl = audioEntry.url;
+
+      if (audioUrl.isEmpty) return;
+
+      await ref.read(quranAudioProvider.notifier).play(
+        surahId: widget.surah.id,
+        reciterName: reciterName,
+        audioUrl: audioUrl,
+      );
+    } catch (e) {
+      debugPrint('SurahReader: Failed to load audio: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Failed to load audio recitation'),
+            backgroundColor: Colors.red.withValues(alpha: 0.8),
+          ),
+        );
+      }
+    }
+  }
+
   // ── Sub-header: surah meaning + reading goal ──
-  Widget _buildSubHeader() {
+  Widget _buildSubHeader(IslamicThemeColors tc) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 16, 6),
       child: Row(
         children: [
           Text(
             '${widget.surah.id}. ${_getSurahMeaning(widget.surah.transliteration)}',
-            style: TextStyle(color: _warmBrown.withOpacity(0.6), fontSize: 13),
+            style: TextStyle(color: tc.textSecondary.withValues(alpha: 0.6), fontSize: 13),
           ),
           const Spacer(),
-          Text('Reading goal: ', style: TextStyle(color: _warmBrown.withOpacity(0.45), fontSize: 12)),
+          Text('Reading goal: ', style: TextStyle(color: tc.textSecondary.withValues(alpha: 0.45), fontSize: 12)),
           Text(
             '${(_readingProgress * widget.surah.totalVerses).round()}/${widget.surah.totalVerses}',
-            style: TextStyle(color: _warmBrown.withOpacity(0.65), fontSize: 12, fontWeight: FontWeight.w600),
+            style: TextStyle(color: tc.textSecondary.withValues(alpha: 0.65), fontSize: 12, fontWeight: FontWeight.w600),
           ),
           const SizedBox(width: 6),
           SizedBox(width: 18, height: 18,
             child: CircularProgressIndicator(
               value: _readingProgress, strokeWidth: 2,
-              backgroundColor: _warmSand, color: _islamicGreen.withOpacity(0.5))),
+              backgroundColor: tc.surface, color: tc.green.withValues(alpha: 0.5))),
           const SizedBox(width: 4),
-          Icon(Icons.chevron_right, color: _warmBrown.withOpacity(0.35), size: 16),
+          Icon(Icons.chevron_right, color: tc.textSecondary.withValues(alpha: 0.35), size: 16),
         ],
       ),
     );
   }
 
   // ── Thin progress bar ──
-  Widget _buildProgressBar() {
+  Widget _buildProgressBar(IslamicThemeColors tc) {
     return Container(
       height: 2.5, width: double.infinity,
-      color: _warmSand.withOpacity(0.5),
+      color: tc.surface.withValues(alpha: 0.5),
       child: Align(
         alignment: Alignment.centerLeft,
         child: AnimatedContainer(
@@ -405,7 +456,7 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
           height: 2.5,
           width: MediaQuery.of(context).size.width * _readingProgress,
           decoration: BoxDecoration(
-            color: _islamicGreen.withOpacity(0.4),
+            color: tc.green.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(2),
           ),
         ),
@@ -414,58 +465,99 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
   }
 
   // ── Ornamental Surah Banner — green header matching reference ──
-  Widget _buildSurahBanner() {
+  Widget _buildSurahBanner(IslamicThemeColors tc) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       margin: const EdgeInsets.only(top: 8, bottom: 28),
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [_islamicGreen, Color(0xFF388E3C), _lightGreen],
-          begin: Alignment.centerLeft, end: Alignment.centerRight,
+        color: tc.surface.withValues(alpha: isDark ? 0.5 : 0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: tc.surface.withValues(alpha: isDark ? 0.6 : 0.8),
+          width: 1,
         ),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _islamicGreen.withOpacity(0.4), width: 2),
-        boxShadow: [
-          BoxShadow(color: _islamicGreen.withOpacity(0.12), blurRadius: 12, offset: const Offset(0, 4)),
-        ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          _buildFlowerOrnament(),
-          const Spacer(),
+          // Surah number badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: tc.green.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: tc.green.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              'Surah ${widget.surah.id}',
+              style: TextStyle(
+                color: tc.green.withValues(alpha: 0.8),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Arabic name - centered and prominent
           Text(
             widget.surah.name,
-            style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w500, height: 1.4),
+            style: TextStyle(
+              color: tc.text.withValues(alpha: 0.95),
+              fontSize: 32,
+              fontWeight: FontWeight.w500,
+              fontFamily: 'Amiri',
+              height: 1.3,
+            ),
             textDirection: TextDirection.rtl,
+            textAlign: TextAlign.center,
           ),
-          const Spacer(),
-          _buildFlowerOrnament(),
+          
+          const SizedBox(height: 8),
+          
+          // Transliteration and info
+          Text(
+            widget.surah.transliteration,
+            style: TextStyle(
+              color: tc.textSecondary.withValues(alpha: 0.7),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.3,
+            ),
+          ),
+          
+          const SizedBox(height: 6),
+          
+          // Type and verses count
+          Text(
+            '${widget.surah.type == 'meccan' ? 'Meccan' : 'Medinan'}  •  ${widget.surah.totalVerses} Verses',
+            style: TextStyle(
+              color: tc.textSecondary.withValues(alpha: 0.5),
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildFlowerOrnament() {
-    return Container(
-      width: 34, height: 34,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
-      ),
-      child: const Center(child: Text('✿', style: TextStyle(fontSize: 15, color: Colors.white))),
     );
   }
 
   // ── Individual Verse ──
-  Widget _buildVerseItem(dynamic verse, dynamic arabicFont, bool isHighlighted, bool isLast) {
+  Widget _buildVerseItem(dynamic verse, dynamic arabicFont, bool isHighlighted, bool isLast, IslamicThemeColors tc, QuranSettings settings) {
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       padding: isHighlighted ? const EdgeInsets.all(12) : EdgeInsets.zero,
       decoration: isHighlighted
           ? BoxDecoration(
-              color: _goldAccent.withOpacity(0.08),
+              color: tc.accent.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _goldAccent.withOpacity(0.2)),
+              border: Border.all(color: tc.accent.withValues(alpha: 0.2)),
             )
           : null,
       child: Column(
@@ -485,14 +577,14 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                   decoration: BoxDecoration(
-                    color: _warmSand.withOpacity(0.7),
+                    color: tc.surface.withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Text('Aya ${widget.surah.id}:${verse.id}',
-                      style: TextStyle(color: _warmBrown.withOpacity(0.55), fontSize: 12, fontWeight: FontWeight.w500)),
+                      style: TextStyle(color: tc.textSecondary.withValues(alpha: 0.55), fontSize: 12, fontWeight: FontWeight.w500)),
                     const SizedBox(width: 3),
-                    Icon(Icons.expand_more, color: _islamicGreen.withOpacity(0.5), size: 15),
+                    Icon(Icons.expand_more, color: tc.green.withValues(alpha: 0.5), size: 15),
                   ]),
                 ),
               ),
@@ -510,7 +602,7 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
                   textAlign: TextAlign.right,
                   textDirection: TextDirection.rtl,
                   style: TextStyle(
-                    color: _richBrown,
+                    color: tc.arabicText,
                     fontSize: 28,
                     height: 2.0,
                     fontWeight: FontWeight.w400,
@@ -520,18 +612,18 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
               ),
               Positioned(
                 left: 0, top: 8,
-                child: _buildVerseMarker(verse.id),
+                child: _buildVerseMarker(verse.id, tc),
               ),
             ],
           ),
-          // ── Translation ──
-          if (verse.translation != null) ...[
+          // ── Translation (conditional) ──
+          if (verse.translation != null && verse.translation!.isNotEmpty && settings.showTranslation) ...[
             const SizedBox(height: 16),
             Text(
               verse.translation!,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: _richBrown.withOpacity(0.7),
+                color: tc.text.withValues(alpha: 0.7),
                 fontSize: 15,
                 height: 1.7,
                 fontWeight: FontWeight.w400,
@@ -539,7 +631,7 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
             ),
           ],
           const SizedBox(height: 28),
-          if (!isLast) _buildVerseDivider(),
+          if (!isLast) _buildVerseDivider(tc),
           const SizedBox(height: 12),
         ],
       ),
@@ -547,33 +639,33 @@ class _SurahReaderScreenState extends ConsumerState<SurahReaderScreen> {
   }
 
   // ── Ornamental verse marker ──
-  Widget _buildVerseMarker(int num) {
+  Widget _buildVerseMarker(int num, IslamicThemeColors tc) {
     return SizedBox(
       width: 30, height: 30,
       child: Stack(alignment: Alignment.center, children: [
         Container(width: 30, height: 30,
           decoration: BoxDecoration(shape: BoxShape.circle,
-            border: Border.all(color: _goldAccent.withOpacity(0.35), width: 1.5))),
+            border: Border.all(color: tc.accent.withValues(alpha: 0.35), width: 1.5))),
         Container(width: 22, height: 22,
           decoration: BoxDecoration(shape: BoxShape.circle,
-            border: Border.all(color: _goldAccent.withOpacity(0.2), width: 1))),
-        Text('$num', style: TextStyle(color: _warmBrown.withOpacity(0.55), fontSize: 9, fontWeight: FontWeight.w600)),
+            border: Border.all(color: tc.accent.withValues(alpha: 0.2), width: 1))),
+        Text('$num', style: TextStyle(color: tc.textSecondary.withValues(alpha: 0.55), fontSize: 9, fontWeight: FontWeight.w600)),
       ]),
     );
   }
 
   // ── Elegant divider ──
-  Widget _buildVerseDivider() {
+  Widget _buildVerseDivider(IslamicThemeColors tc) {
     return Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Container(width: 28, height: 0.5, color: _goldAccent.withOpacity(0.15)),
+      Container(width: 28, height: 0.5, color: tc.accent.withValues(alpha: 0.15)),
       const SizedBox(width: 8),
-      Text('·', style: TextStyle(color: _goldAccent.withOpacity(0.3), fontSize: 10)),
+      Text('·', style: TextStyle(color: tc.accent.withValues(alpha: 0.3), fontSize: 10)),
       const SizedBox(width: 6),
-      Text('✦', style: TextStyle(color: _goldAccent.withOpacity(0.2), fontSize: 7)),
+      Text('✦', style: TextStyle(color: tc.accent.withValues(alpha: 0.2), fontSize: 7)),
       const SizedBox(width: 6),
-      Text('·', style: TextStyle(color: _goldAccent.withOpacity(0.3), fontSize: 10)),
+      Text('·', style: TextStyle(color: tc.accent.withValues(alpha: 0.3), fontSize: 10)),
       const SizedBox(width: 8),
-      Container(width: 28, height: 0.5, color: _goldAccent.withOpacity(0.15)),
+      Container(width: 28, height: 0.5, color: tc.accent.withValues(alpha: 0.15)),
     ]);
   }
 

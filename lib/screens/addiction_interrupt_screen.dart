@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import '../providers/usage_stats_provider.dart';
+import '../utils/hive_box_manager.dart';
 
 /// Addiction Interrupt System - THE KILLER FEATURE
 /// 
@@ -105,7 +105,7 @@ class _AddictionInterruptScreenState
 
   Future<void> _loadInterruptData() async {
     try {
-      final box = await Hive.openBox('addiction_interrupt');
+      final box = await HiveBoxManager.get('addiction_interrupt');
       final today = DateTime.now().toIso8601String().substring(0, 10);
       
       setState(() {
@@ -173,7 +173,7 @@ class _AddictionInterruptScreenState
     HapticFeedback.heavyImpact();
     
     // Save dhikr to tasbih counter
-    final box = await Hive.openBox('tasbih_data');
+    final box = await HiveBoxManager.get('tasbih_data');
     final today = DateTime.now().toIso8601String().substring(0, 10);
     final lastDate = box.get('lastDate', defaultValue: '');
     final currentTotal = (lastDate == today) 
@@ -184,7 +184,7 @@ class _AddictionInterruptScreenState
     await box.put('lastDate', today);
     
     // Record that user earned access through dhikr
-    final interruptBox = await Hive.openBox('addiction_interrupt');
+    final interruptBox = await HiveBoxManager.get('addiction_interrupt');
     await interruptBox.put('earned_through_dhikr_$today', true);
     
     // Show success and proceed
@@ -270,12 +270,12 @@ class _AddictionInterruptScreenState
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      _warningRed.withOpacity(0.2),
-                      _warningRed.withOpacity(0.05),
+                      _warningRed.withValues(alpha: 0.2),
+                      _warningRed.withValues(alpha: 0.05),
                     ],
                   ),
                   border: Border.all(
-                    color: _warningRed.withOpacity(0.3),
+                    color: _warningRed.withValues(alpha: 0.3),
                     width: 2,
                   ),
                 ),
@@ -307,20 +307,20 @@ class _AddictionInterruptScreenState
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: _warningRed.withOpacity(0.1),
+            color: _warningRed.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _warningRed.withOpacity(0.2)),
+            border: Border.all(color: _warningRed.withValues(alpha: 0.2)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.warning_amber_rounded, 
-                color: _warningRed.withOpacity(0.7), size: 16),
+                color: _warningRed.withValues(alpha: 0.7), size: 16),
               const SizedBox(width: 8),
               Text(
                 'Opening ${widget.appName}',
                 style: TextStyle(
-                  color: _warningRed.withOpacity(0.8),
+                  color: _warningRed.withValues(alpha: 0.8),
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -336,7 +336,7 @@ class _AddictionInterruptScreenState
           _getLevelMessage(),
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
+            color: Colors.white.withValues(alpha: 0.5),
             fontSize: 13,
             height: 1.4,
           ),
@@ -352,9 +352,9 @@ class _AddictionInterruptScreenState
       case InterruptLevel.moderate:
         return 'This is your ${_todayInterrupts}th time today.\nLet\'s do some dhikr first.';
       case InterruptLevel.firm:
-        return 'You\'ve been here ${_todayInterrupts} times today.\nYour time is precious.';
+        return 'You\'ve been here $_todayInterrupts times today.\nYour time is precious.';
       case InterruptLevel.strong:
-        return '${_todayInterrupts} interrupts today.\nConsider if this aligns with your goals.';
+        return '$_todayInterrupts interrupts today.\nConsider if this aligns with your goals.';
     }
   }
 
@@ -378,7 +378,7 @@ class _AddictionInterruptScreenState
               Text(
                 'Today\'s Time Balance',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -421,8 +421,8 @@ class _AddictionInterruptScreenState
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               color: isPositive 
-                  ? _primaryGreen.withOpacity(0.1)
-                  : _warningRed.withOpacity(0.1),
+                  ? _primaryGreen.withValues(alpha: 0.1)
+                  : _warningRed.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -477,7 +477,7 @@ class _AddictionInterruptScreenState
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.4),
+            color: Colors.white.withValues(alpha: 0.4),
             fontSize: 11,
           ),
         ),
@@ -496,15 +496,15 @@ class _AddictionInterruptScreenState
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            _primaryGreen.withOpacity(isComplete ? 0.15 : 0.08),
+            _primaryGreen.withValues(alpha: isComplete ? 0.15 : 0.08),
             _cardBg,
           ],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isComplete 
-              ? _primaryGreen.withOpacity(0.4)
-              : _primaryGreen.withOpacity(0.2),
+              ? _primaryGreen.withValues(alpha: 0.4)
+              : _primaryGreen.withValues(alpha: 0.2),
           width: isComplete ? 2 : 1,
         ),
       ),
@@ -516,7 +516,7 @@ class _AddictionInterruptScreenState
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: _primaryGreen.withOpacity(0.15),
+                  color: _primaryGreen.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -541,7 +541,7 @@ class _AddictionInterruptScreenState
                     Text(
                       'Tap to count SubhanAllah',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
+                        color: Colors.white.withValues(alpha: 0.4),
                         fontSize: 11,
                       ),
                     ),
@@ -553,8 +553,8 @@ class _AddictionInterruptScreenState
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: isComplete 
-                      ? _primaryGreen.withOpacity(0.2)
-                      : _spiritualGold.withOpacity(0.15),
+                      ? _primaryGreen.withValues(alpha: 0.2)
+                      : _spiritualGold.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -581,18 +581,18 @@ class _AddictionInterruptScreenState
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: isComplete
-                      ? [_primaryGreen.withOpacity(0.3), _primaryGreen.withOpacity(0.1)]
-                      : [_spiritualGold.withOpacity(0.2), _spiritualGold.withOpacity(0.05)],
+                      ? [_primaryGreen.withValues(alpha: 0.3), _primaryGreen.withValues(alpha: 0.1)]
+                      : [_spiritualGold.withValues(alpha: 0.2), _spiritualGold.withValues(alpha: 0.05)],
                 ),
                 border: Border.all(
                   color: isComplete 
-                      ? _primaryGreen.withOpacity(0.5)
-                      : _spiritualGold.withOpacity(0.3),
+                      ? _primaryGreen.withValues(alpha: 0.5)
+                      : _spiritualGold.withValues(alpha: 0.3),
                   width: 2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (isComplete ? _primaryGreen : _spiritualGold).withOpacity(0.2),
+                    color: (isComplete ? _primaryGreen : _spiritualGold).withValues(alpha: 0.2),
                     blurRadius: 20,
                     spreadRadius: 5,
                   ),
@@ -616,7 +616,7 @@ class _AddictionInterruptScreenState
                       'TAP',
                       style: TextStyle(
                         fontSize: 10,
-                        color: Colors.white.withOpacity(0.4),
+                        color: Colors.white.withValues(alpha: 0.4),
                         letterSpacing: 2,
                       ),
                     ),
@@ -632,7 +632,7 @@ class _AddictionInterruptScreenState
           Container(
             height: 6,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
+              color: Colors.white.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(3),
             ),
             child: FractionallySizedBox(
@@ -646,7 +646,7 @@ class _AddictionInterruptScreenState
                   borderRadius: BorderRadius.circular(3),
                   boxShadow: [
                     BoxShadow(
-                      color: _primaryGreen.withOpacity(0.5),
+                      color: _primaryGreen.withValues(alpha: 0.5),
                       blurRadius: 8,
                     ),
                   ],
@@ -688,7 +688,7 @@ class _AddictionInterruptScreenState
               Text(
                 'Breathing Exercise',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -711,8 +711,8 @@ class _AddictionInterruptScreenState
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
-                          _calmTeal.withOpacity(0.3),
-                          _calmTeal.withOpacity(0.1),
+                          _calmTeal.withValues(alpha: 0.3),
+                          _calmTeal.withValues(alpha: 0.1),
                         ],
                       ),
                     ),
@@ -736,7 +736,7 @@ class _AddictionInterruptScreenState
             Text(
               'Cycle ${_breathCycle + 1} of 3',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
+                color: Colors.white.withValues(alpha: 0.4),
                 fontSize: 12,
               ),
             ),
@@ -746,9 +746,9 @@ class _AddictionInterruptScreenState
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 decoration: BoxDecoration(
-                  color: _calmTeal.withOpacity(0.15),
+                  color: _calmTeal.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(25),
-                  border: Border.all(color: _calmTeal.withOpacity(0.3)),
+                  border: Border.all(color: _calmTeal.withValues(alpha: 0.3)),
                 ),
                 child: Text(
                   _breathCycle >= 3 ? 'Complete ✓' : 'Start Breathing',
@@ -803,15 +803,15 @@ class _AddictionInterruptScreenState
             onPressed: canProceed ? widget.onProceed : null,
             style: TextButton.styleFrom(
               foregroundColor: canProceed 
-                  ? Colors.white.withOpacity(0.6)
-                  : Colors.white.withOpacity(0.2),
+                  ? Colors.white.withValues(alpha: 0.6)
+                  : Colors.white.withValues(alpha: 0.2),
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
                 side: BorderSide(
                   color: canProceed 
-                      ? Colors.white.withOpacity(0.2)
-                      : Colors.white.withOpacity(0.1),
+                      ? Colors.white.withValues(alpha: 0.2)
+                      : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -863,8 +863,8 @@ class _DhikrCompleteDialog extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFFC2A366).withOpacity(0.3),
-                    const Color(0xFFC2A366).withOpacity(0.1),
+                    const Color(0xFFC2A366).withValues(alpha: 0.3),
+                    const Color(0xFFC2A366).withValues(alpha: 0.1),
                   ],
                 ),
               ),
@@ -891,7 +891,7 @@ class _DhikrCompleteDialog extends StatelessWidget {
             Text(
               'You completed $dhikrCount dhikr',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
                 fontSize: 14,
               ),
             ),
@@ -901,7 +901,7 @@ class _DhikrCompleteDialog extends StatelessWidget {
             Text(
               'You earned your access mindfully.',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 fontSize: 12,
               ),
             ),
@@ -955,7 +955,7 @@ class AddictionInterruptService {
 
   static Future<bool> shouldIntercept(String packageName) async {
     try {
-      final box = await Hive.openBox(_boxName);
+      final box = await HiveBoxManager.get(_boxName);
       final isEnabled = box.get('enabled', defaultValue: true);
       if (!isEnabled) return false;
 
@@ -967,40 +967,40 @@ class AddictionInterruptService {
   }
 
   static Future<void> setEnabled(bool enabled) async {
-    final box = await Hive.openBox(_boxName);
+    final box = await HiveBoxManager.get(_boxName);
     await box.put('enabled', enabled);
   }
 
   static Future<bool> isEnabled() async {
-    final box = await Hive.openBox(_boxName);
+    final box = await HiveBoxManager.get(_boxName);
     return box.get('enabled', defaultValue: true);
   }
 
   static Future<List<String>> getBlockedApps() async {
-    final box = await Hive.openBox(_boxName);
+    final box = await HiveBoxManager.get(_boxName);
     return List<String>.from(
       box.get('blocked_apps', defaultValue: defaultBlockedApps.toList())
     );
   }
 
   static Future<void> setBlockedApps(List<String> apps) async {
-    final box = await Hive.openBox(_boxName);
+    final box = await HiveBoxManager.get(_boxName);
     await box.put('blocked_apps', apps);
   }
 
   static Future<int> getTodayInterruptCount() async {
-    final box = await Hive.openBox(_boxName);
+    final box = await HiveBoxManager.get(_boxName);
     final today = DateTime.now().toIso8601String().substring(0, 10);
     return box.get('interrupts_$today', defaultValue: 0);
   }
 
   static Future<int> getTotalSavesCount() async {
-    final box = await Hive.openBox(_boxName);
+    final box = await HiveBoxManager.get(_boxName);
     return box.get('total_saves', defaultValue: 0);
   }
 
   static Future<void> recordSave() async {
-    final box = await Hive.openBox(_boxName);
+    final box = await HiveBoxManager.get(_boxName);
     final current = box.get('total_saves', defaultValue: 0) as int;
     await box.put('total_saves', current + 1);
   }

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 import 'package:installed_apps/installed_apps.dart';
+import '../utils/hive_box_manager.dart';
 
 /// Provider for storing quick action app selections (phone, camera, etc.)
 final quickActionProvider =
@@ -42,18 +43,34 @@ class QuickActionNotifier extends StateNotifier<QuickActions> {
 
   // Common camera package names (ordered by popularity)
   static const _commonCameras = [
-    'com.google.android.GoogleCamera',
-    'com.samsung.android.camera',
-    'com.android.camera',
-    'com.android.camera2',
-    'com.oneplus.camera',
-    'com.miui.camera',
-    'com.huawei.camera',
-    'com.asus.camera',
-    'com.sec.android.app.camera',
-    'com.motorola.camera3',
-    'com.sonyericsson.android.camera',
-    'org.codeaurora.snapcam',
+    'com.google.android.GoogleCamera',       // Google Pixel (GCam)
+    'com.google.android.GoogleCameraGo',     // Google Camera Go (budget Pixels)
+    'com.samsung.android.camera',            // Samsung
+    'com.android.camera',                    // AOSP / stock
+    'com.android.camera2',                   // AOSP Camera2
+    'com.oneplus.camera',                    // OnePlus
+    'com.miui.camera',                       // Xiaomi / MIUI
+    'com.huawei.camera',                     // Huawei
+    'com.asus.camera',                       // Asus
+    'com.sec.android.app.camera',            // Samsung (older)
+    'com.motorola.camera3',                  // Motorola
+    'com.motorola.camera2',                  // Motorola (older)
+    'com.sonyericsson.android.camera',       // Sony
+    'org.codeaurora.snapcam',                // Qualcomm SnapCam
+    'com.oppo.camera',                       // Oppo
+    'com.coloros.camera',                    // Oppo ColorOS camera
+    'com.coloros.camera2',                   // Oppo ColorOS camera2
+    'com.vivo.camera',                       // Vivo
+    'com.realme.camera',                     // Realme
+    'com.hmd.camera',                        // Nokia / HMD
+    'com.lava.camera',                       // Lava
+    'com.lava.camera2',                      // Lava (alt)
+    'com.transsion.camera',                  // Tecno / Infinix / itel (Transsion)
+    'com.mediatek.camera',                   // MediaTek stock camera
+    'com.lenovo.camera',                     // Lenovo
+    'com.nothing.camera',                    // Nothing Phone
+    'com.tcl.camera',                        // TCL
+    'com.zte.camera',                        // ZTE
   ];
 
   QuickActionNotifier() : super(QuickActions()) {
@@ -61,7 +78,7 @@ class QuickActionNotifier extends StateNotifier<QuickActions> {
   }
 
   Future<void> _init() async {
-    _box = await Hive.openBox(_boxName);
+    _box = await HiveBoxManager.get(_boxName);
     _loadFromHive();
 
     // Auto-detect if no apps are saved yet
@@ -121,6 +138,28 @@ class QuickActionNotifier extends StateNotifier<QuickActions> {
     if (_box == null) return;
     await _box?.put('cameraApp', packageName);
     state = state.copyWith(cameraApp: packageName);
+  }
+
+  /// Public helper: re-run camera auto-detect (useful after a native-intent
+  /// fallback so the next tap can use the fast _launchApp path).
+  Future<void> autoDetectCamera() async {
+    if (state.cameraApp != null) return; // already set
+    try {
+      final allApps = await InstalledApps.getInstalledApps(
+        excludeSystemApps: false,
+        withIcon: false,
+      );
+      final installed = allApps.map((a) => a.packageName).toSet();
+      for (final camera in _commonCameras) {
+        if (installed.contains(camera)) {
+          debugPrint('QuickAction: Auto-detected camera app: $camera');
+          await setCameraApp(camera);
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('QuickAction: autoDetectCamera error: $e');
+    }
   }
 
   void clearPhoneApp() {

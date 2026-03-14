@@ -7,6 +7,7 @@ import '../features/quran/services/tafseer_service.dart';
 import '../features/hadith_dua/services/hadith_dua_service.dart';
 import '../features/hadith_dua/models/hadith_dua_models.dart';
 import 'dart:convert';
+import '../utils/hive_box_manager.dart';
 
 /// Offline Content Download Manager
 /// 
@@ -124,7 +125,7 @@ class OfflineContentManager extends StateNotifier<DownloadStatus> {
   Future<void> _init() async {
     try {
       debugPrint('OfflineContentManager: Initializing...');
-      _box = await Hive.openBox<String>(_boxName);
+      _box = await HiveBoxManager.get<String>(_boxName);
       
       _tafseerService = TafseerService();
       await _tafseerService!.init();
@@ -153,16 +154,16 @@ class OfflineContentManager extends StateNotifier<DownloadStatus> {
       
       _isInitialized = true;
       
-      // Listen for connectivity changes
-      _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
-        _onConnectivityChanged,
-      );
-      
-      // Auto-start download if not complete
+      // Only listen for connectivity changes if downloads are incomplete.
+      // Once all content is downloaded, no need to keep a stream subscription
+      // running (saves battery + radio wakeups).
       if (!state.isComplete) {
-        debugPrint('OfflineContentManager: Not complete, checking for auto-start...');
-        _checkAndStartDownload();
+        _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
+          _onConnectivityChanged,
+        );
       }
+      
+      // Do NOT auto-start download — user must trigger it manually
     } catch (e) {
       debugPrint('OfflineContentManager init error: $e');
     }
@@ -177,7 +178,9 @@ class OfflineContentManager extends StateNotifier<DownloadStatus> {
     
     debugPrint('OfflineContentManager: Connectivity changed, hasInternet: $hasInternet');
     
-    if (hasInternet && !state.isComplete && !state.isDownloading && !_isPaused) {
+    // Only resume if a download was already started and paused (has error / partial progress)
+    final wasStartedBefore = state.hadithsDownloaded > 0 || state.duaComplete || state.tafseersDownloaded > 0;
+    if (hasInternet && !state.isComplete && !state.isDownloading && !_isPaused && wasStartedBefore) {
       _checkAndStartDownload();
     }
   }
@@ -239,7 +242,10 @@ class OfflineContentManager extends StateNotifier<DownloadStatus> {
           isDownloading: false,
           lastDownloadTime: DateTime.now(),
         );
-        debugPrint('OfflineContentManager: All downloads complete!');
+        // Cancel connectivity listener — no longer needed (battery saver)
+        _connectivitySubscription?.cancel();
+        _connectivitySubscription = null;
+        debugPrint('OfflineContentManager: All downloads complete! Connectivity listener stopped.');
       } else {
         state = state.copyWith(isDownloading: false);
       }
@@ -274,11 +280,8 @@ class OfflineContentManager extends StateNotifier<DownloadStatus> {
     state = state.copyWith(currentItem: 'Downloading Hadiths...');
     
     try {
-      // Download from main collections
-      final collections = [
-        HadithCollection.fromId('bukhari'),
-        HadithCollection.fromId('muslim'),
-      ];
+      // Download from ALL collections (all 6 major books)
+      final collections = HadithCollection.collections;
       
       List<Map<String, dynamic>> allHadiths = [];
       

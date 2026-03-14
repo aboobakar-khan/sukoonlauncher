@@ -3,16 +3,77 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/hadith_dua_models.dart';
 import '../services/hadith_dua_service.dart';
+import '../../../utils/hive_box_manager.dart';
 
 /// Service provider
 final hadithDuaServiceProvider = Provider((ref) => HadithDuaService());
+
+/// Available hadith languages from the API
+class HadithLanguage {
+  final String code;       // API prefix: eng, urd, ben, etc.
+  final String name;       // Display name: English, Urdu, etc.
+  final String direction;  // 'ltr' or 'rtl'
+
+  const HadithLanguage({
+    required this.code,
+    required this.name,
+    this.direction = 'ltr',
+  });
+
+  static const List<HadithLanguage> available = [
+    HadithLanguage(code: 'eng', name: 'English'),
+    HadithLanguage(code: 'ara', name: 'Arabic', direction: 'rtl'),
+    HadithLanguage(code: 'urd', name: 'Urdu', direction: 'rtl'),
+    HadithLanguage(code: 'ben', name: 'Bengali'),
+    HadithLanguage(code: 'tur', name: 'Turkish'),
+    HadithLanguage(code: 'ind', name: 'Indonesian'),
+    HadithLanguage(code: 'fra', name: 'French'),
+    HadithLanguage(code: 'rus', name: 'Russian'),
+    HadithLanguage(code: 'tam', name: 'Tamil'),
+  ];
+
+  static HadithLanguage fromCode(String code) {
+    return available.firstWhere(
+      (l) => l.code == code,
+      orElse: () => available.first,
+    );
+  }
+}
+
+/// Provider for hadith language selection — persisted in Hive
+final hadithLanguageProvider = StateNotifierProvider<HadithLanguageNotifier, HadithLanguage>((ref) {
+  return HadithLanguageNotifier();
+});
+
+class HadithLanguageNotifier extends StateNotifier<HadithLanguage> {
+  static const String _boxName = 'hadith_settings';
+  Box<String>? _box;
+
+  HadithLanguageNotifier() : super(HadithLanguage.available.first) {
+    _init();
+  }
+
+  Future<void> _init() async {
+    _box = await HiveBoxManager.get<String>(_boxName);
+    final saved = _box?.get('hadith_language');
+    if (saved != null) {
+      state = HadithLanguage.fromCode(saved);
+    }
+  }
+
+  Future<void> setLanguage(HadithLanguage lang) async {
+    state = lang;
+    _box ??= await HiveBoxManager.get<String>(_boxName);
+    await _box!.put('hadith_language', lang.code);
+  }
+}
 
 /// Provider for daily random hadith - with offline support
 final dailyHadithProvider = FutureProvider<Hadith?>((ref) async {
   final service = ref.read(hadithDuaServiceProvider);
   
   // Check if we have a cached daily hadith
-  final box = await Hive.openBox<String>('hadith_dua_cache');
+  final box = await HiveBoxManager.get<String>('hadith_dua_cache');
   final today = DateTime.now().toIso8601String().split('T')[0];
   final cachedKey = 'daily_hadith_$today';
   
@@ -196,7 +257,7 @@ class BookmarksNotifier extends StateNotifier<BookmarksState> {
   }
 
   Future<void> _init() async {
-    _box = await Hive.openBox<String>(_boxName);
+    _box = await HiveBoxManager.get<String>(_boxName);
     _loadBookmarks();
   }
 
@@ -248,7 +309,7 @@ class BookmarksNotifier extends StateNotifier<BookmarksState> {
   }
 
   Future<void> _saveBookmarks() async {
-    _box ??= await Hive.openBox<String>(_boxName);
+    _box ??= await HiveBoxManager.get<String>(_boxName);
     await _box!.put('hadiths', jsonEncode(state.bookmarkedHadiths.map((h) => h.toJson()).toList()));
     await _box!.put('duas', jsonEncode(state.bookmarkedDuas.map((d) => d.toJson()).toList()));
     await _box!.put('collections', jsonEncode(state.collections));
@@ -373,6 +434,47 @@ final hadithDuaTabProvider = StateProvider<int>((ref) => 0); // 0 = Hadith, 1 = 
 /// Selected collection provider
 final selectedCollectionProvider = StateProvider<String>((ref) => 'bukhari');
 
+/// Selected book/chapter filter (null = show all)
+final selectedBookFilterProvider = StateProvider<int?>((ref) => null);
+
+/// Provider for available chapters/books in the selected collection.
+/// Returns a map of book number → chapter name from the API sections data.
+final collectionChaptersProvider = FutureProvider<Map<int, String>>((ref) async {
+  final service = ref.read(hadithDuaServiceProvider);
+  final collectionId = ref.watch(selectedCollectionProvider);
+  final language = ref.watch(hadithLanguageProvider);
+  final collection = HadithCollection.fromId(collectionId);
+  
+  // Build language-specific collection so sections come in the right language
+  final langApiKey = '${language.code}-${collection.id}';
+  final langCollection = HadithCollection(
+    id: collection.id,
+    name: collection.name,
+    shortName: collection.shortName,
+    apiKey: langApiKey,
+    totalHadiths: collection.totalHadiths,
+    arabicName: collection.arabicName,
+    defaultGrade: collection.defaultGrade,
+  );
+
+  // Ensure data is fetched (populates _sectionsCache)
+  await service.fetchHadiths(langCollection);
+  final sections = service.getSections(collectionId);
+  if (sections == null || sections.isEmpty) return {};
+
+  // Convert string keys to int, sort by book number
+  final result = <int, String>{};
+  for (final entry in sections.entries) {
+    final bookNum = int.tryParse(entry.key);
+    if (bookNum != null) {
+      result[bookNum] = entry.value;
+    }
+  }
+  return Map.fromEntries(
+    result.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+  );
+});
+
 /// Selected grade filter
 final selectedGradeFilterProvider = StateProvider<HadithGrade?>((ref) => null);
 
@@ -385,15 +487,34 @@ final collectionHadithsProvider = FutureProvider<List<Hadith>>((ref) async {
   final collectionId = ref.watch(selectedCollectionProvider);
   final gradeFilter = ref.watch(selectedGradeFilterProvider);
   final categoryFilter = ref.watch(selectedCategoryFilterProvider);
+  final bookFilter = ref.watch(selectedBookFilterProvider);
+  final language = ref.watch(hadithLanguageProvider);
   
   final collection = HadithCollection.fromId(collectionId);
   
+  // Build language-specific API key: e.g. "eng-bukhari" → "urd-bukhari"
+  final langApiKey = '${language.code}-${collection.id}';
+  final langCollection = HadithCollection(
+    id: collection.id,
+    name: collection.name,
+    shortName: collection.shortName,
+    apiKey: langApiKey,
+    totalHadiths: collection.totalHadiths,
+    arabicName: collection.arabicName,
+    defaultGrade: collection.defaultGrade,
+  );
+  
   // Try online fetch first
-  var hadiths = await service.fetchHadiths(collection);
+  var hadiths = await service.fetchHadiths(langCollection);
   
   // If empty, try offline cache
   if (hadiths.isEmpty) {
     hadiths = await _getOfflineHadiths(collectionId);
+  }
+  
+  // Apply book/chapter filter
+  if (bookFilter != null) {
+    hadiths = hadiths.where((h) => h.book == bookFilter).toList();
   }
   
   // Apply filters
@@ -410,7 +531,7 @@ final collectionHadithsProvider = FutureProvider<List<Hadith>>((ref) async {
 /// Get hadiths from offline cache
 Future<List<Hadith>> _getOfflineHadiths(String? collectionId) async {
   try {
-    final box = await Hive.openBox<String>('offline_content_v2');
+    final box = await HiveBoxManager.get<String>('offline_content_v2');
     final cached = box.get('hadith_cache');
     if (cached != null) {
       final list = jsonDecode(cached) as List<dynamic>;

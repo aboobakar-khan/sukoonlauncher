@@ -5,11 +5,10 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:hijri/hijri_calendar.dart';
 import '../providers/prayer_provider.dart';
+import '../providers/theme_provider.dart';
 import '../models/prayer_record.dart';
 
 // ─── Design tokens (Sukoon brand — disciplined palette) ─────────────────────
-const Color _sandGold = Color(0xFFC2A366);
-const Color _oasisGreen = Color(0xFF7BAE6E);
 
 /// ─── Islamic Occasions ───────────────────────────────────────────────────────
 const Map<String, Map<String, String>> _islamicOccasions = {
@@ -29,10 +28,18 @@ const Map<String, Map<String, String>> _islamicOccasions = {
 /// Sunnah fasting days
 bool _isSunnahFastDay(HijriCalendar hijri, DateTime gregorian) {
   if (gregorian.weekday == DateTime.monday ||
-      gregorian.weekday == DateTime.thursday) return true;
-  if (hijri.hDay == 13 || hijri.hDay == 14 || hijri.hDay == 15) return true;
-  if (hijri.hMonth == 12 && hijri.hDay == 9) return true;
-  if (hijri.hMonth == 1 && (hijri.hDay == 9 || hijri.hDay == 10)) return true;
+      gregorian.weekday == DateTime.thursday) {
+    return true;
+  }
+  if (hijri.hDay == 13 || hijri.hDay == 14 || hijri.hDay == 15) {
+    return true;
+  }
+  if (hijri.hMonth == 12 && hijri.hDay == 9) {
+    return true;
+  }
+  if (hijri.hMonth == 1 && (hijri.hDay == 9 || hijri.hDay == 10)) {
+    return true;
+  }
   return false;
 }
 
@@ -59,6 +66,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
   @override
   Widget build(BuildContext context) {
     final prayerRecordsMap = ref.watch(prayerRecordsMapProvider);
+    final accent = ref.watch(themeColorProvider).color;
 
     final hijriSelected = HijriCalendar.fromDate(_selectedDay ?? DateTime.now());
     final hijriFocused = HijriCalendar.fromDate(_focusedDay);
@@ -125,7 +133,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                   letterSpacing: 0.5,
                 ),
                 weekendStyle: TextStyle(
-                  color: _sandGold.withValues(alpha: 0.4),
+                  color: accent.withValues(alpha: 0.4),
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
@@ -135,19 +143,19 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
               calendarStyle: const CalendarStyle(outsideDaysVisible: false),
               calendarBuilders: CalendarBuilders(
                 defaultBuilder: (ctx, day, focusedDay) =>
-                    _buildDayCell(day, false, false, prayerRecordsMap),
+                    _buildDayCell(day, false, false, prayerRecordsMap, accent),
                 todayBuilder: (ctx, day, focusedDay) =>
-                    _buildDayCell(day, true, false, prayerRecordsMap),
+                    _buildDayCell(day, true, false, prayerRecordsMap, accent),
                 selectedBuilder: (ctx, day, focusedDay) =>
                     _buildDayCell(day, isSameDay(day, DateTime.now()), true,
-                        prayerRecordsMap),
+                        prayerRecordsMap, accent),
               ),
             ),
           ),
           const SizedBox(height: 4),
           _buildSelectedDayPanel(
             hijriSelected, prayerCount, isJummah, isSunnahFast,
-            occasion,
+            occasion, accent,
           ),
           const SizedBox(height: 12),
         ],
@@ -157,6 +165,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
 
   // ─── Custom Header ────────────────────────────────────────────────────────
   Widget _buildHeader(HijriCalendar hijri) {
+    final accent = ref.watch(themeColorProvider).color;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 14, 10, 2),
       child: Row(
@@ -178,7 +187,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                 Text(
                   '${hijri.longMonthName} ${hijri.hYear}',
                   style: TextStyle(
-                    color: _sandGold.withValues(alpha: 0.5),
+                    color: accent.withValues(alpha: 0.5),
                     fontSize: 11,
                     fontWeight: FontWeight.w400,
                   ),
@@ -200,7 +209,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
               child: Text(
                 'Today',
                 style: TextStyle(
-                  color: _sandGold.withValues(alpha: 0.6),
+                  color: accent.withValues(alpha: 0.6),
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                 ),
@@ -266,6 +275,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
     bool isToday,
     bool isSelected,
     Map<String, PrayerRecord> prayerRecordsMap,
+    Color accent,
   ) {
     final dateKey =
         '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
@@ -280,11 +290,11 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
     // Prayer text color based on completion
     Color prayerTextColor;
     if (prayerCount == 5) {
-      prayerTextColor = _oasisGreen;
+      prayerTextColor = accent;
     } else if (prayerCount >= 3) {
-      prayerTextColor = _sandGold;
+      prayerTextColor = accent;
     } else if (prayerCount >= 1) {
-      prayerTextColor = _sandGold.withValues(alpha: 0.7);
+      prayerTextColor = accent.withValues(alpha: 0.7);
     } else {
       prayerTextColor = Colors.white;
     }
@@ -301,14 +311,14 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: isSelected
-                  ? _sandGold.withValues(alpha: 0.25)
+                  ? accent.withValues(alpha: 0.25)
                   : isToday
-                      ? _sandGold.withValues(alpha: 0.1)
+                      ? accent.withValues(alpha: 0.1)
                       : hasOccasion
-                          ? _sandGold.withValues(alpha: 0.08)
+                          ? accent.withValues(alpha: 0.08)
                           : Colors.transparent,
               border: isToday && !isSelected
-                  ? Border.all(color: _sandGold.withValues(alpha: 0.5), width: 1.5)
+                  ? Border.all(color: accent.withValues(alpha: 0.5), width: 1.5)
                   : null,
             ),
           ),
@@ -322,11 +332,11 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                   color: isSelected
                       ? Colors.white
                       : isToday
-                          ? _sandGold
+                          ? accent
                           : hasOccasion
-                              ? _sandGold.withValues(alpha: 0.9)
+                              ? accent.withValues(alpha: 0.9)
                               : isFriday
-                                  ? _sandGold.withValues(alpha: 0.7)
+                                  ? accent.withValues(alpha: 0.7)
                                   : Colors.white.withValues(alpha: 0.65),
                   fontSize: 12.5,
                   fontWeight:
@@ -356,7 +366,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                 width: 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: _sandGold.withValues(alpha: 0.7),
+                  color: accent.withValues(alpha: 0.7),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -373,6 +383,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
     bool isJummah,
     bool isSunnahFast,
     Map<String, String>? occasion,
+    Color accent,
   ) {
     final isToday = isSameDay(_selectedDay, DateTime.now());
     final isPast = _selectedDay != null &&
@@ -389,7 +400,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: occasion != null
-                ? _sandGold.withValues(alpha: 0.15)
+                ? accent.withValues(alpha: 0.15)
                 : Colors.white.withValues(alpha: 0.04),
           ),
         ),
@@ -415,7 +426,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                 Text(
                   '${hijri.hDay} ${hijri.shortMonthName} ${hijri.hYear}',
                   style: TextStyle(
-                    color: _sandGold.withValues(alpha: 0.55),
+                    color: accent.withValues(alpha: 0.55),
                     fontSize: 11,
                     fontWeight: FontWeight.w400,
                   ),
@@ -434,14 +445,14 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                     Icons.mosque_rounded,
                     '$prayerCount/5',
                     prayerCount == 5
-                        ? _oasisGreen
-                        : _sandGold,
+                        ? accent
+                        : accent,
                     filled: prayerCount == 5,
                   ),
                 if (isJummah)
-                  _buildChip(Icons.auto_awesome, 'Jummah', _sandGold),
+                  _buildChip(Icons.auto_awesome, 'Jummah', accent),
                 if (isSunnahFast)
-                  _buildChip(Icons.restaurant_rounded, 'Sunnah Fast', _sandGold),
+                  _buildChip(Icons.restaurant_rounded, 'Sunnah Fast', accent),
               ],
             ),
 
@@ -453,11 +464,11 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(colors: [
-                    _sandGold.withValues(alpha: 0.12),
-                    _sandGold.withValues(alpha: 0.06),
+                    accent.withValues(alpha: 0.12),
+                    accent.withValues(alpha: 0.06),
                   ]),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: _sandGold.withValues(alpha: 0.2)),
+                  border: Border.all(color: accent.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
@@ -478,7 +489,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                           Text(
                             'Islamic Occasion',
                             style: TextStyle(
-                              color: _sandGold.withValues(alpha: 0.6),
+                              color: accent.withValues(alpha: 0.6),
                               fontSize: 10,
                             ),
                           ),

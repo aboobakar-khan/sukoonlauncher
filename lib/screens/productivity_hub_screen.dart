@@ -1,26 +1,53 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../providers/productivity_provider.dart';
-import '../providers/theme_provider.dart';
 import '../providers/installed_apps_provider.dart';
 import '../models/installed_app.dart';
-import '../providers/premium_provider.dart';
+import '../providers/theme_provider.dart';
+import '../providers/zen_mode_provider.dart';
 
 import '../models/productivity_models.dart';
 import '../providers/ambient_sound_provider.dart';
 import '../services/native_app_blocker_service.dart';
-import '../widgets/zen_mode_widget.dart';
-import 'premium_paywall_screen.dart';
+import '../widgets/swipe_back_wrapper.dart';
+import 'zen_mode_entry_screen.dart';
+import 'screen_time_settings_screen.dart';
+import 'notification_feed_screen.dart';
+import '../providers/screen_time_provider.dart';
+import '../providers/notification_filter_provider.dart';
+import '../utils/smooth_page_route.dart';
+import 'pomodoro_screen.dart';
 
 // ─── Sukoon Design Tokens ────────────────────────────────────────────────────
-const Color _sandGold = Color(0xFFC2A366);
 const Color _warmBrown = Color(0xFFA67B5B);
 const Color _oasisGreen = Color(0xFF7BAE6E);
 const Color _desertWarm = Color(0xFFD4A96A);
 const Color _desertSunset = Color(0xFFE8915A);
+
+// ─── Dark Theme Tokens ──────────────────────────────────────────────────────
+const Color _ftBg = Color(0xFF000000);         // pure black background
+final Color _ftCard = Colors.white.withValues(alpha: 0.04);       // semi-transparent card surface
+final Color _ftCardLight = Colors.white.withValues(alpha: 0.06);  // slightly lighter card variant
+const Color _ftText = Color(0xFFE8E8E8);       // light text on dark
+const Color _ftTextSoft = Color(0xFF8A8A8A);   // muted text
+final Color _ftBorder = Colors.white.withValues(alpha: 0.08);     // subtle border
+const Color _ftGold = Color(0xFFBFA76A);       // gold accent for streaks
+
+// ─── Shadow Systems ─────────────────────────────────────────────────────────
+const Color _shadowDark = Color(0xFF000000);
+
+final List<BoxShadow> _darkCardShadowNormal = [
+  BoxShadow(color: _shadowDark.withValues(alpha: 0.25), offset: const Offset(0, 4), blurRadius: 16, spreadRadius: -2),
+  BoxShadow(color: _shadowDark.withValues(alpha: 0.15), offset: const Offset(0, 1), blurRadius: 4),
+];
+final List<BoxShadow> _darkCardShadowElevated = [
+  BoxShadow(color: _shadowDark.withValues(alpha: 0.35), offset: const Offset(0, 4), blurRadius: 16, spreadRadius: -2),
+  BoxShadow(color: _shadowDark.withValues(alpha: 0.15), offset: const Offset(0, 1), blurRadius: 4),
+];
 
 /// 🌙 Productivity Hub — Distraction-free tools
 /// Features: Todo · Pomodoro · Academic Doubts · Events · App Blocker
@@ -33,25 +60,47 @@ class ProductivityHubScreen extends ConsumerStatefulWidget {
 }
 
 class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen> {
-  Timer? _pomodoroTimer;
 
   @override
   void initState() {
     super.initState();
-    _startPomodoroTicker();
-  }
-
-  void _startPomodoroTicker() {
-    _pomodoroTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      final pomo = ref.read(pomodoroProvider);
-      if (pomo.state != PomodoroState.idle && pomo.state != PomodoroState.paused) {
-        ref.read(pomodoroProvider.notifier).tick();
-      }
-      _syncAmbientSound(pomo.state);
+    // Ambient sound sync via listener (timer self-ticks inside PomodoroNotifier)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.listenManual(pomodoroProvider, (prev, next) {
+        if (prev?.state != next.state) {
+          _syncAmbientSound(next.state);
+        }
+      });
     });
   }
 
   PomodoroState? _lastPomodoroState;
+
+  // ── Hub always uses dark mode ──
+  Color get _card => ref.watch(themeColorProvider).isLight
+      ? Colors.black.withValues(alpha: 0.04)
+      : _ftCard;
+  Color get _cardLight => ref.watch(themeColorProvider).isLight
+      ? Colors.black.withValues(alpha: 0.06)
+      : _ftCardLight;
+  Color get _text => ref.watch(themeColorProvider).isLight
+      ? const Color(0xFF0D0D0D)
+      : _ftText;
+  Color get _textSoft => ref.watch(themeColorProvider).isLight
+      ? const Color(0xFF6B6B6B)
+      : _ftTextSoft;
+  Color get _border => ref.watch(themeColorProvider).isLight
+      ? Colors.black.withValues(alpha: 0.08)
+      : _ftBorder;
+  
+  // 🎨 Theme-aware primary color (replaces sage green with user's theme choice)
+  Color get _sage => ref.watch(themeColorProvider).color;
+  Color get _gold => _ftGold;
+
+  /// Paper shadow — always dark mode
+  List<BoxShadow> _paperShadow({bool elevated = false}) {
+    return elevated ? _darkCardShadowElevated : _darkCardShadowNormal;
+  }
 
   /// Sync ambient sound with pomodoro timer state
   void _syncAmbientSound(PomodoroState currentState) {
@@ -66,7 +115,7 @@ class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen> {
     if ((currentState == PomodoroState.focusing ||
          currentState == PomodoroState.shortBreak ||
          currentState == PomodoroState.longBreak) &&
-        (prev == PomodoroState.paused || prev == PomodoroState.idle)) {
+        (prev == PomodoroState.paused || prev == PomodoroState.idle || prev == null)) {
       if (!ambient.isPlaying) {
         final soundId = ambient.currentSoundId ?? 'rain';
         ambientNotifier.selectAndPlay(soundId);
@@ -77,149 +126,157 @@ class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen> {
       ambientNotifier.togglePlayPause();
     }
     // Timer stopped/reset → stop sound completely
+    // Use a tiny delay so auto-start break/focus transitions don't cause audio glitch
     else if (currentState == PomodoroState.idle && prev != null && prev != PomodoroState.idle) {
-      ambientNotifier.stop();
+      Future.delayed(const Duration(milliseconds: 120), () {
+        // Re-read state after delay — if timer auto-started a new session, don't stop
+        final currentPomo = ref.read(pomodoroProvider);
+        if (currentPomo.state == PomodoroState.idle) {
+          ref.read(ambientSoundProvider.notifier).stop();
+        }
+      });
     }
   }
 
   @override
   void dispose() {
-    _pomodoroTimer?.cancel();
     super.dispose();
+  }
+
+  // ── Time-of-day contextual greeting (Psychology: emotional anchor) ──
+  String get _greeting {
+    final hour = DateTime.now().hour;
+    if (hour < 5) return 'Late night';
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    if (hour < 21) return 'Good evening';
+    return 'Wind down';
+  }
+
+  String get _greetingSubtext {
+    final hour = DateTime.now().hour;
+    if (hour < 5) return 'Rest is productive too';
+    if (hour < 12) return 'Start with intention';
+    if (hour < 17) return 'Stay in the flow';
+    if (hour < 21) return 'Finish strong';
+    return 'Reflect on your progress';
+  }
+
+  IconData get _greetingIcon {
+    final hour = DateTime.now().hour;
+    if (hour < 5) return Icons.bedtime_rounded;
+    if (hour < 12) return Icons.wb_sunny_rounded;
+    if (hour < 17) return Icons.light_mode_rounded;
+    if (hour < 21) return Icons.wb_twilight_rounded;
+    return Icons.nightlight_round;
   }
 
   @override
   Widget build(BuildContext context) {
-    final themeColor = ref.watch(themeColorProvider);
-    final accent = themeColor.color;
-    final screenHeight = MediaQuery.of(context).size.height;
     final pomo = ref.watch(pomodoroProvider);
+    final todos = ref.watch(todoProvider);
+    final streak = ref.watch(focusStreakProvider);
+    final zen = ref.watch(zenModeProvider);
+    final blockRules = ref.watch(appBlockRuleProvider);
+    final st = ref.watch(screenTimeProvider);
+    final nf = ref.watch(notificationFilterProvider);
+    final pendingTodos = todos.where((t) => !t.isCompleted).toList();
+    final completedToday = todos.where((t) => t.isCompleted).length;
+    final isFocusing = pomo.state == PomodoroState.focusing ||
+        pomo.state == PomodoroState.shortBreak ||
+        pomo.state == PomodoroState.longBreak;
+    final isPaused = pomo.state == PomodoroState.paused;
+    final isTimerActive = isFocusing || isPaused;
+    final activeBlockedCount = blockRules
+        .where((r) => r.isEnabled)
+        .fold<int>(0, (sum, r) => sum + r.blockedPackages.length);
+    final activeRules = blockRules.where((r) => r.isEnabled).toList();
+    final hasActiveBlocker = activeRules.isNotEmpty;
+    final isScreenTimeActive = st.featureEnabled;
+    final isNotifActive = nf.featureEnabled;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(height: screenHeight * 0.04),
+    // ── Responsive scaling ──
+    final screenW = MediaQuery.of(context).size.width;
+    // Scale factor: 1.0 at 375px (iPhone SE), clamp 0.85–1.25
+    final sf = (screenW / 375).clamp(0.85, 1.25);
+    final hPad = (screenW * 0.053).clamp(14.0, 28.0); // ~20 at 375
 
-              // Header
-              Text(
-                'Productivity',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Stay focused — distraction-free tools',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
+    // Timer display
+    final totalSec = pomo.remainingSeconds;
+    final mins = totalSec ~/ 60;
+    final secs = totalSec % 60;
+    final timeStr = '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
 
-              SizedBox(height: screenHeight * 0.04),
+    // Focus minutes today
+    final totalFocusMin = pomo.totalFocusMinutesToday;
+    final focusHours = totalFocusMin ~/ 60;
+    final focusMins = totalFocusMin % 60;
+    final focusTimeLabel = focusHours > 0 ? '${focusHours}h ${focusMins}m' : '${focusMins}m';
 
-              // Cards — 2x2 equal grid filling the page
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Column(
+    // Screen time
+    final todayTotal = st.todayTotal;
+    final stHours = todayTotal.inHours;
+    final stMins = todayTotal.inMinutes.remainder(60);
+    final stLabel = stHours > 0 ? '${stHours}h ${stMins}m' : '${stMins}m';
+
+    // Protection score (how many tools are active)
+    final protectionActive = [hasActiveBlocker, isScreenTimeActive, isNotifActive, zen.isActive]
+        .where((b) => b).length;
+
+    return Container(
+      color: Colors.transparent,
+      child: SafeArea(
+        child: RepaintBoundary(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: hPad),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 16),
+
+                  // ═══════════════════════════════════════════════════════
+                  // 1. CONTEXTUAL HEADER — greeting + streak + theme toggle
+                  //    Psychology: Emotional anchoring, personal connection
+                  // ═══════════════════════════════════════════════════════
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── Top Row: Focus Timer + Tasks ──
                       Expanded(
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: _buildGridCard(
-                                context,
-                                icon: Icons.timer_rounded,
-                                title: 'Focus Timer',
-                                subtitle: pomo.state != PomodoroState.idle
-                                    ? pomo.timeDisplay
-                                    : 'Pomodoro',
-                                color: _desertSunset,
-                                isActive: pomo.state != PomodoroState.idle,
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  Navigator.push(context, MaterialPageRoute(
-                                    builder: (_) => _ProductivitySubScreen(
-                                      title: 'Focus Timer',
-                                      child: _PomodoroTab(),
+                            Row(
+                              children: [
+                                Icon(
+                                  _greetingIcon,
+                                  size: 18 * sf,
+                                  color: _sage.withValues(alpha: 0.7),
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    _greeting,
+                                    style: TextStyle(
+                                      color: _text,
+                                      fontSize: (22 * sf).clamp(18.0, 28.0),
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -0.5,
                                     ),
-                                  ));
-                                },
-                              ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildGridCard(
-                                context,
-                                icon: Icons.check_circle_outline_rounded,
-                                title: 'Tasks',
-                                subtitle: 'Todo & Events',
-                                color: _oasisGreen,
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  Navigator.push(context, MaterialPageRoute(
-                                    builder: (_) => _ProductivitySubScreen(
-                                      title: 'Tasks',
-                                      child: _TodoTab(),
-                                    ),
-                                  ));
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // ── Bottom Row: Doubts + App Blocker ──
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _buildGridCard(
-                                context,
-                                icon: Icons.psychology_rounded,
-                                title: 'Doubts',
-                                subtitle: 'Academic notes',
-                                color: _sandGold,
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  Navigator.push(context, MaterialPageRoute(
-                                    builder: (_) => _ProductivitySubScreen(
-                                      title: 'Doubts',
-                                      child: _DoubtsTab(),
-                                    ),
-                                  ));
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildGridCard(
-                                context,
-                                icon: Icons.shield_outlined,
-                                title: 'Blocker',
-                                subtitle: 'Block apps',
-                                color: _warmBrown,
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  Navigator.push(context, MaterialPageRoute(
-                                    builder: (_) => _ProductivitySubScreen(
-                                      title: 'App Blocker',
-                                      child: _BlockerTab(),
-                                    ),
-                                  ));
-                                },
+                            const SizedBox(height: 4),
+                            Text(
+                              _greetingSubtext,
+                              style: TextStyle(
+                                color: _textSoft,
+                                fontSize: (13 * sf).clamp(11.0, 16.0),
+                                fontWeight: FontWeight.w400,
                               ),
                             ),
                           ],
@@ -227,376 +284,791 @@ class _ProductivityHubScreenState extends ConsumerState<ProductivityHubScreen> {
                       ),
                     ],
                   ),
+
+                  const SizedBox(height: 6),
+
+                  // ── Inline stats ribbon (streak + focus today + tasks done) ──
+                  // Psychology: Progress visibility (Endowed Progress Effect)
+                  Wrap(
+                    spacing: (8 * sf).clamp(5.0, 12.0),
+                    runSpacing: (6 * sf).clamp(4.0, 10.0),
+                    children: [
+                      if (streak > 0)
+                        _miniChip(
+                          icon: Icons.local_fire_department_rounded,
+                          label: '$streak day streak',
+                          color: const Color(0xFFE8915A),
+                          sf: sf,
+                        ),
+                      if (totalFocusMin > 0)
+                        _miniChip(
+                          icon: Icons.timer_outlined,
+                          label: '$focusTimeLabel focused',
+                          color: _sage,
+                          sf: sf,
+                        ),
+                      if (completedToday > 0)
+                        _miniChip(
+                          icon: Icons.check_circle_outline_rounded,
+                          label: '$completedToday done',
+                          color: _sage,
+                          sf: sf,
+                        ),
+                    ],
+                  ),
+
+                  SizedBox(height: (20 * sf).clamp(14.0, 28.0)),
+
+                  // ═══════════════════════════════════════════════════════
+                  // 2. HERO FOCUS CARD — tap to open full Focus screen
+                  // ═══════════════════════════════════════════════════════
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        SmoothForwardRoute(
+                          child: PomodoroScreen(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all((20 * sf).clamp(14.0, 26.0)),
+                      decoration: BoxDecoration(
+                        color: isTimerActive
+                            ? _sage.withValues(alpha: 0.06)
+                            : _card,
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: isTimerActive
+                              ? _sage.withValues(alpha: 0.2)
+                              : _border,
+                          width: isTimerActive ? 1 : 0.5,
+                        ),
+                        boxShadow: _paperShadow(elevated: isTimerActive),
+                      ),
+                      child: Row(
+                        children: [
+                          // Timer ring (compact) — responsive
+                          SizedBox(
+                            width: (56 * sf).clamp(44.0, 68.0),
+                            height: (56 * sf).clamp(44.0, 68.0),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                SizedBox.expand(
+                                  child: CustomPaint(
+                                    painter: _FocusRingPainter(
+                                      progress: isTimerActive ? pomo.progress : 0.0,
+                                      trackColor: _border.withValues(alpha: 0.5),
+                                      progressColor: isFocusing
+                                          ? _sage
+                                          : isPaused
+                                              ? _sage.withValues(alpha: 0.4)
+                                              : _border.withValues(alpha: 0.4),
+                                      strokeWidth: (2.5 * sf).clamp(2.0, 3.5),
+                                    ),
+                                  ),
+                                ),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(6),
+                                    child: Text(
+                                      timeStr,
+                                      style: TextStyle(
+                                        color: isTimerActive
+                                            ? _text
+                                            : _text.withValues(alpha: 0.45),
+                                        fontSize: (14 * sf).clamp(11.0, 17.0),
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.5,
+                                        fontFeatures: const [FontFeature.tabularFigures()],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(width: (16 * sf).clamp(10.0, 20.0)),
+                          // Info
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isFocusing
+                                      ? (pomo.state == PomodoroState.focusing
+                                          ? 'Deep Focus'
+                                          : pomo.state == PomodoroState.shortBreak
+                                              ? 'Short Break'
+                                              : 'Long Break')
+                                      : isPaused
+                                          ? 'Paused'
+                                          : 'Focus',
+                                  style: TextStyle(
+                                    color: _text,
+                                    fontSize: (17 * sf).clamp(14.0, 22.0),
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.3,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                SizedBox(height: (3 * sf).clamp(2.0, 5.0)),
+                                Text(
+                                  isTimerActive
+                                      ? 'Session ${pomo.completedSessions + 1} · $focusTimeLabel today'
+                                      : 'Tap to start focusing',
+                                  style: TextStyle(
+                                    color: isTimerActive
+                                        ? _sage.withValues(alpha: 0.7)
+                                        : _textSoft,
+                                    fontSize: (12 * sf).clamp(10.0, 15.0),
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(width: (8 * sf).clamp(6.0, 12.0)),
+                          // Play / Pause — responsive
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.mediumImpact();
+                              if (isPaused) {
+                                ref.read(pomodoroProvider.notifier).resume();
+                              } else if (isFocusing) {
+                                ref.read(pomodoroProvider.notifier).pause();
+                              } else {
+                                ref.read(pomodoroProvider.notifier).startFocus();
+                              }
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: (44 * sf).clamp(36.0, 54.0),
+                              height: (44 * sf).clamp(36.0, 54.0),
+                              decoration: BoxDecoration(
+                                color: isTimerActive
+                                    ? _sage.withValues(alpha: 0.12)
+                                    : _sage,
+                                shape: BoxShape.circle,
+                                border: isTimerActive
+                                    ? Border.all(
+                                        color: _sage.withValues(alpha: 0.25),
+                                        width: 1.5,
+                                      )
+                                    : null,
+                                boxShadow: !isTimerActive
+                                    ? [BoxShadow(
+                                        color: _sage.withValues(alpha: 0.25),
+                                        offset: const Offset(0, 4),
+                                        blurRadius: 12,
+                                      )]
+                                    : null,
+                              ),
+                              child: Icon(
+                                isPaused
+                                    ? Icons.play_arrow_rounded
+                                    : isFocusing
+                                        ? Icons.pause_rounded
+                                        : Icons.play_arrow_rounded,
+                                color: isTimerActive
+                                    ? _sage
+                                    : (_sage.computeLuminance() > 0.45
+                                        ? Colors.black
+                                        : Colors.white),
+                                size: (22 * sf).clamp(18.0, 28.0),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ═══════════════════════════════════════════════════════
+                  // 3. TASKS — inline preview (no extra card chrome)
+                  //    Psychology: Zeigarnik Effect — showing incomplete
+                  //    tasks creates urge to complete them
+                  // ═══════════════════════════════════════════════════════
+                  _buildTaskPreview(context, pendingTodos, sf),
+
+                  const SizedBox(height: 20),
+
+                  // ═══════════════════════════════════════════════════════
+                  // 4. DIGITAL WELLBEING SECTION — grouped protection tools
+                  //    Psychology: Gestalt Law of Proximity — related tools
+                  //    are perceived as belonging together
+                  // ═══════════════════════════════════════════════════════
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Digital Wellbeing',
+                          style: TextStyle(
+                            color: _text,
+                            fontSize: (15 * sf).clamp(13.0, 19.0),
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (protectionActive > 0)
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 7 * sf, vertical: 3 * sf),
+                          decoration: BoxDecoration(
+                            color: _sage.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '$protectionActive active',
+                            style: TextStyle(
+                              color: _sage,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── 2x2 Compact Grid: Zen Mode · Notifications · Blocker · Screen Time ──
+                  // Psychology: Miller's Law — chunked into digestible groups
+                  Row(
+                    children: [
+                      // Zen Mode
+                      Expanded(
+                        child: _wellbeingTile(
+                          icon: zen.isActive
+                              ? Icons.self_improvement_rounded
+                              : Icons.phone_android_rounded,
+                          label: 'Muraqaba',
+                          value: zen.isActive ? 'Active' : 'Off',
+                          isActive: zen.isActive,
+                          accentColor: zen.isActive ? _sage : null,
+                          sf: sf,
+                          onTap: () {
+                            if (zen.isActive) {
+                              ref.read(zenModeProvider.notifier).endZenMode();
+                            } else {
+                              Navigator.push(context, SmoothForwardRoute(
+                                child: const ZenModeEntryScreen(),
+                              ));
+                            }
+                          },
+                        ),
+                      ),
+                      SizedBox(width: (10 * sf).clamp(6.0, 14.0)),
+                      // Notifications
+                      Expanded(
+                        child: _wellbeingTile(
+                          icon: Icons.notifications_outlined,
+                          label: 'Notifications',
+                          value: isNotifActive
+                              ? '${nf.totalCount} queued'
+                              : 'Off',
+                          isActive: isNotifActive,
+                          badge: isNotifActive && nf.totalCount > 0
+                              ? nf.totalCount
+                              : null,
+                          sf: sf,
+                          onTap: () {
+                            Navigator.push(context, SmoothForwardRoute(
+                              child: const NotificationFeedScreen(),
+                            ));
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: (10 * sf).clamp(6.0, 14.0)),
+                  Row(
+                    children: [
+                      // App Blocker
+                      Expanded(
+                        child: _wellbeingTile(
+                          icon: Icons.shield_rounded,
+                          label: 'App Blocker',
+                          value: hasActiveBlocker
+                              ? '$activeBlockedCount blocked'
+                              : 'Off',
+                          isActive: hasActiveBlocker,
+                          sf: sf,
+                          onTap: () {
+                            Navigator.push(context, SmoothForwardRoute(
+                              child: _ProductivitySubScreen(
+                                title: 'App Blocker',
+                                child: _BlockerTab(),
+                              ),
+                            ));
+                          },
+                        ),
+                      ),
+                      SizedBox(width: (10 * sf).clamp(6.0, 14.0)),
+                      // Screen Time
+                      Expanded(
+                        child: _wellbeingTile(
+                          icon: Icons.timer_outlined,
+                          label: 'Screen Time',
+                          value: isScreenTimeActive ? stLabel : 'Off',
+                          isActive: isScreenTimeActive,
+                          sf: sf,
+                          onTap: () {
+                            Navigator.push(context, SmoothForwardRoute(
+                              child: const ScreenTimeSettingsScreen(),
+                            ));
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Bottom safe area padding — responsive
+                  SizedBox(height: (32 * sf).clamp(20.0, 48.0)),
+                ],              // Column children
+              ),                // Column
+            ),                  // Padding
+          ),                    // SingleChildScrollView
+        ),                      // RepaintBoundary
+      ),                        // SafeArea
+    );                          // Container
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // MINI CHIP — inline stat pill for the greeting area
+  // ─────────────────────────────────────────────────────────────────────────
+  Widget _miniChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+    double sf = 1.0,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: (10 * sf).clamp(6.0, 14.0),
+        vertical: (5 * sf).clamp(3.0, 8.0),
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: (13 * sf).clamp(10.0, 17.0), color: color.withValues(alpha: 0.7)),
+          SizedBox(width: (5 * sf).clamp(3.0, 8.0)),
+          Text(
+            label,
+            style: TextStyle(
+              color: color.withValues(alpha: 0.85),
+              fontSize: (11.5 * sf).clamp(9.0, 15.0),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // WELLBEING TILE — compact card for the 2x2 grid
+  // ─────────────────────────────────────────────────────────────────────────
+  Widget _wellbeingTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool isActive,
+    required VoidCallback onTap,
+    Color? accentColor,
+    int? badge,
+    double sf = 1.0,
+  }) {
+    final color = accentColor ?? _sage;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.all((16 * sf).clamp(12.0, 22.0)),
+        decoration: BoxDecoration(
+          color: _card,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isActive
+                ? color.withValues(alpha: 0.20)
+                : _border,
+            width: 0.5,
+          ),
+          boxShadow: _paperShadow(),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all((8 * sf).clamp(6.0, 12.0)),
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? color.withValues(alpha: 0.10)
+                        : _cardLight,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: (16 * sf).clamp(13.0, 20.0), color: isActive ? color : _textSoft),
+                ),
+                const Spacer(),
+                if (badge != null)
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6 * sf, vertical: 2 * sf),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$badge',
+                      style: TextStyle(
+                        color: color,
+                        fontSize: (10 * sf).clamp(8.0, 13.0),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                else if (isActive)
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: color,
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.4),
+                          blurRadius: 6,
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            SizedBox(height: (12 * sf).clamp(8.0, 16.0)),
+            Text(
+              label,
+              style: TextStyle(
+                color: _text,
+                fontSize: (13.5 * sf).clamp(11.0, 17.0),
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              style: TextStyle(
+                color: isActive ? color : _textSoft,
+                fontSize: (11.5 * sf).clamp(9.5, 15.0),
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // (Old status bar and focus engine removed — replaced by new hub design)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 3. COMPACT TASK PREVIEW
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildTaskPreview(BuildContext context, List<TodoItem> pendingTodos, double sf) {
+    final previewTodos = pendingTodos.take(2).toList();
+    final remaining = pendingTodos.length - previewTodos.length;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all((20 * sf).clamp(14.0, 26.0)),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border, width: 0.5),
+        boxShadow: _paperShadow(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row
+          Row(
+            children: [
+              Text(
+                'Tasks',
+                style: TextStyle(
+                  color: _text,
+                  fontSize: (17 * sf).clamp(14.0, 22.0),
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    SmoothForwardRoute(
+                      child: _ProductivitySubScreen(
+                        title: 'Tasks',
+                        child: _TodoTab(),
+                      ),
+                    ),
+                  );
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'View All',
+                      style: TextStyle(
+                        color: _sage,
+                        fontSize: (12.5 * sf).clamp(10.0, 16.0),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: (13 * sf).clamp(10.0, 16.0),
+                      color: _sage,
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
 
-  /// Equal-sized grid card — fills available space in 2×2 grid
-  Widget _buildGridCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-    bool isActive = false,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: color.withValues(alpha: isActive ? 0.4 : 0.12),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Icon
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(icon, color: color, size: 28),
-            ),
-            const Spacer(),
-            // Title
-            Text(
-              title,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.9),
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 4),
-            // Subtitle
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: isActive ? color : Colors.white.withValues(alpha: 0.35),
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Arrow
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.arrow_forward_rounded,
-                  color: color.withValues(alpha: 0.7),
-                  size: 16,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+          SizedBox(height: (16 * sf).clamp(10.0, 22.0)),
 
-  /// Tall vertical bento card — left side of the grid
-  Widget _buildTallCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-    bool isActive = false,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: color.withValues(alpha: isActive ? 0.4 : 0.12),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Icon
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Icon(icon, color: color, size: 32),
-            ),
-            const Spacer(),
-            // Title
-            Text(
-              title,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.9),
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.5,
-                height: 1.2,
-              ),
-            ),
-            const SizedBox(height: 8),
-            // Subtitle
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: isActive ? color : Colors.white.withValues(alpha: 0.35),
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Arrow
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_rounded,
-                    color: color.withValues(alpha: 0.7),
-                    size: 16,
-                  ),
+          // Task rows
+          if (previewTodos.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'All done for today ✨',
+                style: TextStyle(
+                  color: _textSoft.withValues(alpha: 0.7),
+                  fontSize: (13.5 * sf).clamp(11.0, 17.0),
+                  fontWeight: FontWeight.w400,
                 ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+              ),
+            )
+          else
+            ...previewTodos.asMap().entries.map((entry) {
+              final i = entry.key;
+              final todo = entry.value;
+              final isHigh = todo.priority >= 2;
+              final isLast = i == previewTodos.length - 1 && remaining <= 0;
 
-  /// Compact card for the right stacked column
-  Widget _buildCompactCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-    bool isActive = false,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: color.withValues(alpha: isActive ? 0.3 : 0.12),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: isActive ? color : Colors.white.withValues(alpha: 0.35),
-                    fontSize: 11,
-                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Full-width featured card — with large icon and descriptive text
-  Widget _buildFeaturedCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-    bool isActive = false,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: color.withValues(alpha: isActive ? 0.35 : 0.12),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(icon, color: color, size: 28),
-            ),
-            const SizedBox(width: 18),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              return Column(
                 children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.3,
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: (8 * sf).clamp(5.0, 12.0)),
+                    child: Row(
+                      children: [
+                        // Checkbox circle — responsive
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            ref.read(todoProvider.notifier).toggleTodo(todo.id);
+                          },
+                          child: Container(
+                            width: (22 * sf).clamp(18.0, 30.0),
+                            height: (22 * sf).clamp(18.0, 30.0),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _cardLight,
+                              border: Border.all(
+                                color: _border,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: (12 * sf).clamp(8.0, 16.0)),
+                        // Priority indicator
+                        if (isHigh)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Icon(
+                              Icons.lightbulb_rounded,
+                              size: 14,
+                              color: _gold.withValues(alpha: 0.8),
+                            ),
+                          ),
+                        // Task title
+                        Expanded(
+                          child: Text(
+                            todo.title,
+                            style: TextStyle(
+                              color: _text.withValues(alpha: 0.8),
+                              fontSize: (14.5 * sf).clamp(12.0, 18.0),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // Priority dot
+                        Container(
+                          width: (6 * sf).clamp(4.0, 8.0),
+                          height: (6 * sf).clamp(4.0, 8.0),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isHigh
+                                ? _sage
+                                : _border,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: isActive ? color : Colors.white.withValues(alpha: 0.35),
-                      fontSize: 12,
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                  if (!isLast)
+                    Container(
+                      height: 0.5,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            _border.withValues(alpha: 0.0),
+                            _border.withValues(alpha: 0.3),
+                            _border.withValues(alpha: 0.3),
+                            _border.withValues(alpha: 0.0),
+                          ],
+                          stops: const [0.0, 0.2, 0.8, 1.0],
+                        ),
+                      ),
                     ),
-                  ),
                 ],
+              );
+            }),
+
+          // "+N more" indicator
+          if (remaining > 0)
+            Padding(
+              padding: EdgeInsets.only(top: (8 * sf).clamp(5.0, 12.0)),
+              child: Text(
+                '+$remaining more',
+                style: TextStyle(
+                  color: _textSoft.withValues(alpha: 0.6),
+                  fontSize: (12.5 * sf).clamp(10.0, 16.0),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: Colors.white.withValues(alpha: 0.15),
-              size: 22,
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildHubCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-    bool isActive = false,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        height: 150,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: color.withValues(alpha: isActive ? 0.3 : 0.12),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: isActive ? color : Colors.white.withValues(alpha: 0.35),
-                    fontSize: 12,
-                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+  // ─────────────────────────────────────────────────────────────────────────
+  // (Old doubts/blocker/screen-time/notification/zen-mode cards removed
+  //  — replaced by new hub Digital Wellbeing 2x2 grid)
+  // ─────────────────────────────────────────────────────────────────────────
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FOCUS RING CUSTOM PAINTER
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _FocusRingPainter extends CustomPainter {
+  final double progress;
+  final Color trackColor;
+  final Color progressColor;
+  final double strokeWidth;
+
+  _FocusRingPainter({
+    required this.progress,
+    required this.trackColor,
+    required this.progressColor,
+    required this.strokeWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (math.min(size.width, size.height) / 2) - strokeWidth;
+
+    // Track
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawCircle(center, radius, trackPaint);
+
+    // Progress
+    if (progress > 0) {
+      final progressPaint = Paint()
+        ..color = progressColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round;
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -math.pi / 2,
+        2 * math.pi * progress,
+        false,
+        progressPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _FocusRingPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.trackColor != trackColor ||
+        oldDelegate.progressColor != progressColor;
   }
 }
 
 /// Wrapper screen for Productivity sub-screens (Focus, Tasks, Doubts, Blocker)
-class _ProductivitySubScreen extends StatelessWidget {
+class _ProductivitySubScreen extends ConsumerWidget {
   final String title;
   final Widget child;
   const _ProductivitySubScreen({required this.title, required this.child});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Theme-aware colors for sub-screen header
+    final isLight = ref.watch(themeColorProvider).isLight;
+    final themeBg = isLight ? const Color(0xFFF5F5F5) : Colors.black;
+    final themeText = isLight
+        ? const Color(0xFF0D0D0D).withValues(alpha: 0.85)
+        : Colors.white.withValues(alpha: 0.85);
+    final themeIcon = isLight
+        ? const Color(0xFF0D0D0D).withValues(alpha: 0.6)
+        : Colors.white.withValues(alpha: 0.6);
+
+    final textColor = themeText;
+    final iconColor = themeIcon;
+
+    return SwipeBackWrapper(
+      child: Scaffold(
+      backgroundColor: themeBg,
       body: SafeArea(
         child: Column(
           children: [
@@ -609,14 +1081,14 @@ class _ProductivitySubScreen extends StatelessWidget {
                     onPressed: () => Navigator.pop(context),
                     icon: Icon(
                       Icons.arrow_back_rounded,
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: iconColor,
                       size: 22,
                     ),
                   ),
                   Text(
                     title,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
+                      color: textColor,
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
                     ),
@@ -629,6 +1101,7 @@ class _ProductivitySubScreen extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }
@@ -643,6 +1116,23 @@ class _TodoTab extends ConsumerStatefulWidget {
 }
 
 class _TodoTabState extends ConsumerState<_TodoTab> {
+
+  // ── Theme-aware colors ──
+  bool get _isLight => ref.watch(themeColorProvider).isLight;
+  Color get _bg => _isLight ? const Color(0xFFF5F5F5) : _ftBg;
+  Color get _card => _isLight ? Colors.black.withValues(alpha: 0.04) : _ftCard;
+  Color get _text => _isLight ? const Color(0xFF0D0D0D) : _ftText;
+  Color get _textSoft => _isLight ? const Color(0xFF6B6B6B) : _ftTextSoft;
+  Color get _border => _isLight ? Colors.black.withValues(alpha: 0.08) : _ftBorder;
+  Color get _sage => ref.watch(themeColorProvider).color;
+  Color get _sageDark {
+    final themeColor = ref.watch(themeColorProvider).color;
+    final hslColor = HSLColor.fromColor(themeColor);
+    return hslColor
+        .withLightness((hslColor.lightness * 0.85).clamp(0.0, 1.0))
+        .toColor();
+  }
+  Color get _gold => _ftGold;
   String _filter = 'all';
 
   @override
@@ -688,7 +1178,7 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
               Text(
                 '$pending tasks pending',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: _textSoft,
                   fontSize: 12,
                 ),
               ),
@@ -710,14 +1200,16 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                     children: [
                       Icon(Icons.check_circle_outline,
                           size: 48,
-                          color: Colors.white.withValues(alpha: 0.15)),
+                          color: _border),
                       const SizedBox(height: 12),
                       Text(
                         _filter == 'done'
                             ? 'No completed tasks'
-                            : 'No tasks yet',
+                            : 'A productive day starts with intention.\nAdd your first task — Bismillah.',
                         style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.3)),
+                            color: _textSoft,
+                            height: 1.5),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
@@ -761,19 +1253,19 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   decoration: BoxDecoration(
-                    color: _sandGold.withValues(alpha: 0.06),
+                    color: _gold.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _sandGold.withValues(alpha: 0.15)),
+                    border: Border.all(color: _gold.withValues(alpha: 0.18)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.event_outlined,
-                          size: 16, color: _sandGold.withValues(alpha: 0.7)),
+                          size: 16, color: _gold.withValues(alpha: 0.7)),
                       const SizedBox(width: 6),
                       Text('Event',
                           style: TextStyle(
-                            color: _sandGold.withValues(alpha: 0.7),
+                            color: _gold.withValues(alpha: 0.8),
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           )),
@@ -794,7 +1286,7 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
       child: Text(
         text,
         style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.35),
+          color: _textSoft,
           fontSize: 11,
           fontWeight: FontWeight.w500,
           letterSpacing: 0.3,
@@ -822,9 +1314,9 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.06),
+          color: _card,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.12)),
+          border: Border.all(color: _border),
         ),
         child: Row(
           children: [
@@ -842,12 +1334,12 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                 children: [
                   Text(event.title,
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.85),
+                          color: _text,
                           fontSize: 13, fontWeight: FontWeight.w500)),
                   const SizedBox(height: 2),
                   Text(timeText,
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.35),
+                          color: _textSoft,
                           fontSize: 11)),
                 ],
               ),
@@ -863,7 +1355,7 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
   void _showEventOptions(ProductivityEvent event) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: _card,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => Padding(
@@ -872,9 +1364,9 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.add_task, color: _sandGold),
-              title: const Text('Create Todo from Event',
-                  style: TextStyle(color: Colors.white)),
+              leading: Icon(Icons.add_task, color: _sage),
+              title: Text('Create Todo from Event',
+                  style: TextStyle(color: _text)),
               onTap: () {
                 ref.read(todoProvider.notifier).addTodo(
                       title: event.title,
@@ -882,14 +1374,13 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                       linkedEventId: event.id,
                     );
                 Navigator.pop(ctx);
-                HapticFeedback.lightImpact();
               },
             ),
             ListTile(
-              leading: const Icon(Icons.shield_outlined,
-                  color: _desertSunset),
-              title: const Text('Block apps during event',
-                  style: TextStyle(color: Colors.white)),
+              leading: Icon(Icons.shield_outlined,
+                  color: _gold),
+              title: Text('Block apps during event',
+                  style: TextStyle(color: _text)),
               onTap: () {
                 Navigator.pop(ctx);
                 _createBlockRuleForEvent(event);
@@ -937,20 +1428,20 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: selected
-              ? _sandGold.withValues(alpha: 0.15)
+              ? _sage.withValues(alpha: 0.12)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: selected
-                ? _sandGold.withValues(alpha: 0.3)
-                : Colors.white.withValues(alpha: 0.08),
+                ? _sage.withValues(alpha: 0.3)
+                : _border,
           ),
         ),
         child: Text(
           label[0].toUpperCase() + label.substring(1),
           style: TextStyle(
             fontSize: 11,
-            color: selected ? _sandGold : Colors.white.withValues(alpha: 0.4),
+            color: selected ? _sageDark : _textSoft,
           ),
         ),
       ),
@@ -959,10 +1450,10 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
 
   Widget _todoTile(TodoItem todo) {
     final priorityColors = [
-      Colors.white.withValues(alpha: 0.4),
-      _oasisGreen,
-      _desertWarm,
-      _desertSunset,
+      _textSoft,
+      _sage,
+      _gold,
+      const Color(0xFFD97B4A),
     ];
     final color = priorityColors[todo.priority.clamp(0, 3)];
 
@@ -973,19 +1464,19 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
-          color: Colors.red.withValues(alpha: 0.15),
+          color: Colors.red.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(Icons.delete_outline,
-            color: Colors.red.withValues(alpha: 0.6)),
+            color: Colors.red.withValues(alpha: 0.5)),
       ),
       onDismissed: (_) => ref.read(todoProvider.notifier).deleteTodo(todo.id),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
+          color: _card,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+          border: Border.all(color: _border),
         ),
         child: ListTile(
           dense: true,
@@ -1001,17 +1492,17 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: todo.isCompleted
-                    ? _oasisGreen.withValues(alpha: 0.3)
+                    ? _sage.withValues(alpha: 0.15)
                     : Colors.transparent,
                 border: Border.all(
                   color: todo.isCompleted
-                      ? _oasisGreen
-                      : color.withValues(alpha: 0.4),
+                      ? _sage
+                      : color.withValues(alpha: 0.5),
                   width: 1.5,
                 ),
               ),
               child: todo.isCompleted
-                  ? const Icon(Icons.check, size: 14, color: _oasisGreen)
+                  ? Icon(Icons.check, size: 14, color: _sage)
                   : null,
             ),
           ),
@@ -1019,8 +1510,8 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
             todo.title,
             style: TextStyle(
               color: todo.isCompleted
-                  ? Colors.white.withValues(alpha: 0.3)
-                  : Colors.white.withValues(alpha: 0.85),
+                  ? _textSoft.withValues(alpha: 0.5)
+                  : _text,
               fontSize: 14,
               decoration:
                   todo.isCompleted ? TextDecoration.lineThrough : null,
@@ -1032,8 +1523,8 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                   style: TextStyle(
                     fontSize: 11,
                     color: _isDueToday(todo.dueDate!)
-                        ? _desertSunset.withValues(alpha: 0.7)
-                        : Colors.white.withValues(alpha: 0.3),
+                        ? const Color(0xFFD97B4A)
+                        : _textSoft,
                   ),
                 )
               : null,
@@ -1075,8 +1566,8 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
             20,
             MediaQuery.of(ctx).viewInsets.bottom + 20,
           ),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A1A1A),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111111),
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
@@ -1086,7 +1577,7 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
               // Title
               Text('New Task',
                   style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      color: _text,
                       fontSize: 18,
                       fontWeight: FontWeight.w600)),
               const SizedBox(height: 16),
@@ -1094,16 +1585,24 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
               TextField(
                 controller: controller,
                 autofocus: true,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: _text),
                 decoration: InputDecoration(
                   hintText: 'What needs to be done?',
                   hintStyle:
-                      TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                      TextStyle(color: _textSoft),
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.06),
+                  fillColor: _bg,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+                    borderSide: BorderSide(color: _border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: _border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: _sage.withValues(alpha: 0.4)),
                   ),
                 ),
               ),
@@ -1113,7 +1612,7 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                 children: [
                   Text('Priority:',
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
+                          color: _textSoft,
                           fontSize: 12)),
                   const SizedBox(width: 8),
                   for (int p = 1; p <= 3; p++)
@@ -1127,21 +1626,26 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                           color: priority == p
                               ? [
                                   Colors.transparent,
-                                  _oasisGreen,
-                                  _desertWarm,
-                                  _desertSunset
+                                  _sage,
+                                  _gold,
+                                  const Color(0xFFD97B4A)
                                 ][p]
-                                  .withValues(alpha: 0.2)
-                              : Colors.white.withValues(alpha: 0.04),
+                                  .withValues(alpha: 0.12)
+                              : _bg,
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: priority == p
+                                ? [Colors.transparent, _sage, _gold, const Color(0xFFD97B4A)][p].withValues(alpha: 0.3)
+                                : _border,
+                          ),
                         ),
                         child: Text(
                           ['', 'Low', 'Med', 'High'][p],
                           style: TextStyle(
                             fontSize: 11,
                             color: priority == p
-                                ? Colors.white
-                                : Colors.white.withValues(alpha: 0.4),
+                                ? [Colors.transparent, _sageDark, _gold, const Color(0xFFD97B4A)][p]
+                                : _textSoft,
                           ),
                         ),
                       ),
@@ -1157,7 +1661,7 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                         lastDate:
                             DateTime.now().add(const Duration(days: 365)),
                       );
-                      if (date != null) {
+                      if (date != null && ctx.mounted) {
                         final time = await showTimePicker(
                           context: ctx,
                           initialTime: TimeOfDay.now(),
@@ -1178,9 +1682,10 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                           horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: dueDate != null
-                            ? _sandGold.withValues(alpha: 0.15)
-                            : Colors.white.withValues(alpha: 0.04),
+                            ? _gold.withValues(alpha: 0.1)
+                            : _bg,
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: dueDate != null ? _gold.withValues(alpha: 0.25) : _border),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1188,14 +1693,14 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                           Icon(Icons.calendar_today,
                               size: 12,
                               color: dueDate != null
-                                  ? _sandGold
-                                  : Colors.white.withValues(alpha: 0.4)),
+                                  ? _gold
+                                  : _textSoft),
                           if (dueDate != null) ...[
                             const SizedBox(width: 4),
                             Text(
                               DateFormat('MMM d').format(dueDate!),
-                              style: const TextStyle(
-                                  fontSize: 11, color: _sandGold),
+                              style: TextStyle(
+                                  fontSize: 11, color: _gold),
                             ),
                           ],
                         ],
@@ -1223,8 +1728,8 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                         Icon(Icons.link,
                             size: 14,
                             color: linkedDoubtId != null
-                                ? _sandGold
-                                : Colors.white.withValues(alpha: 0.3)),
+                                ? _sage
+                                : _textSoft),
                         const SizedBox(width: 6),
                         Text(
                           linkedDoubtId != null
@@ -1233,8 +1738,8 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                           style: TextStyle(
                             fontSize: 12,
                             color: linkedDoubtId != null
-                                ? _sandGold
-                                : Colors.white.withValues(alpha: 0.3),
+                                ? _sage
+                                : _textSoft,
                           ),
                         ),
                       ],
@@ -1256,11 +1761,10 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                           linkedDoubtId: linkedDoubtId,
                         );
                     Navigator.pop(ctx);
-                    HapticFeedback.lightImpact();
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _sandGold.withValues(alpha: 0.2),
-                    foregroundColor: _sandGold,
+                    backgroundColor: _sage.withValues(alpha: 0.15),
+                    foregroundColor: _sageDark,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1279,7 +1783,7 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
       void Function(String) onSelect) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: _card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -1293,10 +1797,10 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
             title: Text(doubts[i].question,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 13)),
+                style: TextStyle(color: _text, fontSize: 13)),
             subtitle: Text(doubts[i].subject,
                 style: TextStyle(
-                    color: _sandGold.withValues(alpha: 0.6), fontSize: 11)),
+                    color: _gold, fontSize: 11)),
             onTap: () {
               onSelect(doubts[i].id);
               Navigator.pop(ctx);
@@ -1317,10 +1821,10 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
     String selectedColor = 'C2A366';
 
     final colorOptions = {
-      'C2A366': _sandGold,
+      'C2A366': _gold,
       'A67B5B': _warmBrown,
-      '7BAE6E': _oasisGreen,
-      'E8915A': _desertSunset,
+      '7BAE6E': _sage,
+      'E8915A': const Color(0xFFD97B4A),
     };
 
     showModalBottomSheet(
@@ -1331,8 +1835,8 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
         builder: (ctx, setBS) => Container(
           padding: EdgeInsets.fromLTRB(
               20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A1A1A),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111111),
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: SingleChildScrollView(
@@ -1342,23 +1846,29 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
               children: [
                 Text('New Event',
                     style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
+                        color: _text,
                         fontSize: 18,
                         fontWeight: FontWeight.w600)),
                 const SizedBox(height: 16),
                 TextField(
                   controller: titleCtrl,
                   autofocus: true,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: _text),
                   decoration: InputDecoration(
                     hintText: 'Event title',
                     hintStyle:
-                        TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                        TextStyle(color: _textSoft),
                     filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.06),
+                    fillColor: _bg,
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none),
+                        borderSide: BorderSide(color: _border)),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: _border)),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: _sage.withValues(alpha: 0.4))),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1376,17 +1886,18 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.06),
+                      color: _bg,
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _border),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.calendar_today, size: 16, color: _sandGold.withValues(alpha: 0.7)),
+                        Icon(Icons.calendar_today, size: 16, color: _gold),
                         const SizedBox(width: 10),
                         Text(DateFormat('EEE, MMM d').format(selectedDate),
-                            style: const TextStyle(color: Colors.white, fontSize: 13)),
+                            style: TextStyle(color: _text, fontSize: 13)),
                         const Spacer(),
-                        Icon(Icons.chevron_right, size: 16, color: Colors.white.withValues(alpha: 0.3)),
+                        Icon(Icons.chevron_right, size: 16, color: _textSoft),
                       ],
                     ),
                   ),
@@ -1395,17 +1906,17 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                 // All day
                 Row(
                   children: [
-                    Text('All day', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                    Text('All day', style: TextStyle(color: _textSoft, fontSize: 13)),
                     const Spacer(),
-                    Switch(value: isAllDay, onChanged: (v) => setBS(() { isAllDay = v; if (v) hasSpecificTime = false; }), activeColor: _sandGold),
+                    Switch(value: isAllDay, onChanged: (v) => setBS(() { isAllDay = v; if (v) hasSpecificTime = false; }), activeThumbColor: _sage),
                   ],
                 ),
                 if (!isAllDay) ...[
                   Row(
                     children: [
-                      Text('Set time', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                      Text('Set time', style: TextStyle(color: _textSoft, fontSize: 13)),
                       const Spacer(),
-                      Switch(value: hasSpecificTime, onChanged: (v) => setBS(() { hasSpecificTime = v; if (v && selectedStartTime == null) selectedStartTime = TimeOfDay.fromDateTime(DateTime.now().add(const Duration(hours: 1))); }), activeColor: _sandGold),
+                      Switch(value: hasSpecificTime, onChanged: (v) => setBS(() { hasSpecificTime = v; if (v && selectedStartTime == null) selectedStartTime = TimeOfDay.fromDateTime(DateTime.now().add(const Duration(hours: 1))); }), activeThumbColor: _sage),
                     ],
                   ),
                   if (hasSpecificTime) ...[
@@ -1416,11 +1927,11 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                       },
                       child: Container(
                         padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
+                        decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(10), border: Border.all(color: _border)),
                         child: Row(children: [
-                          Text('Start', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+                          Text('Start', style: TextStyle(color: _textSoft, fontSize: 12)),
                           const Spacer(),
-                          Text(selectedStartTime?.format(ctx) ?? 'Set', style: const TextStyle(color: Colors.white, fontSize: 13)),
+                          Text(selectedStartTime?.format(ctx) ?? 'Set', style: TextStyle(color: _text, fontSize: 13)),
                         ]),
                       ),
                     ),
@@ -1431,11 +1942,11 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                       },
                       child: Container(
                         padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(10)),
+                        decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(10), border: Border.all(color: _border)),
                         child: Row(children: [
-                          Text('End (optional)', style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 12)),
+                          Text('End (optional)', style: TextStyle(color: _textSoft, fontSize: 12)),
                           const Spacer(),
-                          Text(selectedEndTime?.format(ctx) ?? '—', style: TextStyle(color: selectedEndTime != null ? Colors.white : Colors.white.withValues(alpha: 0.3), fontSize: 13)),
+                          Text(selectedEndTime?.format(ctx) ?? '—', style: TextStyle(color: selectedEndTime != null ? _text : _textSoft, fontSize: 13)),
                         ]),
                       ),
                     ),
@@ -1445,14 +1956,14 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                 // Color
                 Row(
                   children: [
-                    Text('Color', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+                    Text('Color', style: TextStyle(color: _textSoft, fontSize: 12)),
                     const SizedBox(width: 12),
                     ...colorOptions.entries.map((e) => GestureDetector(
                           onTap: () => setBS(() => selectedColor = e.key),
                           child: Container(
                             margin: const EdgeInsets.only(right: 8), width: 24, height: 24,
                             decoration: BoxDecoration(color: e.value, shape: BoxShape.circle,
-                              border: selectedColor == e.key ? Border.all(color: Colors.white, width: 2) : null),
+                              border: selectedColor == e.key ? Border.all(color: _text, width: 2) : null),
                           ),
                         )),
                   ],
@@ -1483,11 +1994,10 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
                             isAllDay: isAllDay,
                           );
                       Navigator.pop(ctx);
-                      HapticFeedback.lightImpact();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _sandGold.withValues(alpha: 0.2),
-                      foregroundColor: _sandGold,
+                      backgroundColor: _sage.withValues(alpha: 0.15),
+                      foregroundColor: _sageDark,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -1504,1041 +2014,6 @@ class _TodoTabState extends ConsumerState<_TodoTab> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🍅 POMODORO TAB
-// ═══════════════════════════════════════════════════════════════════════════════
-
-class _PomodoroTab extends ConsumerStatefulWidget {
-  @override
-  ConsumerState<_PomodoroTab> createState() => _PomodoroTabState();
-}
-
-class _PomodoroTabState extends ConsumerState<_PomodoroTab> {
-  int _prevSessionCount = 0;
-  final List<String> _motivationalQuotes = const [
-    '"The secret of getting ahead is getting started."',
-    '"Focus on being productive, not busy."',
-    '"Small daily improvements are the key."',
-    '"Deep work is the superpower of the 21st century."',
-    '"Discipline is choosing between what you want now and what you want most."',
-    '"One hour of focused work beats three of distracted."',
-    '"You don\'t need more time — you need more focus."',
-    '"Starve your distractions, feed your focus."',
-  ];
-
-  String get _todayQuote {
-    final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year)).inDays;
-    return _motivationalQuotes[dayOfYear % _motivationalQuotes.length];
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final pomo = ref.watch(pomodoroProvider);
-    final todos = ref.watch(todoProvider).where((t) => !t.isCompleted).toList();
-    final focusCat = ref.watch(focusCategoryProvider);
-    final streak = ref.watch(focusStreakProvider);
-
-    // Track session completion for streak
-    if (pomo.completedSessions > _prevSessionCount) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(focusStreakProvider.notifier).recordSession();
-        setState(() => _prevSessionCount = pomo.completedSessions);
-      });
-    }
-
-    final stateColors = {
-      PomodoroState.idle: Colors.white.withValues(alpha: 0.5),
-      PomodoroState.focusing: _desertSunset,
-      PomodoroState.shortBreak: _oasisGreen,
-      PomodoroState.longBreak: _sandGold,
-      PomodoroState.paused: Colors.white.withValues(alpha: 0.4),
-    };
-
-    final accent = stateColors[pomo.state]!;
-
-    final isFocusActive = pomo.state == PomodoroState.focusing;
-    final isBreakActive = pomo.state == PomodoroState.shortBreak;
-    final isLongActive = pomo.state == PomodoroState.longBreak;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-
-            // ── Top Row: Streak + Settings ──
-            Row(
-              children: [
-                // Streak badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: _sandGold.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _sandGold.withValues(alpha: 0.15)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('🔥', style: TextStyle(fontSize: 14)),
-                      const SizedBox(width: 6),
-                      Text(
-                        '$streak day${streak != 1 ? 's' : ''}',
-                        style: TextStyle(
-                          color: _sandGold,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                // Settings gear
-                GestureDetector(
-                  onTap: () => _showPomodoroSettings(context, ref, pomo.settings),
-                  child: Container(
-                    width: 40, height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.04),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-                    ),
-                    child: Icon(Icons.settings_rounded, size: 18, color: Colors.white.withValues(alpha: 0.4)),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // ── Motivational quote ──
-            Text(
-              _todayQuote,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.25),
-                fontSize: 12,
-                fontStyle: FontStyle.italic,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ── Focus / Break / Long — Mode tabs ──
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.04),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  _buildModeTab(
-                    label: 'Focus',
-                    isActive: pomo.state == PomodoroState.idle || isFocusActive || (pomo.state == PomodoroState.paused && pomo.previousState == PomodoroState.focusing),
-                    color: _desertSunset,
-                    onTap: () {
-                      if (pomo.state == PomodoroState.idle) {
-                        HapticFeedback.mediumImpact();
-                        ref.read(pomodoroProvider.notifier).startFocus(todoId: pomo.activeTodoId);
-                      }
-                    },
-                  ),
-                  _buildModeTab(
-                    label: 'Break',
-                    isActive: isBreakActive || (pomo.state == PomodoroState.paused && pomo.previousState == PomodoroState.shortBreak),
-                    color: _oasisGreen,
-                    onTap: () {
-                      HapticFeedback.mediumImpact();
-                      ref.read(pomodoroProvider.notifier).startBreak();
-                    },
-                  ),
-                  _buildModeTab(
-                    label: 'Long',
-                    isActive: isLongActive || (pomo.state == PomodoroState.paused && pomo.previousState == PomodoroState.longBreak),
-                    color: _sandGold,
-                    onTap: () {
-                      HapticFeedback.mediumImpact();
-                      final pn = ref.read(pomodoroProvider.notifier);
-                      // Force long break
-                      pn.updateSettings(pomo.settings); // ensure same settings
-                      ref.read(pomodoroProvider.notifier).startBreak();
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 28),
-
-            // ── BIG Circular Timer ──
-            SizedBox(
-              width: 260,
-              height: 260,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Background ring
-                  SizedBox(
-                    width: 240,
-                    height: 240,
-                    child: CircularProgressIndicator(
-                      value: 1.0,
-                      strokeWidth: 6,
-                      color: Colors.white.withValues(alpha: 0.05),
-                    ),
-                  ),
-                  // Progress ring
-                  SizedBox(
-                    width: 240,
-                    height: 240,
-                    child: CircularProgressIndicator(
-                      value: pomo.progress,
-                      strokeWidth: 6,
-                      color: accent,
-                      strokeCap: StrokeCap.round,
-                    ),
-                  ),
-                  // Center content
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        pomo.timeDisplay,
-                        style: TextStyle(
-                          fontSize: 56,
-                          fontWeight: FontWeight.w200,
-                          color: Colors.white.withValues(alpha: 0.9),
-                          letterSpacing: 3,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      // Session dots inside timer
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: List.generate(
-                          pomo.settings.sessionsBeforeLongBreak,
-                          (i) => Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 3),
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: i < pomo.completedSessions
-                                  ? _oasisGreen
-                                  : Colors.white.withValues(alpha: 0.1),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ── Control Buttons ──
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (pomo.state == PomodoroState.paused) ...[
-                  // Resume
-                  _CircleButton(
-                    icon: Icons.play_arrow_rounded,
-                    color: _desertSunset.withValues(alpha: 0.2),
-                    size: 64,
-                    iconSize: 32,
-                    onTap: () {
-                      HapticFeedback.mediumImpact();
-                      ref.read(pomodoroProvider.notifier).resume();
-                    },
-                  ),
-                  const SizedBox(width: 20),
-                  _CircleButton(
-                    icon: Icons.stop_rounded,
-                    color: Colors.white.withValues(alpha: 0.08),
-                    onTap: () {
-                      HapticFeedback.mediumImpact();
-                      ref.read(pomodoroProvider.notifier).reset();
-                    },
-                  ),
-                ] else if (pomo.state != PomodoroState.idle) ...[
-                  // Pause
-                  _CircleButton(
-                    icon: Icons.pause_rounded,
-                    color: accent.withValues(alpha: 0.2),
-                    size: 64,
-                    iconSize: 32,
-                    onTap: () {
-                      HapticFeedback.mediumImpact();
-                      ref.read(pomodoroProvider.notifier).pause();
-                    },
-                  ),
-                  const SizedBox(width: 20),
-                  _CircleButton(
-                    icon: Icons.stop_rounded,
-                    color: Colors.white.withValues(alpha: 0.08),
-                    onTap: () {
-                      HapticFeedback.mediumImpact();
-                      ref.read(pomodoroProvider.notifier).reset();
-                    },
-                  ),
-                ] else ...[
-                  // Start
-                  _CircleButton(
-                    icon: Icons.play_arrow_rounded,
-                    color: _desertSunset.withValues(alpha: 0.15),
-                    size: 64,
-                    iconSize: 32,
-                    onTap: () {
-                      HapticFeedback.mediumImpact();
-                      ref.read(pomodoroProvider.notifier).startFocus(todoId: pomo.activeTodoId);
-                    },
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 22),
-
-            // ── Focus Category Chips ──
-            SizedBox(
-              height: 36,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  ...focusCat.categories.map((cat) {
-                    final isActive = focusCat.activeCategory == cat;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: GestureDetector(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          ref.read(focusCategoryProvider.notifier).select(cat);
-                        },
-                        onLongPress: () => _showDeleteCategoryDialog(cat),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isActive
-                                ? _sandGold.withValues(alpha: 0.12)
-                                : Colors.white.withValues(alpha: 0.04),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isActive
-                                  ? _sandGold.withValues(alpha: 0.4)
-                                  : Colors.white.withValues(alpha: 0.06),
-                            ),
-                          ),
-                          child: Text(
-                            cat,
-                            style: TextStyle(
-                              color: isActive ? _sandGold : Colors.white.withValues(alpha: 0.4),
-                              fontSize: 12,
-                              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                  // Add custom
-                  GestureDetector(
-                    onTap: () => _showAddCategoryDialog(),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.03),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.06), style: BorderStyle.solid),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.add_rounded, size: 14, color: Colors.white.withValues(alpha: 0.3)),
-                          const SizedBox(width: 4),
-                          Text('Add', style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.3))),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-
-            // ── Link to Todo ──
-            if (todos.isNotEmpty)
-              _LinkTodoRow(
-                activeTodoId: pomo.activeTodoId,
-                todos: todos,
-                onSelect: (id) {
-                  ref.read(pomodoroProvider.notifier).startFocus(todoId: id);
-                },
-              ),
-
-            const SizedBox(height: 14),
-
-            // ── Stats Bar ──
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.03),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-              ),
-              child: Row(
-                children: [
-                  // Time today
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          '${pomo.totalFocusMinutesToday}',
-                          style: TextStyle(
-                            color: _desertSunset,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'min today',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(width: 1, height: 28, color: Colors.white.withValues(alpha: 0.06)),
-                  // Sessions
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          '${pomo.completedSessions}',
-                          style: TextStyle(
-                            color: _oasisGreen,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'sessions',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(width: 1, height: 28, color: Colors.white.withValues(alpha: 0.06)),
-                  // Streak
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          '$streak',
-                          style: TextStyle(
-                            color: _sandGold,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'day streak',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // ── Sound quick-toggle ──
-            if (pomo.state == PomodoroState.idle || pomo.state == PomodoroState.focusing || pomo.state == PomodoroState.paused)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Consumer(
-                  builder: (ctx, sRef, _) {
-                    final sound = sRef.watch(ambientSoundProvider);
-                    final currentSound = sound.currentSoundId != null
-                        ? ambientSounds.firstWhere((s) => s.id == sound.currentSoundId, orElse: () => ambientSounds.first)
-                        : null;
-                    return GestureDetector(
-                      onTap: () => _showPomodoroSettings(context, ref, pomo.settings),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            sound.isPlaying ? '${currentSound?.emoji ?? '🎵'} ${currentSound?.name ?? 'Sound'}' : '🔇 No sound',
-                            style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.3)),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(Icons.chevron_right_rounded, size: 14, color: Colors.white.withValues(alpha: 0.2)),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildModeTab({
-    required String label,
-    required bool isActive,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isActive ? color.withValues(alpha: 0.12) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isActive ? color : Colors.white.withValues(alpha: 0.35),
-                fontSize: 13,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showDeleteCategoryDialog(String category) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Remove "$category"?', style: const TextStyle(color: Colors.white, fontSize: 16)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
-          ),
-          TextButton(
-            onPressed: () {
-              ref.read(focusCategoryProvider.notifier).remove(category);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Remove', style: TextStyle(color: _desertSunset)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddCategoryDialog() {
-    final ctrl = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Add Focus Category', style: TextStyle(color: Colors.white, fontSize: 16)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          decoration: InputDecoration(
-            hintText: 'e.g. Studying, Design...',
-            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-            filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.05),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
-          ),
-          TextButton(
-            onPressed: () {
-              if (ctrl.text.trim().isNotEmpty) {
-                ref.read(focusCategoryProvider.notifier).add(ctrl.text.trim());
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('Add', style: TextStyle(color: _sandGold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showPomodoroSettings(
-      BuildContext context, WidgetRef ref, PomodoroSettings current) {
-    int focus = current.focusMinutes;
-    int shortBreak = current.shortBreakMinutes;
-    int longBreak = current.longBreakMinutes;
-    int sessions = current.sessionsBeforeLongBreak;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF0D0D0D),
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setBS) => Padding(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 28,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Header ──
-              Row(
-                children: [
-                  Container(
-                    width: 36, height: 36,
-                    decoration: BoxDecoration(
-                      color: _sandGold.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(Icons.tune_rounded, color: _sandGold.withValues(alpha: 0.6), size: 18),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Focus Settings',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 17, fontWeight: FontWeight.w600)),
-                      Text('Customize your session',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 11)),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // ── Timer Settings — Clean card ──
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.03),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                ),
-                child: Column(
-                  children: [
-                    _SettingRow(
-                      label: 'Focus',
-                      value: focus,
-                      suffix: 'min',
-                      color: _desertSunset,
-                      onMinus: () { if (focus > 5) setBS(() => focus -= 5); },
-                      onPlus: () { if (focus < 90) setBS(() => focus += 5); },
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Container(height: 1, color: Colors.white.withValues(alpha: 0.04)),
-                    ),
-                    _SettingRow(
-                      label: 'Short Break',
-                      value: shortBreak,
-                      suffix: 'min',
-                      color: _oasisGreen,
-                      onMinus: () { if (shortBreak > 1) setBS(() => shortBreak--); },
-                      onPlus: () { if (shortBreak < 15) setBS(() => shortBreak++); },
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Container(height: 1, color: Colors.white.withValues(alpha: 0.04)),
-                    ),
-                    _SettingRow(
-                      label: 'Long Break',
-                      value: longBreak,
-                      suffix: 'min',
-                      color: _sandGold,
-                      onMinus: () { if (longBreak > 5) setBS(() => longBreak -= 5); },
-                      onPlus: () { if (longBreak < 30) setBS(() => longBreak += 5); },
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Container(height: 1, color: Colors.white.withValues(alpha: 0.04)),
-                    ),
-                    _SettingRow(
-                      label: 'Sessions',
-                      value: sessions,
-                      suffix: '',
-                      color: _warmBrown,
-                      onMinus: () { if (sessions > 2) setBS(() => sessions--); },
-                      onPlus: () { if (sessions < 8) setBS(() => sessions++); },
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 22),
-
-              // ── Soothing Sounds ──
-              Row(
-                children: [
-                  Icon(Icons.spa_rounded, color: _sandGold.withValues(alpha: 0.5), size: 16),
-                  const SizedBox(width: 8),
-                  Text('Soothing Sounds',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14, fontWeight: FontWeight.w600)),
-                  const Spacer(),
-                  Text('Auto-plays on focus',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 10)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Consumer(
-                builder: (ctx, sRef, _) {
-                  final soundState = sRef.watch(ambientSoundProvider);
-                  return Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                    ),
-                    child: Column(
-                      children: [
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _buildSoundChip(
-                              emoji: '🔇',
-                              label: 'None',
-                              isSelected: soundState.currentSoundId == null && !soundState.isPlaying,
-                              onTap: () {
-                                HapticFeedback.selectionClick();
-                                sRef.read(ambientSoundProvider.notifier).stop();
-                              },
-                            ),
-                            ...ambientSounds.map((sound) {
-                              final isSelected = soundState.currentSoundId == sound.id;
-                              return _buildSoundChip(
-                                emoji: sound.emoji,
-                                label: sound.name,
-                                isSelected: isSelected && soundState.isPlaying,
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  if (isSelected && soundState.isPlaying) {
-                                    sRef.read(ambientSoundProvider.notifier).stop();
-                                  } else {
-                                    sRef.read(ambientSoundProvider.notifier).selectAndPlay(sound.id);
-                                  }
-                                },
-                              );
-                            }),
-                          ],
-                        ),
-                        // Volume slider — only if playing
-                        if (soundState.isPlaying) ...[
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Icon(Icons.volume_down_rounded,
-                                  size: 15, color: Colors.white.withValues(alpha: 0.3)),
-                              Expanded(
-                                child: SliderTheme(
-                                  data: SliderThemeData(
-                                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-                                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                                    trackHeight: 2.5,
-                                    activeTrackColor: _sandGold.withValues(alpha: 0.6),
-                                    inactiveTrackColor: Colors.white.withValues(alpha: 0.06),
-                                    thumbColor: _sandGold,
-                                  ),
-                                  child: Slider(
-                                    value: soundState.volume,
-                                    min: 0.0,
-                                    max: 1.0,
-                                    onChanged: (v) {
-                                      sRef.read(ambientSoundProvider.notifier).setVolume(v);
-                                    },
-                                  ),
-                                ),
-                              ),
-                              Icon(Icons.volume_up_rounded,
-                                  size: 15, color: Colors.white.withValues(alpha: 0.3)),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 22),
-
-              // ── Quick Presets ──
-              Row(
-                children: [
-                  Icon(Icons.timer_rounded, color: _sandGold.withValues(alpha: 0.5), size: 16),
-                  const SizedBox(width: 8),
-                  Text('Quick Presets',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14, fontWeight: FontWeight.w600)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _buildPresetButton('25 / 5', focus == 25 && shortBreak == 5, () {
-                    setBS(() { focus = 25; shortBreak = 5; longBreak = 15; });
-                  }),
-                  const SizedBox(width: 8),
-                  _buildPresetButton('50 / 10', focus == 50 && shortBreak == 10, () {
-                    setBS(() { focus = 50; shortBreak = 10; longBreak = 20; });
-                  }),
-                  const SizedBox(width: 8),
-                  _buildPresetButton('90 min', focus == 90, () {
-                    setBS(() { focus = 90; shortBreak = 15; longBreak = 30; });
-                  }),
-                ],
-              ),
-
-              const SizedBox(height: 22),
-
-              // ── Focus History ──
-              Row(
-                children: [
-                  Icon(Icons.history_rounded, color: _sandGold.withValues(alpha: 0.5), size: 16),
-                  const SizedBox(width: 8),
-                  Text('Today\'s History',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14, fontWeight: FontWeight.w600)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Consumer(
-                builder: (ctx, hRef, _) {
-                  final pomo = hRef.watch(pomodoroProvider);
-                  final streak = hRef.watch(focusStreakProvider);
-                  return Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            _buildHistoryStat('🍅', '${pomo.completedSessions}', 'Sessions'),
-                            const SizedBox(width: 16),
-                            _buildHistoryStat('⏱️', '${pomo.totalFocusMinutesToday}', 'Minutes'),
-                            const SizedBox(width: 16),
-                            _buildHistoryStat('🔥', '$streak', 'Day Streak'),
-                          ],
-                        ),
-                        if (pomo.completedSessions > 0) ...[
-                          const SizedBox(height: 12),
-                          Container(height: 1, color: Colors.white.withValues(alpha: 0.04)),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Text(
-                                'Sessions completed',
-                                style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 11),
-                              ),
-                              const Spacer(),
-                              // Session progress bar
-                              ...List.generate(pomo.settings.sessionsBeforeLongBreak, (i) {
-                                return Container(
-                                  margin: const EdgeInsets.only(left: 4),
-                                  width: 16,
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(3),
-                                    color: i < pomo.completedSessions
-                                        ? _oasisGreen.withValues(alpha: 0.7)
-                                        : Colors.white.withValues(alpha: 0.06),
-                                  ),
-                                );
-                              }),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 22),
-
-              // ── Save Button ──
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  final s = PomodoroSettings(
-                    focusMinutes: focus,
-                    shortBreakMinutes: shortBreak,
-                    longBreakMinutes: longBreak,
-                    sessionsBeforeLongBreak: sessions,
-                  );
-                  ref.read(pomodoroProvider.notifier).updateSettings(s);
-                  Navigator.pop(ctx);
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  decoration: BoxDecoration(
-                    color: _sandGold.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _sandGold.withValues(alpha: 0.2)),
-                  ),
-                  child: Center(
-                    child: Text('Save',
-                      style: TextStyle(color: _sandGold, fontSize: 14, fontWeight: FontWeight.w600)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSoundChip({
-    required String emoji,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? _sandGold.withValues(alpha: 0.15)
-              : Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected 
-                ? _sandGold.withValues(alpha: 0.5)
-                : Colors.white.withValues(alpha: 0.08),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 16)),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: isSelected ? _sandGold : Colors.white.withValues(alpha: 0.5),
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPresetButton(String label, bool isSelected, VoidCallback onTap) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? _sandGold.withValues(alpha: 0.12)
-                : Colors.white.withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected
-                  ? _sandGold.withValues(alpha: 0.35)
-                  : Colors.white.withValues(alpha: 0.06),
-            ),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? _sandGold : Colors.white.withValues(alpha: 0.4),
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHistoryStat(String emoji, String value, String label) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 16)),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.3),
-              fontSize: 10,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // 📝 ACADEMIC DOUBTS TAB
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2548,6 +2023,23 @@ class _DoubtsTab extends ConsumerStatefulWidget {
 }
 
 class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
+
+  // ── Theme-aware colors ──
+  bool get _isLight => ref.watch(themeColorProvider).isLight;
+  Color get _bg => _isLight ? const Color(0xFFF5F5F5) : _ftBg;
+  Color get _card => _isLight ? Colors.black.withValues(alpha: 0.04) : _ftCard;
+  Color get _text => _isLight ? const Color(0xFF0D0D0D) : _ftText;
+  Color get _textSoft => _isLight ? const Color(0xFF6B6B6B) : _ftTextSoft;
+  Color get _border => _isLight ? Colors.black.withValues(alpha: 0.08) : _ftBorder;
+  Color get _sage => ref.watch(themeColorProvider).color;
+  Color get _sageDark {
+    final themeColor = ref.watch(themeColorProvider).color;
+    final hslColor = HSLColor.fromColor(themeColor);
+    return hslColor
+        .withLightness((hslColor.lightness * 0.85).clamp(0.0, 1.0))
+        .toColor();
+  }
+  Color get _gold => _ftGold;
   String _subjectFilter = 'All';
 
   @override
@@ -2579,13 +2071,13 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                           horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: selected
-                            ? _sandGold.withValues(alpha: 0.15)
-                            : Colors.white.withValues(alpha: 0.04),
+                            ? _sage.withValues(alpha: 0.12)
+                            : _card,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: selected
-                              ? _sandGold.withValues(alpha: 0.3)
-                              : Colors.white.withValues(alpha: 0.06),
+                              ? _sage.withValues(alpha: 0.3)
+                              : _border,
                         ),
                       ),
                       child: Text(
@@ -2593,8 +2085,8 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                         style: TextStyle(
                           fontSize: 11,
                           color: selected
-                              ? _sandGold
-                              : Colors.white.withValues(alpha: 0.4),
+                              ? _sageDark
+                              : _textSoft,
                         ),
                       ),
                     ),
@@ -2612,14 +2104,14 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
               Text(
                 '$unresolved unresolved',
                 style: TextStyle(
-                    color: _desertSunset.withValues(alpha: 0.6),
+                    color: const Color(0xFFD97B4A),
                     fontSize: 11),
               ),
               const Spacer(),
               Text(
                 '${doubts.length} total',
                 style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.3), fontSize: 11),
+                    color: _textSoft, fontSize: 11),
               ),
             ],
           ),
@@ -2633,15 +2125,15 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                     children: [
                       Icon(Icons.lightbulb_outline,
                           size: 48,
-                          color: Colors.white.withValues(alpha: 0.15)),
+                          color: _border),
                       const SizedBox(height: 12),
                       Text('No doubts yet',
                           style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.3))),
+                              color: _textSoft)),
                       const SizedBox(height: 4),
                       Text('Note down academic questions',
                           style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.2),
+                              color: _textSoft.withValues(alpha: 0.5),
                               fontSize: 12)),
                     ],
                   ),
@@ -2673,12 +2165,12 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
+          color: _card,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: doubt.isResolved
-                ? _oasisGreen.withValues(alpha: 0.15)
-                : Colors.white.withValues(alpha: 0.06),
+                ? _sage.withValues(alpha: 0.25)
+                : _border,
           ),
         ),
         child: Column(
@@ -2690,18 +2182,18 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: _sandGold.withValues(alpha: 0.12),
+                    color: _gold.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(doubt.subject,
                       style:
-                          const TextStyle(fontSize: 10, color: _sandGold)),
+                          TextStyle(fontSize: 10, color: _gold)),
                 ),
                 const Spacer(),
                 if (doubt.isResolved)
                   Icon(Icons.check_circle,
                       size: 16,
-                      color: _oasisGreen.withValues(alpha: 0.6)),
+                      color: _sage),
                 if (!doubt.isResolved)
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -2709,7 +2201,7 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                       doubt.urgency.clamp(1, 3),
                       (_) => Icon(Icons.priority_high,
                           size: 10,
-                          color: _desertSunset.withValues(alpha: 0.5)),
+                          color: const Color(0xFFD97B4A).withValues(alpha: 0.6)),
                     ),
                   ),
               ],
@@ -2720,7 +2212,7 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.85),
+                color: _text,
                 fontSize: 13,
                 height: 1.4,
               ),
@@ -2732,7 +2224,7 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: _oasisGreen.withValues(alpha: 0.6),
+                  color: _sage,
                   fontSize: 11,
                 ),
               ),
@@ -2746,13 +2238,14 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
+                            color: _bg,
                             borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: _border),
                           ),
                           child: Text(t,
                               style: TextStyle(
                                   fontSize: 9,
-                                  color: Colors.white.withValues(alpha: 0.3))),
+                                  color: _textSoft)),
                         ))
                     .toList(),
               ),
@@ -2769,7 +2262,7 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: _card,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => Padding(
@@ -2785,12 +2278,12 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: _sandGold.withValues(alpha: 0.12),
+                    color: _gold.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(doubt.subject,
                       style:
-                          const TextStyle(fontSize: 11, color: _sandGold)),
+                          TextStyle(fontSize: 11, color: _gold)),
                 ),
                 const Spacer(),
                 // Delete
@@ -2811,7 +2304,7 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
             Text(
               doubt.question,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: _text,
                 fontSize: 15,
                 height: 1.5,
               ),
@@ -2819,22 +2312,28 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
             const SizedBox(height: 16),
             Text('Answer / Resolution',
                 style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
+                    color: _textSoft,
                     fontSize: 12)),
             const SizedBox(height: 8),
             TextField(
               controller: answerController,
               maxLines: 4,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
+              style: TextStyle(color: _text, fontSize: 13),
               decoration: InputDecoration(
                 hintText: 'Type your answer or resolution...',
                 hintStyle:
-                    TextStyle(color: Colors.white.withValues(alpha: 0.2)),
+                    TextStyle(color: _textSoft),
                 filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.06),
+                fillColor: _bg,
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none),
+                    borderSide: BorderSide(color: _border)),
+                enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: _border)),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: _sage.withValues(alpha: 0.4))),
               ),
             ),
             const SizedBox(height: 12),
@@ -2852,8 +2351,8 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                       Navigator.pop(ctx);
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _oasisGreen.withValues(alpha: 0.2),
-                      foregroundColor: _oasisGreen,
+                      backgroundColor: _sage.withValues(alpha: 0.15),
+                      foregroundColor: _sageDark,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
@@ -2872,7 +2371,6 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                           linkedDoubtId: doubt.id,
                         );
                     Navigator.pop(ctx);
-                    HapticFeedback.lightImpact();
                     // Brief non-blocking overlay instead of sticky snackbar
                     if (context.mounted) {
                       final overlay = Overlay.of(context);
@@ -2896,12 +2394,12 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF1A2332),
+                                  color: _card,
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: _sandGold.withValues(alpha: 0.2)),
+                                  border: Border.all(color: _sage.withValues(alpha: 0.2)),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.3),
+                                      color: Colors.black.withValues(alpha: 0.08),
                                       blurRadius: 12,
                                       offset: const Offset(0, 4),
                                     ),
@@ -2912,10 +2410,10 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(Icons.check_circle_outline,
-                                        color: _oasisGreen, size: 18),
+                                        color: _sage, size: 18),
                                     const SizedBox(width: 8),
-                                    const Text('Todo created ✓',
-                                        style: TextStyle(color: Colors.white,
+                                    Text('Todo created ✓',
+                                        style: TextStyle(color: _text,
                                             fontSize: 13, fontWeight: FontWeight.w500)),
                                   ],
                                 ),
@@ -2933,11 +2431,11 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: _sandGold.withValues(alpha: 0.12),
+                      color: _gold.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.add_task,
-                        size: 20, color: _sandGold),
+                    child: Icon(Icons.add_task,
+                        size: 20, color: _gold),
                   ),
                 ),
               ],
@@ -2962,8 +2460,8 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
         builder: (ctx, setBS) => Container(
           padding: EdgeInsets.fromLTRB(
               20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A1A1A),
+          decoration: BoxDecoration(
+            color: _card,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
@@ -2972,23 +2470,29 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
             children: [
               Text('New Doubt',
                   style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      color: _text,
                       fontSize: 18,
                       fontWeight: FontWeight.w600)),
               const SizedBox(height: 16),
               // Subject
               TextField(
                 controller: subjectCtrl,
-                style: const TextStyle(color: Colors.white, fontSize: 13),
+                style: TextStyle(color: _text, fontSize: 13),
                 decoration: InputDecoration(
                   hintText: 'Subject (e.g. Math, Physics)',
                   hintStyle:
-                      TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                      TextStyle(color: _textSoft),
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.06),
+                  fillColor: _bg,
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
+                      borderSide: BorderSide(color: _border)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: _border)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: _sage.withValues(alpha: 0.4))),
                 ),
               ),
               const SizedBox(height: 10),
@@ -2997,32 +2501,44 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                 controller: questionCtrl,
                 autofocus: true,
                 maxLines: 3,
-                style: const TextStyle(color: Colors.white, fontSize: 13),
+                style: TextStyle(color: _text, fontSize: 13),
                 decoration: InputDecoration(
                   hintText: 'Describe your doubt...',
                   hintStyle:
-                      TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                      TextStyle(color: _textSoft),
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.06),
+                  fillColor: _bg,
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
+                      borderSide: BorderSide(color: _border)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: _border)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: _sage.withValues(alpha: 0.4))),
                 ),
               ),
               const SizedBox(height: 10),
               // Tags
               TextField(
                 controller: tagsCtrl,
-                style: const TextStyle(color: Colors.white, fontSize: 12),
+                style: TextStyle(color: _text, fontSize: 12),
                 decoration: InputDecoration(
                   hintText: 'Tags (comma separated)',
                   hintStyle:
-                      TextStyle(color: Colors.white.withValues(alpha: 0.2)),
+                      TextStyle(color: _textSoft),
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.04),
+                  fillColor: _bg,
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
+                      borderSide: BorderSide(color: _border)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: _border)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: _sage.withValues(alpha: 0.4))),
                 ),
               ),
               const SizedBox(height: 10),
@@ -3031,7 +2547,7 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                 children: [
                   Text('Urgency:',
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
+                          color: _textSoft,
                           fontSize: 12)),
                   const SizedBox(width: 8),
                   for (int u = 1; u <= 3; u++)
@@ -3045,21 +2561,26 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                           color: urgency == u
                               ? [
                                   Colors.transparent,
-                                  _oasisGreen,
-                                  _desertWarm,
-                                  _desertSunset
+                                  _sage,
+                                  _gold,
+                                  const Color(0xFFD97B4A)
                                 ][u]
-                                  .withValues(alpha: 0.2)
-                              : Colors.white.withValues(alpha: 0.04),
+                                  .withValues(alpha: 0.12)
+                              : _bg,
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: urgency == u
+                                ? [Colors.transparent, _sage, _gold, const Color(0xFFD97B4A)][u].withValues(alpha: 0.3)
+                                : _border,
+                          ),
                         ),
                         child: Text(
                           ['', 'Low', 'Medium', 'Urgent'][u],
                           style: TextStyle(
                             fontSize: 11,
                             color: urgency == u
-                                ? Colors.white
-                                : Colors.white.withValues(alpha: 0.4),
+                                ? [Colors.transparent, _sageDark, _gold, const Color(0xFFD97B4A)][u]
+                                : _textSoft,
                           ),
                         ),
                       ),
@@ -3086,11 +2607,10 @@ class _DoubtsTabState extends ConsumerState<_DoubtsTab> {
                           tags: tags.isEmpty ? null : tags,
                         );
                     Navigator.pop(ctx);
-                    HapticFeedback.lightImpact();
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _sandGold.withValues(alpha: 0.2),
-                    foregroundColor: _sandGold,
+                    backgroundColor: _sage.withValues(alpha: 0.15),
+                    foregroundColor: _sageDark,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -3116,6 +2636,23 @@ class _EventsTab extends ConsumerStatefulWidget {
 }
 
 class _EventsTabState extends ConsumerState<_EventsTab> {
+
+  // ── Theme-aware colors ──
+  bool get _isLight => ref.watch(themeColorProvider).isLight;
+  Color get _bg => _isLight ? const Color(0xFFF5F5F5) : _ftBg;
+  Color get _card => _isLight ? Colors.black.withValues(alpha: 0.04) : _ftCard;
+  Color get _text => _isLight ? const Color(0xFF0D0D0D) : _ftText;
+  Color get _textSoft => _isLight ? const Color(0xFF6B6B6B) : _ftTextSoft;
+  Color get _border => _isLight ? Colors.black.withValues(alpha: 0.08) : _ftBorder;
+  Color get _sage => ref.watch(themeColorProvider).color;
+  Color get _sageDark {
+    final themeColor = ref.watch(themeColorProvider).color;
+    final hslColor = HSLColor.fromColor(themeColor);
+    return hslColor
+        .withLightness((hslColor.lightness * 0.85).clamp(0.0, 1.0))
+        .toColor();
+  }
+
   DateTime _selectedDate = DateTime.now();
 
   @override
@@ -3147,11 +2684,11 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                     children: [
                       Icon(Icons.event_outlined,
                           size: 48,
-                          color: Colors.white.withValues(alpha: 0.15)),
+                          color: _border),
                       const SizedBox(height: 12),
                       Text('No events',
                           style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.3))),
+                              color: _textSoft)),
                     ],
                   ),
                 )
@@ -3163,7 +2700,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                       Text(
                         DateFormat('EEEE, MMMM d').format(_selectedDate),
                         style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
+                            color: _textSoft,
                             fontSize: 12,
                             fontWeight: FontWeight.w500),
                       ),
@@ -3173,7 +2710,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                     if (dateEvents.isEmpty && upcoming.isNotEmpty) ...[
                       Text('Upcoming',
                           style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.5),
+                              color: _textSoft,
                               fontSize: 12,
                               fontWeight: FontWeight.w500)),
                       const SizedBox(height: 8),
@@ -3220,12 +2757,12 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
         decoration: BoxDecoration(
           color: isActive
               ? color.withValues(alpha: 0.1)
-              : Colors.white.withValues(alpha: 0.04),
+              : _card,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isActive
                 ? color.withValues(alpha: 0.3)
-                : Colors.white.withValues(alpha: 0.06),
+                : _border,
           ),
         ),
         child: Row(
@@ -3246,7 +2783,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                   Text(
                     event.title,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      color: _text,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
@@ -3255,7 +2792,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                   Text(
                     timeText,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
+                      color: _textSoft,
                       fontSize: 11,
                     ),
                   ),
@@ -3275,7 +2812,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
   void _showEventOptions(ProductivityEvent event) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: _card,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => Padding(
@@ -3284,9 +2821,9 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.add_task, color: _sandGold),
-              title: const Text('Create Todo from Event',
-                  style: TextStyle(color: Colors.white)),
+              leading: Icon(Icons.add_task, color: _sage),
+              title: Text('Create Todo from Event',
+                  style: TextStyle(color: _text)),
               onTap: () {
                 ref.read(todoProvider.notifier).addTodo(
                       title: event.title,
@@ -3294,14 +2831,13 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                       linkedEventId: event.id,
                     );
                 Navigator.pop(ctx);
-                HapticFeedback.lightImpact();
               },
             ),
             ListTile(
-              leading: const Icon(Icons.shield_outlined,
+              leading: Icon(Icons.shield_outlined,
                   color: _desertSunset),
-              title: const Text('Block apps during event',
-                  style: TextStyle(color: Colors.white)),
+              title: Text('Block apps during event',
+                  style: TextStyle(color: _text)),
               onTap: () {
                 Navigator.pop(ctx);
                 _createBlockRuleForEvent(event);
@@ -3354,7 +2890,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: _card,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => StatefulBuilder(
@@ -3372,13 +2908,13 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                         children: [
                           Text('Select Apps to Block',
                               style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.9),
+                                  color: _text,
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600)),
                           const SizedBox(height: 4),
                           Text('Block rule: ${rule.name}',
                               style: TextStyle(
-                                  color: _sandGold.withValues(alpha: 0.5),
+                                  color: _sage.withValues(alpha: 0.5),
                                   fontSize: 12)),
                         ],
                       ),
@@ -3393,7 +2929,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('${selected.length} apps will be blocked during event'),
-                            backgroundColor: const Color(0xFF7BAE6E),
+                            backgroundColor: _sage,
                           ),
                         );
                       },
@@ -3401,12 +2937,12 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          color: _sandGold.withValues(alpha: 0.2),
+                          color: _sage.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Text('Done',
+                        child: Text('Done',
                             style: TextStyle(
-                                color: _sandGold, fontSize: 13)),
+                                color: _sageDark, fontSize: 13)),
                       ),
                     ),
                   ],
@@ -3422,11 +2958,11 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                     return ListTile(
                       dense: true,
                       title: Text(app.appName,
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 13)),
+                          style: TextStyle(
+                              color: _text, fontSize: 13)),
                       subtitle: Text(app.packageName,
                           style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.3),
+                              color: _textSoft,
                               fontSize: 10)),
                       trailing: Icon(
                         isSelected
@@ -3434,7 +2970,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                             : Icons.circle_outlined,
                         color: isSelected
                             ? _desertSunset
-                            : Colors.white.withValues(alpha: 0.2),
+                            : _border,
                         size: 20,
                       ),
                       onTap: () {
@@ -3458,6 +2994,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
   }
 
   void _showAddEvent(BuildContext context) {
+    final accent = _sage;
     final titleCtrl = TextEditingController();
     final descCtrl = TextEditingController();
     DateTime selectedDate = DateTime.now().add(const Duration(hours: 1));
@@ -3468,7 +3005,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
     String selectedColor = 'C2A366';
 
     final colorOptions = {
-      'C2A366': _sandGold,
+      'C2A366': accent,
       'A67B5B': _warmBrown,
       '7BAE6E': _oasisGreen,
       'E8915A': _desertSunset,
@@ -3483,8 +3020,8 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
         builder: (ctx, setBS) => Container(
           padding: EdgeInsets.fromLTRB(
               20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A1A1A),
+          decoration: BoxDecoration(
+            color: _card,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: SingleChildScrollView(
@@ -3494,39 +3031,49 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
               children: [
                 Text('New Event',
                     style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
+                        color: _text,
                         fontSize: 18,
                         fontWeight: FontWeight.w600)),
                 const SizedBox(height: 16),
                 TextField(
                   controller: titleCtrl,
                   autofocus: true,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: _text),
                   decoration: InputDecoration(
                     hintText: 'Event title',
                     hintStyle:
-                        TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                        TextStyle(color: _textSoft),
                     filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.06),
+                    fillColor: _bg,
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none),
+                        borderSide: BorderSide(color: _border)),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: _border)),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: accent.withValues(alpha: 0.4))),
                   ),
                 ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: descCtrl,
-                  style:
-                      const TextStyle(color: Colors.white, fontSize: 13),
+                  style: TextStyle(color: _text, fontSize: 13),
                   decoration: InputDecoration(
                     hintText: 'Description (optional)',
-                    hintStyle:
-                        TextStyle(color: Colors.white.withValues(alpha: 0.2)),
+                    hintStyle: TextStyle(color: _textSoft),
                     filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.04),
+                    fillColor: _bg,
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none),
+                        borderSide: BorderSide(color: _border)),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: _border)),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: accent.withValues(alpha: 0.4))),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -3546,26 +3093,27 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.06),
+                      color: _bg,
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _border),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.calendar_today, size: 16, color: _sandGold.withValues(alpha: 0.7)),
+                        Icon(Icons.calendar_today, size: 16, color: accent.withValues(alpha: 0.7)),
                         const SizedBox(width: 10),
                         Text('Date',
                             style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.5),
+                                color: _textSoft,
                                 fontSize: 12)),
                         const Spacer(),
                         Text(
                           DateFormat('EEE, MMM d, yyyy').format(selectedDate),
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          style: TextStyle(color: _text, fontSize: 13),
                         ),
                         const SizedBox(width: 4),
                         Icon(Icons.chevron_right,
                             size: 16,
-                            color: Colors.white.withValues(alpha: 0.3)),
+                            color: _textSoft),
                       ],
                     ),
                   ),
@@ -3576,7 +3124,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                   children: [
                     Text('All day',
                         style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.6),
+                            color: _textSoft,
                             fontSize: 13)),
                     const Spacer(),
                     Switch(
@@ -3585,7 +3133,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                         isAllDay = v;
                         if (v) hasSpecificTime = false;
                       }),
-                      activeColor: _sandGold,
+                      activeThumbColor: accent,
                     ),
                   ],
                 ),
@@ -3595,7 +3143,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                     children: [
                       Text('Add specific time',
                           style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
+                              color: _textSoft,
                               fontSize: 13)),
                       const Spacer(),
                       Switch(
@@ -3607,7 +3155,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                                 DateTime.now().add(const Duration(hours: 1)));
                           }
                         }),
-                        activeColor: _sandGold,
+                        activeThumbColor: accent,
                       ),
                     ],
                   ),
@@ -3627,24 +3175,25 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                         padding: const EdgeInsets.all(12),
                         margin: const EdgeInsets.only(bottom: 8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.06),
+                          color: _bg,
                           borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: _border),
                         ),
                         child: Row(
                           children: [
                             Text('Start',
                                 style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.5),
+                                    color: _textSoft,
                                     fontSize: 12)),
                             const Spacer(),
                             Text(
                               selectedStartTime?.format(ctx) ?? 'Set time',
-                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                              style: TextStyle(color: _text, fontSize: 13),
                             ),
                             const SizedBox(width: 4),
                             Icon(Icons.chevron_right,
                                 size: 16,
-                                color: Colors.white.withValues(alpha: 0.3)),
+                                color: _textSoft),
                           ],
                         ),
                       ),
@@ -3667,23 +3216,20 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                         padding: const EdgeInsets.all(12),
                         margin: const EdgeInsets.only(bottom: 8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.04),
+                          color: _bg,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.04),
-                            style: BorderStyle.solid,
-                          ),
+                          border: Border.all(color: _border),
                         ),
                         child: Row(
                           children: [
                             Text('End',
                                 style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.35),
+                                    color: _textSoft,
                                     fontSize: 12)),
                             const SizedBox(width: 4),
                             Text('(optional)',
                                 style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.2),
+                                    color: _textSoft.withValues(alpha: 0.5),
                                     fontSize: 10,
                                     fontStyle: FontStyle.italic)),
                             const Spacer(),
@@ -3691,14 +3237,14 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                               selectedEndTime?.format(ctx) ?? '—',
                               style: TextStyle(
                                   color: selectedEndTime != null
-                                      ? Colors.white
-                                      : Colors.white.withValues(alpha: 0.3),
+                                      ? _text
+                                      : _textSoft,
                                   fontSize: 13),
                             ),
                             const SizedBox(width: 4),
                             Icon(Icons.chevron_right,
                                 size: 16,
-                                color: Colors.white.withValues(alpha: 0.3)),
+                                color: _textSoft),
                           ],
                         ),
                       ),
@@ -3711,7 +3257,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                   children: [
                     Text('Color',
                         style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
+                            color: _textSoft,
                             fontSize: 12)),
                     const SizedBox(width: 12),
                     ...colorOptions.entries.map((e) => GestureDetector(
@@ -3724,7 +3270,7 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                               color: e.value,
                               shape: BoxShape.circle,
                               border: selectedColor == e.key
-                                  ? Border.all(color: Colors.white, width: 2)
+                                  ? Border.all(color: _text, width: 2)
                                   : null,
                             ),
                           ),
@@ -3768,11 +3314,10 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
                             isAllDay: isAllDay,
                           );
                       Navigator.pop(ctx);
-                      HapticFeedback.lightImpact();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _sandGold.withValues(alpha: 0.2),
-                      foregroundColor: _sandGold,
+                      backgroundColor: accent.withValues(alpha: 0.2),
+                      foregroundColor: accent,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -3793,19 +3338,36 @@ class _EventsTabState extends ConsumerState<_EventsTab> {
 // 🛡️ APP BLOCKER TAB
 // ═══════════════════════════════════════════════════════════════════════════════
 
-class _BlockerTab extends ConsumerWidget {
+class _BlockerTab extends ConsumerStatefulWidget {
+  const _BlockerTab();
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_BlockerTab> createState() => _BlockerTabState();
+}
+
+class _BlockerTabState extends ConsumerState<_BlockerTab> {
+  // ── Theme-aware colors ──
+  bool get _isLight => ref.watch(themeColorProvider).isLight;
+  Color get _bg => _isLight ? const Color(0xFFF5F5F5) : _ftBg;
+  Color get _card => _isLight ? Colors.black.withValues(alpha: 0.04) : _ftCard;
+  Color get _text => _isLight ? const Color(0xFF0D0D0D) : _ftText;
+  Color get _textSoft => _isLight ? const Color(0xFF6B6B6B) : _ftTextSoft;
+  Color get _border => _isLight ? Colors.black.withValues(alpha: 0.08) : _ftBorder;
+  Color get _sage => ref.watch(themeColorProvider).color;
+  Color get _sageDark {
+    final themeColor = ref.watch(themeColorProvider).color;
+    final hslColor = HSLColor.fromColor(themeColor);
+    return hslColor
+        .withLightness((hslColor.lightness * 0.85).clamp(0.0, 1.0))
+        .toColor();
+  }
+  Color get _gold => _ftGold;
+
+  @override
+  Widget build(BuildContext context) {
     final rules = ref.watch(appBlockRuleProvider);
 
     return Column(
       children: [
-        // ─── Zen Mode Card ────────────────────────────
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: ZenModeWidget(),
-        ),
-
         // Active rules count
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -3814,13 +3376,13 @@ class _BlockerTab extends ConsumerWidget {
               Icon(Icons.shield,
                   size: 14,
                   color: rules.any((r) => r.isEnabled)
-                      ? _oasisGreen
-                      : Colors.white.withValues(alpha: 0.3)),
+                      ? _sage
+                      : _textSoft),
               const SizedBox(width: 6),
               Text(
                 '${rules.where((r) => r.isEnabled).length} active rules',
                 style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: _textSoft,
                     fontSize: 12),
               ),
             ],
@@ -3835,15 +3397,15 @@ class _BlockerTab extends ConsumerWidget {
                     children: [
                       Icon(Icons.shield_outlined,
                           size: 48,
-                          color: Colors.white.withValues(alpha: 0.15)),
+                          color: _border),
                       const SizedBox(height: 12),
                       Text('No block rules',
                           style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.3))),
+                              color: _textSoft)),
                       const SizedBox(height: 4),
                       Text('Block distracting apps 🌙',
                           style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.2),
+                              color: _textSoft.withValues(alpha: 0.5),
                               fontSize: 12)),
                     ],
                   ),
@@ -3855,12 +3417,27 @@ class _BlockerTab extends ConsumerWidget {
                   itemBuilder: (ctx, i) => _ruleCard(ctx, ref, rules[i]),
                 ),
         ),
+        // ── Direct access buttons: Custom Block + Smart Packs ──
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: _AddButton(
-            label: 'New Block Rule',
-            icon: Icons.add,
-            onTap: () => _showAddRule(context, ref),
+          child: Row(
+            children: [
+              Expanded(
+                child: _AddButton(
+                  label: 'Custom Block',
+                  icon: Icons.tune_rounded,
+                  onTap: () => _launchCustomBlock(context, ref),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _AddButton(
+                  label: 'Smart Packs',
+                  icon: Icons.inventory_2_rounded,
+                  onTap: () => _launchSmartPacks(context, ref),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -3868,6 +3445,7 @@ class _BlockerTab extends ConsumerWidget {
   }
 
   Widget _ruleCard(BuildContext context, WidgetRef ref, AppBlockRule rule) {
+    final dangerColor = const Color(0xFFD97B4A);
     return GestureDetector(
       onTap: () => _showRuleInfoSheet(context, ref, rule),
       child: Container(
@@ -3875,17 +3453,15 @@ class _BlockerTab extends ConsumerWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: rule.isHardBlock
-            ? _desertSunset.withValues(alpha: 0.08)
-            : rule.isEnabled
-                ? _desertSunset.withValues(alpha: 0.06)
-                : Colors.white.withValues(alpha: 0.04),
+            ? dangerColor.withValues(alpha: 0.06)
+            : _card,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: rule.isHardBlock
-              ? _desertSunset.withValues(alpha: 0.35)
+              ? dangerColor.withValues(alpha: 0.25)
               : rule.isEnabled
-                  ? _desertSunset.withValues(alpha: 0.2)
-                  : Colors.white.withValues(alpha: 0.06),
+                  ? _sage.withValues(alpha: 0.25)
+                  : _border,
         ),
       ),
       child: Column(
@@ -3894,14 +3470,14 @@ class _BlockerTab extends ConsumerWidget {
           Row(
             children: [
               if (rule.isHardBlock) ...[
-                Icon(Icons.lock, size: 14, color: _desertSunset.withValues(alpha: 0.7)),
+                Icon(Icons.lock, size: 14, color: dangerColor.withValues(alpha: 0.7)),
                 const SizedBox(width: 6),
               ],
               Expanded(
                 child: Text(
                   rule.name,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: _text,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -3911,13 +3487,13 @@ class _BlockerTab extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: _desertSunset.withValues(alpha: 0.15),
+                    color: dangerColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     'HARD BLOCK',
                     style: TextStyle(
-                      color: _desertSunset.withValues(alpha: 0.8),
+                      color: dangerColor,
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
@@ -3930,7 +3506,6 @@ class _BlockerTab extends ConsumerWidget {
                   onTap: () {
                     HapticFeedback.lightImpact();
                     if (rule.isEnabled) {
-                      // Show confirmation before deactivating
                       _showDeactivateConfirmation(context, ref, rule);
                     } else {
                       ref.read(appBlockRuleProvider.notifier).toggleRule(rule.id);
@@ -3944,8 +3519,8 @@ class _BlockerTab extends ConsumerWidget {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       color: rule.isEnabled
-                          ? _desertSunset.withValues(alpha: 0.3)
-                          : Colors.white.withValues(alpha: 0.1),
+                          ? _sage.withValues(alpha: 0.3)
+                          : _border,
                     ),
                     child: AnimatedAlign(
                       duration: const Duration(milliseconds: 200),
@@ -3958,7 +3533,7 @@ class _BlockerTab extends ConsumerWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color:
-                              rule.isEnabled ? _desertSunset : Colors.white38,
+                              rule.isEnabled ? _sage : _textSoft,
                         ),
                       ),
                     ),
@@ -3973,7 +3548,7 @@ class _BlockerTab extends ConsumerWidget {
               Icon(
                 rule.isTimeBased ? Icons.schedule : Icons.block,
                 size: 12,
-                color: Colors.white.withValues(alpha: 0.3),
+                color: _textSoft,
               ),
               const SizedBox(width: 4),
               Text(
@@ -3981,14 +3556,14 @@ class _BlockerTab extends ConsumerWidget {
                     ? '${_formatHour(rule.startHour, rule.startMinute)} — ${_formatHour(rule.endHour, rule.endMinute)}'
                     : 'Manual toggle',
                 style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
+                    color: _textSoft,
                     fontSize: 11),
               ),
               const Spacer(),
               Text(
                 '${rule.blockedPackages.length} apps',
                 style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.3),
+                    color: _textSoft,
                     fontSize: 11),
               ),
             ],
@@ -3998,28 +3573,27 @@ class _BlockerTab extends ConsumerWidget {
             Row(
               children: [
                 Icon(Icons.free_breakfast_outlined, size: 11,
-                    color: Colors.white.withValues(alpha: 0.25)),
+                    color: _textSoft.withValues(alpha: 0.6)),
                 const SizedBox(width: 4),
                 Text(
                   'Breaks allowed',
                   style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.25), fontSize: 10),
+                      color: _textSoft.withValues(alpha: 0.6), fontSize: 10),
                 ),
               ],
             ),
           ],
-          // Locked info for all rules
           if (rule.isHardBlock)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, size: 11, color: Colors.white.withValues(alpha: 0.2)),
+                  Icon(Icons.info_outline, size: 11, color: _textSoft.withValues(alpha: 0.5)),
                   const SizedBox(width: 4),
                   Text(
                     'Locked — cannot be modified or deleted',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.2),
+                      color: _textSoft.withValues(alpha: 0.5),
                       fontSize: 10,
                       fontStyle: FontStyle.italic,
                     ),
@@ -4042,14 +3616,15 @@ class _BlockerTab extends ConsumerWidget {
 
   // ── Deactivation confirmation for easy-mode blockers ──
   void _showDeactivateConfirmation(BuildContext context, WidgetRef ref, AppBlockRule rule) {
+    final dangerColor = const Color(0xFFD97B4A);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
-        decoration: const BoxDecoration(
-          color: Color(0xFF141414),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111111),
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
@@ -4059,7 +3634,7 @@ class _BlockerTab extends ConsumerWidget {
             Container(
               width: 36, height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.12),
+                color: _border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -4068,17 +3643,17 @@ class _BlockerTab extends ConsumerWidget {
             Container(
               width: 64, height: 64,
               decoration: BoxDecoration(
-                color: _desertSunset.withValues(alpha: 0.12),
+                color: dangerColor.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.shield_outlined, size: 30,
-                  color: _desertSunset.withValues(alpha: 0.8)),
+                  color: dangerColor.withValues(alpha: 0.7)),
             ),
             const SizedBox(height: 20),
             Text(
               'Stay Focused',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.95),
+                color: _text,
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
               ),
@@ -4088,7 +3663,7 @@ class _BlockerTab extends ConsumerWidget {
               'You set this blocker for a reason.\nDisabling it now means giving in to distraction.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: _textSoft,
                 fontSize: 13,
                 height: 1.5,
               ),
@@ -4098,21 +3673,21 @@ class _BlockerTab extends ConsumerWidget {
               margin: const EdgeInsets.symmetric(vertical: 12),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: _sandGold.withValues(alpha: 0.08),
+                color: _gold.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _sandGold.withValues(alpha: 0.15)),
+                border: Border.all(color: _gold.withValues(alpha: 0.15)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.format_quote, size: 14,
-                      color: _sandGold.withValues(alpha: 0.6)),
+                      color: _gold.withValues(alpha: 0.6)),
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
                       '"Discipline is choosing between what you\nwant now and what you want most."',
                       style: TextStyle(
-                        color: _sandGold.withValues(alpha: 0.8),
+                        color: _gold,
                         fontSize: 12,
                         fontStyle: FontStyle.italic,
                         height: 1.4,
@@ -4128,21 +3703,20 @@ class _BlockerTab extends ConsumerWidget {
               width: double.infinity,
               child: GestureDetector(
                 onTap: () {
-                  HapticFeedback.lightImpact();
                   Navigator.pop(ctx);
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
-                    color: _desertSunset.withValues(alpha: 0.2),
+                    color: _sage.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _desertSunset.withValues(alpha: 0.4)),
+                    border: Border.all(color: _sage.withValues(alpha: 0.3)),
                   ),
                   child: Center(
                     child: Text(
                       'Keep Blocker Active',
                       style: TextStyle(
-                        color: _desertSunset,
+                        color: _sageDark,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
@@ -4152,7 +3726,7 @@ class _BlockerTab extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 10),
-            // Confirm deactivate button → 100-tap confirmation
+            // Confirm deactivate
             SizedBox(
               width: double.infinity,
               child: GestureDetector(
@@ -4161,8 +3735,8 @@ class _BlockerTab extends ConsumerWidget {
                   Navigator.pop(ctx);
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => _DeactivateRuleConfirmScreen(
+                    SmoothForwardRoute(
+                      child: _DeactivateRuleConfirmScreen(
                         ruleId: rule.id,
                         ruleName: rule.name,
                       ),
@@ -4172,14 +3746,14 @@ class _BlockerTab extends ConsumerWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.04),
+                    color: _bg,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
                     child: Text(
                       'Confirm Deactivate',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.35),
+                        color: _textSoft,
                         fontSize: 14,
                         fontWeight: FontWeight.w400,
                       ),
@@ -4189,99 +3763,6 @@ class _BlockerTab extends ConsumerWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  void _showEditApps(BuildContext context, WidgetRef ref, AppBlockRule rule) {
-    final allApps = ref.read(installedAppsProvider);
-    final selected = Set<String>.from(rule.blockedPackages);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setBS) => SizedBox(
-          height: MediaQuery.of(context).size.height * 0.7,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Text('Select Apps to Block',
-                        style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () {
-                        ref
-                            .read(appBlockRuleProvider.notifier)
-                            .updateRule(rule.id,
-                                blockedPackages: selected.toList());
-                        Navigator.pop(ctx);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _sandGold.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text('Done',
-                            style: TextStyle(
-                                color: _sandGold, fontSize: 13)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: allApps.length,
-                  itemBuilder: (ctx, i) {
-                    final app = allApps[i];
-                    final isSelected =
-                        selected.contains(app.packageName);
-                    return ListTile(
-                      dense: true,
-                      title: Text(app.appName,
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 13)),
-                      subtitle: Text(app.packageName,
-                          style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.3),
-                              fontSize: 10)),
-                      trailing: Icon(
-                        isSelected
-                            ? Icons.check_circle
-                            : Icons.circle_outlined,
-                        color: isSelected
-                            ? _desertSunset
-                            : Colors.white.withValues(alpha: 0.2),
-                        size: 20,
-                      ),
-                      onTap: () {
-                        setBS(() {
-                          if (isSelected) {
-                            selected.remove(app.packageName);
-                          } else {
-                            selected.add(app.packageName);
-                          }
-                        });
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -4300,8 +3781,8 @@ class _BlockerTab extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
         constraints: BoxConstraints(
             maxHeight: MediaQuery.of(ctx).size.height * 0.75),
-        decoration: const BoxDecoration(
-          color: Color(0xFF141414),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111111),
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: SingleChildScrollView(
@@ -4314,7 +3795,7 @@ class _BlockerTab extends ConsumerWidget {
                 child: Container(
                   width: 36, height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.12),
+                    color: _border,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -4326,11 +3807,11 @@ class _BlockerTab extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: _oasisGreen.withValues(alpha: 0.12),
+                      color: _sage.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(Icons.check_circle_rounded,
-                        color: _oasisGreen.withValues(alpha: 0.8), size: 22),
+                        color: _sage, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -4339,13 +3820,13 @@ class _BlockerTab extends ConsumerWidget {
                       children: [
                         Text('Rule Created',
                             style: TextStyle(
-                                color: _oasisGreen.withValues(alpha: 0.9),
+                                color: _sage,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600)),
                         const SizedBox(height: 2),
                         Text(rule.name,
                             style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.9),
+                                color: _text,
                                 fontSize: 17,
                                 fontWeight: FontWeight.w600)),
                       ],
@@ -4355,7 +3836,7 @@ class _BlockerTab extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: _desertSunset.withValues(alpha: 0.15),
+                        color: _desertSunset.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Row(
@@ -4380,9 +3861,9 @@ class _BlockerTab extends ConsumerWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.04),
+                  color: _bg,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                  border: Border.all(color: _border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -4390,11 +3871,11 @@ class _BlockerTab extends ConsumerWidget {
                     Row(
                       children: [
                         Icon(Icons.schedule_rounded, size: 14,
-                            color: _sandGold.withValues(alpha: 0.7)),
+                            color: _gold),
                         const SizedBox(width: 6),
                         Text('Schedule',
                             style: TextStyle(
-                                color: _sandGold.withValues(alpha: 0.8),
+                                color: _gold,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600)),
                       ],
@@ -4411,7 +3892,7 @@ class _BlockerTab extends ConsumerWidget {
                         ),
                         const SizedBox(width: 8),
                         Icon(Icons.arrow_forward, size: 12,
-                            color: Colors.white.withValues(alpha: 0.15)),
+                            color: _border),
                         const SizedBox(width: 8),
                         Expanded(
                           child: _infoChip(
@@ -4431,12 +3912,12 @@ class _BlockerTab extends ConsumerWidget {
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: _sandGold.withValues(alpha: 0.1),
+                              color: _gold.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(label,
                                 style: TextStyle(
-                                    color: _sandGold.withValues(alpha: 0.7),
+                                    color: _gold,
                                     fontSize: 10,
                                     fontWeight: FontWeight.w500)),
                           );
@@ -4453,9 +3934,9 @@ class _BlockerTab extends ConsumerWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.04),
+                  color: _bg,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                  border: Border.all(color: _border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -4473,7 +3954,7 @@ class _BlockerTab extends ConsumerWidget {
                         const Spacer(),
                         Text('${rule.blockedPackages.length}',
                             style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.3),
+                                color: _textSoft,
                                 fontSize: 11)),
                       ],
                     ),
@@ -4489,13 +3970,13 @@ class _BlockerTab extends ConsumerWidget {
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
-                            color: _desertSunset.withValues(alpha: 0.08),
+                            color: _desertSunset.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: _desertSunset.withValues(alpha: 0.15)),
+                            border: Border.all(color: _desertSunset.withValues(alpha: 0.12)),
                           ),
                           child: Text(appName,
                               style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.7),
+                                  color: _text,
                                   fontSize: 11)),
                         );
                       }).toList(),
@@ -4510,17 +3991,17 @@ class _BlockerTab extends ConsumerWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.04),
+                  color: _bg,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                  border: Border.all(color: _border),
                 ),
                 child: Row(
                   children: [
                     _settingPill(Icons.shield, rule.isHardBlock ? 'Hard Block' : 'Easy Block',
-                        rule.isHardBlock ? _desertSunset : _oasisGreen),
+                        rule.isHardBlock ? _desertSunset : _sage),
                     const SizedBox(width: 8),
                     if (rule.allowBreaks)
-                      _settingPill(Icons.free_breakfast_outlined, 'Breaks On', _sandGold),
+                      _settingPill(Icons.free_breakfast_outlined, 'Breaks On', _gold),
                   ],
                 ),
               ),
@@ -4534,8 +4015,8 @@ class _BlockerTab extends ConsumerWidget {
                     onTap: () {
                       Navigator.pop(ctx);
                       Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => _DeleteRuleConfirmScreen(
+                        SmoothForwardRoute(
+                          child: _DeleteRuleConfirmScreen(
                             ruleId: rule.id,
                             ruleName: rule.name,
                           ),
@@ -4575,13 +4056,13 @@ class _BlockerTab extends ConsumerWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      color: _sandGold.withValues(alpha: 0.12),
+                      color: _sage.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
                       child: Text('Done',
                           style: TextStyle(
-                              color: _sandGold,
+                              color: _sageDark,
                               fontSize: 14,
                               fontWeight: FontWeight.w600)),
                     ),
@@ -4599,7 +4080,7 @@ class _BlockerTab extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: _bg,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -4608,15 +4089,15 @@ class _BlockerTab extends ConsumerWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 11, color: Colors.white.withValues(alpha: 0.3)),
+              Icon(icon, size: 11, color: _textSoft),
               const SizedBox(width: 4),
               Text(label, style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.35), fontSize: 10)),
+                  color: _textSoft, fontSize: 10)),
             ],
           ),
           const SizedBox(height: 4),
           Text(value, style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8), fontSize: 13,
+              color: _text, fontSize: 13,
               fontWeight: FontWeight.w500)),
         ],
       ),
@@ -4644,87 +4125,41 @@ class _BlockerTab extends ConsumerWidget {
     );
   }
 
-  // ── Task 6: Show block type chooser — checks permissions first ──
-  void _showAddRule(BuildContext context, WidgetRef ref) async {
-    // Check if all required permissions are granted
+  // ── Permission check helper — returns true if all permissions granted ──
+  Future<bool> _ensureBlockerPermissions(BuildContext context) async {
     final hasUsage = await NativeAppBlockerService.hasUsageStatsPermission();
     final hasNotif = await NativeAppBlockerService.hasNotificationPermission();
 
     if (!hasUsage || !hasNotif) {
-      // Show permission setup flow
       if (context.mounted) {
         final granted = await Navigator.push<bool>(
           context,
-          MaterialPageRoute(
-            builder: (_) => _BlockerPermissionScreen(
+          SmoothForwardRoute(
+            child: _BlockerPermissionScreen(
               hasUsageStats: hasUsage,
               hasNotification: hasNotif,
             ),
           ),
         );
-        if (granted != true) return; // User cancelled
-      } else {
-        return;
+        return granted == true;
       }
+      return false;
     }
-
-    if (!context.mounted) return;
-    _showAddRuleChooser(context, ref);
+    return true;
   }
 
-  void _showAddRuleChooser(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-        decoration: const BoxDecoration(
-          color: Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('New Block Rule',
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            Text('Choose how to set up your blocker',
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.35),
-                    fontSize: 13)),
-            const SizedBox(height: 20),
-            // Option A: Custom Block (unified)
-            _BlockTypeOption(
-              icon: Icons.tune_rounded,
-              color: _desertSunset,
-              title: 'Custom Block',
-              subtitle: 'Pick apps and choose your schedule',
-              onTap: () {
-                Navigator.pop(ctx);
-                _showUnifiedBlockSheet(context, ref);
-              },
-            ),
-            const SizedBox(height: 10),
-            // Option B: Smart Packs
-            _BlockTypeOption(
-              icon: Icons.inventory_2_rounded,
-              color: _oasisGreen,
-              title: 'Smart Packs',
-              subtitle: 'Pre-built packs — social media, games & more',
-              onTap: () {
-                Navigator.pop(ctx);
-                _showSmartPackSheet(context, ref);
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
+  // ── Direct launch: Custom Block (skips chooser) ──
+  void _launchCustomBlock(BuildContext context, WidgetRef ref) async {
+    if (!await _ensureBlockerPermissions(context)) return;
+    if (!context.mounted) return;
+    _showUnifiedBlockSheet(context, ref);
+  }
+
+  // ── Direct launch: Smart Packs (skips chooser) ──
+  void _launchSmartPacks(BuildContext context, WidgetRef ref) async {
+    if (!await _ensureBlockerPermissions(context)) return;
+    if (!context.mounted) return;
+    _showSmartPackSheet(context, ref);
   }
 
   // ── Unified Block Sheet (replaces Block Now + Scheduled Block) ──
@@ -4748,8 +4183,8 @@ class _BlockerTab extends ConsumerWidget {
               20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
           constraints: BoxConstraints(
               maxHeight: MediaQuery.of(ctx).size.height * 0.88),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A1A1A),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111111),
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: SingleChildScrollView(
@@ -4759,11 +4194,11 @@ class _BlockerTab extends ConsumerWidget {
               children: [
                 Row(children: [
                   Icon(Icons.tune_rounded,
-                      color: _desertSunset.withValues(alpha: 0.7), size: 20),
+                      color: _sage, size: 20),
                   const SizedBox(width: 8),
                   Text('Custom Block',
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: _text,
                           fontSize: 18,
                           fontWeight: FontWeight.w600)),
                 ]),
@@ -4771,16 +4206,21 @@ class _BlockerTab extends ConsumerWidget {
                 // Rule name
                 TextField(
                   controller: nameCtrl,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: _text),
                   decoration: InputDecoration(
                     hintText: 'Rule name (e.g. Study Focus)',
-                    hintStyle:
-                        TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                    hintStyle: TextStyle(color: _textSoft),
                     filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.06),
+                    fillColor: _bg,
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none),
+                        borderSide: BorderSide(color: _border)),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: _border)),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: _sage)),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -4791,15 +4231,15 @@ class _BlockerTab extends ConsumerWidget {
                 // Schedule mode selector
                 Text('Schedule',
                     style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: _textSoft,
                         fontSize: 13)),
                 const SizedBox(height: 8),
                 Row(children: [
-                  _buildScheduleChip("Always On", 0, scheduleMode, _desertSunset, (v) => setBS(() => scheduleMode = v)),
+                  _buildScheduleChip("Always On", 0, scheduleMode, _sage, (v) => setBS(() => scheduleMode = v)),
                   const SizedBox(width: 8),
-                  _buildScheduleChip("Duration", 1, scheduleMode, _desertSunset, (v) => setBS(() => scheduleMode = v)),
+                  _buildScheduleChip("Duration", 1, scheduleMode, _sage, (v) => setBS(() => scheduleMode = v)),
                   const SizedBox(width: 8),
-                  _buildScheduleChip("Time Window", 2, scheduleMode, _desertSunset, (v) => setBS(() => scheduleMode = v)),
+                  _buildScheduleChip("Time Window", 2, scheduleMode, _sage, (v) => setBS(() => scheduleMode = v)),
                 ]),
 
                 // Duration picker (mode 1)
@@ -4818,19 +4258,19 @@ class _BlockerTab extends ConsumerWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? _desertSunset.withValues(alpha: 0.15)
-                                : Colors.white.withValues(alpha: 0.04),
+                                ? _sage.withValues(alpha: 0.12)
+                                : _bg,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                                 color: isSelected
-                                    ? _desertSunset.withValues(alpha: 0.4)
-                                    : Colors.white.withValues(alpha: 0.06)),
+                                    ? _sage.withValues(alpha: 0.4)
+                                    : _border),
                           ),
                           child: Text(label,
                               style: TextStyle(
                                   color: isSelected
-                                      ? _desertSunset
-                                      : Colors.white.withValues(alpha: 0.5),
+                                      ? _sageDark
+                                      : _textSoft,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500)),
                         ),
@@ -4853,11 +4293,12 @@ class _BlockerTab extends ConsumerWidget {
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
+                            color: _bg,
                             borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: _border),
                           ),
                           child: Text('Start: ${_formatHour(startH, startM)}',
-                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                              style: TextStyle(color: _text, fontSize: 13),
                               textAlign: TextAlign.center),
                         ),
                       ),
@@ -4873,11 +4314,12 @@ class _BlockerTab extends ConsumerWidget {
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
+                            color: _bg,
                             borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: _border),
                           ),
                           child: Text('End: ${_formatHour(endH, endM)}',
-                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                              style: TextStyle(color: _text, fontSize: 13),
                               textAlign: TextAlign.center),
                         ),
                       ),
@@ -4892,21 +4334,25 @@ class _BlockerTab extends ConsumerWidget {
                       final active = activeDays.contains(day);
                       return GestureDetector(
                         onTap: () => setBS(() {
-                          if (active) activeDays.remove(day); else activeDays.add(day);
+                          if (active) {
+                            activeDays.remove(day);
+                          } else {
+                            activeDays.add(day);
+                          }
                         }),
                         child: Container(
                           width: 36, height: 36,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: active
-                                ? _desertSunset.withValues(alpha: 0.2)
-                                : Colors.white.withValues(alpha: 0.04),
+                                ? _sage.withValues(alpha: 0.15)
+                                : _bg,
                           ),
                           child: Center(
                             child: Text(labels[i],
                                 style: TextStyle(
                                     fontSize: 12,
-                                    color: active ? _desertSunset : Colors.white.withValues(alpha: 0.3))),
+                                    color: active ? _sageDark : _textSoft)),
                           ),
                         ),
                       );
@@ -4945,6 +4391,7 @@ class _BlockerTab extends ConsumerWidget {
                       int sH = 0, sM = 0, eH = 23, eM = 59;
                       List<int> days = List.generate(7, (i) => i + 1);
                       bool isTimeBased = true;
+                      DateTime? expiresAt;
 
                       if (scheduleMode == 1) {
                         final now = DateTime.now();
@@ -4952,6 +4399,7 @@ class _BlockerTab extends ConsumerWidget {
                         sH = now.hour; sM = now.minute;
                         eH = end.hour; eM = end.minute;
                         days = [now.weekday];
+                        expiresAt = end; // Exact expiry time for duration-based blocks
                       } else if (scheduleMode == 2) {
                         sH = startH; sM = startM;
                         eH = endH; eM = endM;
@@ -4971,7 +4419,9 @@ class _BlockerTab extends ConsumerWidget {
                         activeDays: days,
                         isHardBlock: breakDifficulty == 1,
                         allowBreaks: breakDifficulty == 0,
+                        expiresAt: expiresAt,
                       );
+                      if (!ctx.mounted) return;
                       Navigator.pop(ctx);
                       HapticFeedback.lightImpact();
                       if (context.mounted) {
@@ -4979,8 +4429,8 @@ class _BlockerTab extends ConsumerWidget {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _desertSunset.withValues(alpha: 0.2),
-                      foregroundColor: _desertSunset,
+                      backgroundColor: _sage.withValues(alpha: 0.15),
+                      foregroundColor: _sageDark,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -5085,8 +4535,8 @@ class _BlockerTab extends ConsumerWidget {
       builder: (ctx) => Container(
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
         constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
-        decoration: const BoxDecoration(
-          color: Color(0xFF1A1A1A),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111111),
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
@@ -5094,24 +4544,24 @@ class _BlockerTab extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              Icon(Icons.inventory_2_rounded, color: _oasisGreen.withValues(alpha: 0.7), size: 20),
+              Icon(Icons.inventory_2_rounded, color: _gold, size: 20),
               const SizedBox(width: 8),
               Text("Smart Packs",
                   style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      color: _text,
                       fontSize: 18,
                       fontWeight: FontWeight.w600)),
             ]),
             const SizedBox(height: 4),
             Text("One-tap block packs — review & customize apps",
                 style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.35), fontSize: 13)),
+                    color: _textSoft, fontSize: 13)),
             const SizedBox(height: 20),
             Flexible(
               child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: _smartPacks.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (_, i) {
                   final pack = _smartPacks[i];
                   final packColor = pack['color'] as Color;
@@ -5122,11 +4572,10 @@ class _BlockerTab extends ConsumerWidget {
 
                   return GestureDetector(
                     onTap: () {
-                      HapticFeedback.lightImpact();
                       Navigator.pop(ctx);
                       if (isActive || isInactive) {
                         // Edit existing rule — pass the active rule
-                        final existingRule = activeInfo!['rule'] as AppBlockRule;
+                        final existingRule = activeInfo['rule'] as AppBlockRule;
                         _showPackEditSheet(context, ref, pack, existingRule);
                       } else {
                         _showPackCustomizeSheet(context, ref, pack);
@@ -5165,7 +4614,7 @@ class _BlockerTab extends ConsumerWidget {
                                     Flexible(
                                       child: Text(pack['name'] as String,
                                           style: TextStyle(
-                                              color: Colors.white.withValues(alpha: 0.9),
+                                              color: _text,
                                               fontSize: 15,
                                               fontWeight: FontWeight.w600)),
                                     ),
@@ -5174,17 +4623,17 @@ class _BlockerTab extends ConsumerWidget {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: _oasisGreen.withValues(alpha: 0.15),
+                                          color: _sage.withValues(alpha: 0.12),
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(Icons.shield_rounded, size: 10, color: _oasisGreen.withValues(alpha: 0.9)),
+                                            Icon(Icons.shield_rounded, size: 10, color: _sage),
                                             const SizedBox(width: 3),
                                             Text("ACTIVE",
                                                 style: TextStyle(
-                                                    color: _oasisGreen.withValues(alpha: 0.9),
+                                                    color: _sageDark,
                                                     fontSize: 9,
                                                     fontWeight: FontWeight.w700,
                                                     letterSpacing: 0.5)),
@@ -5196,12 +4645,12 @@ class _BlockerTab extends ConsumerWidget {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.06),
+                                          color: _bg,
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text("PAUSED",
                                             style: TextStyle(
-                                                color: Colors.white.withValues(alpha: 0.3),
+                                                color: _textSoft,
                                                 fontSize: 9,
                                                 fontWeight: FontWeight.w700,
                                                 letterSpacing: 0.5)),
@@ -5212,7 +4661,7 @@ class _BlockerTab extends ConsumerWidget {
                                 const SizedBox(height: 2),
                                 Text(pack['desc'] as String,
                                     style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.35),
+                                        color: _textSoft,
                                         fontSize: 12)),
                                 const SizedBox(height: 6),
                                 Text(isActive
@@ -5220,7 +4669,7 @@ class _BlockerTab extends ConsumerWidget {
                                     : "${apps.length} apps included",
                                     style: TextStyle(
                                         color: isActive
-                                            ? _oasisGreen.withValues(alpha: 0.6)
+                                            ? _sage
                                             : packColor.withValues(alpha: 0.6),
                                         fontSize: 11,
                                         fontWeight: FontWeight.w500)),
@@ -5228,7 +4677,7 @@ class _BlockerTab extends ConsumerWidget {
                             ),
                           ),
                           Icon(isActive ? Icons.edit_rounded : Icons.arrow_forward_ios,
-                              size: 14, color: Colors.white.withValues(alpha: isActive ? 0.3 : 0.15)),
+                              size: 14, color: _textSoft),
                         ],
                       ),
                     ),
@@ -5276,8 +4725,8 @@ class _BlockerTab extends ConsumerWidget {
         builder: (ctx, setBS) => Container(
           padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
           constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.88),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A1A1A),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111111),
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: SingleChildScrollView(
@@ -5291,7 +4740,7 @@ class _BlockerTab extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Text("$packName Pack",
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: _text,
                           fontSize: 18,
                           fontWeight: FontWeight.w600)),
                   const Spacer(),
@@ -5309,10 +4758,10 @@ class _BlockerTab extends ConsumerWidget {
 
                 // Apps list with toggles
                 Text("Apps to Block",
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                    style: TextStyle(color: _textSoft, fontSize: 13)),
                 const SizedBox(height: 4),
                 Text("Remove any apps you want to keep accessible",
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 11)),
+                    style: TextStyle(color: _textSoft, fontSize: 11)),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 6,
@@ -5338,17 +4787,17 @@ class _BlockerTab extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: !isInstalled
-                              ? Colors.white.withValues(alpha: 0.02)
+                              ? _bg
                               : isSelected
-                                  ? packColor.withValues(alpha: 0.12)
-                                  : Colors.white.withValues(alpha: 0.04),
+                                  ? packColor.withValues(alpha: 0.10)
+                                  : _bg,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: !isInstalled
-                                ? Colors.white.withValues(alpha: 0.04)
+                                ? _border
                                 : isSelected
                                     ? packColor.withValues(alpha: 0.3)
-                                    : Colors.white.withValues(alpha: 0.06),
+                                    : _border,
                           ),
                         ),
                         child: Row(
@@ -5357,23 +4806,23 @@ class _BlockerTab extends ConsumerWidget {
                             if (isSelected && isInstalled)
                               Icon(Icons.check_circle_rounded, size: 15, color: packColor.withValues(alpha: 0.8))
                             else if (!isInstalled)
-                              Icon(Icons.block_rounded, size: 15, color: Colors.white.withValues(alpha: 0.15))
+                              Icon(Icons.block_rounded, size: 15, color: _border)
                             else
-                              Icon(Icons.circle_outlined, size: 15, color: Colors.white.withValues(alpha: 0.2)),
+                              Icon(Icons.circle_outlined, size: 15, color: _textSoft),
                             const SizedBox(width: 6),
                             Text(name,
                                 style: TextStyle(
                                     color: !isInstalled
-                                        ? Colors.white.withValues(alpha: 0.2)
+                                        ? _textSoft
                                         : isSelected
-                                            ? Colors.white.withValues(alpha: 0.8)
-                                            : Colors.white.withValues(alpha: 0.4),
+                                            ? _text
+                                            : _textSoft,
                                     fontSize: 12,
                                     fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400)),
                             if (!isInstalled) ...[
                               const SizedBox(width: 4),
                               Text("not installed",
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.15), fontSize: 9)),
+                                  style: TextStyle(color: _textSoft, fontSize: 9)),
                             ],
                           ],
                         ),
@@ -5386,7 +4835,7 @@ class _BlockerTab extends ConsumerWidget {
 
                 // Schedule mode selector
                 Text("Schedule",
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                    style: TextStyle(color: _textSoft, fontSize: 13)),
                 const SizedBox(height: 8),
                 Row(children: [
                   _buildScheduleChip("Always On", 0, scheduleMode, packColor, (v) => setBS(() => scheduleMode = v)),
@@ -5412,19 +4861,19 @@ class _BlockerTab extends ConsumerWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? packColor.withValues(alpha: 0.15)
-                                : Colors.white.withValues(alpha: 0.04),
+                                ? packColor.withValues(alpha: 0.10)
+                                : _bg,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                                 color: isSelected
                                     ? packColor.withValues(alpha: 0.4)
-                                    : Colors.white.withValues(alpha: 0.06)),
+                                    : _border),
                           ),
                           child: Text(label,
                               style: TextStyle(
                                   color: isSelected
                                       ? packColor
-                                      : Colors.white.withValues(alpha: 0.5),
+                                      : _textSoft,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500)),
                         ),
@@ -5447,11 +4896,12 @@ class _BlockerTab extends ConsumerWidget {
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
+                            color: _bg,
                             borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: _border),
                           ),
                           child: Text("Start: ${_formatHour(startH, startM)}",
-                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                              style: TextStyle(color: _text, fontSize: 13),
                               textAlign: TextAlign.center),
                         ),
                       ),
@@ -5467,11 +4917,12 @@ class _BlockerTab extends ConsumerWidget {
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
+                            color: _bg,
                             borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: _border),
                           ),
                           child: Text("End: ${_formatHour(endH, endM)}",
-                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                              style: TextStyle(color: _text, fontSize: 13),
                               textAlign: TextAlign.center),
                         ),
                       ),
@@ -5486,21 +4937,25 @@ class _BlockerTab extends ConsumerWidget {
                       final active = activeDays.contains(day);
                       return GestureDetector(
                         onTap: () => setBS(() {
-                          if (active) activeDays.remove(day); else activeDays.add(day);
+                          if (active) {
+                            activeDays.remove(day);
+                          } else {
+                            activeDays.add(day);
+                          }
                         }),
                         child: Container(
                           width: 36, height: 36,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: active
-                                ? packColor.withValues(alpha: 0.2)
-                                : Colors.white.withValues(alpha: 0.04),
+                                ? packColor.withValues(alpha: 0.15)
+                                : _bg,
                           ),
                           child: Center(
                             child: Text(labels[i],
                                 style: TextStyle(
                                     fontSize: 12,
-                                    color: active ? packColor : Colors.white.withValues(alpha: 0.3))),
+                                    color: active ? packColor : _textSoft)),
                           ),
                         ),
                       );
@@ -5531,6 +4986,7 @@ class _BlockerTab extends ConsumerWidget {
                       int sH = 0, sM = 0, eH = 23, eM = 59;
                       List<int> days = List.generate(7, (i) => i + 1);
                       bool isTimeBased = true;
+                      DateTime? expiresAt;
 
                       if (scheduleMode == 1) {
                         // Duration-based: start now, end after X minutes
@@ -5539,6 +4995,7 @@ class _BlockerTab extends ConsumerWidget {
                         sH = now.hour; sM = now.minute;
                         eH = end.hour; eM = end.minute;
                         days = [now.weekday];
+                        expiresAt = end; // Exact expiry time for duration-based blocks
                       } else if (scheduleMode == 2) {
                         // Scheduled time window
                         sH = startH; sM = startM;
@@ -5560,7 +5017,9 @@ class _BlockerTab extends ConsumerWidget {
                         activeDays: days,
                         isHardBlock: breakDifficulty == 1,
                         allowBreaks: breakDifficulty == 0,
+                        expiresAt: expiresAt,
                       );
+                      if (!ctx.mounted) return;
                       Navigator.pop(ctx);
                       HapticFeedback.lightImpact();
                       if (context.mounted) {
@@ -5620,8 +5079,8 @@ class _BlockerTab extends ConsumerWidget {
         builder: (ctx, setBS) => Container(
           padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
           constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.75),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A1A1A),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111111),
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: SingleChildScrollView(
@@ -5635,23 +5094,23 @@ class _BlockerTab extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Text("Edit $packName",
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: _text,
                           fontSize: 18,
                           fontWeight: FontWeight.w600)),
                   const Spacer(),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: _oasisGreen.withValues(alpha: 0.12),
+                      color: _sage.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.shield_rounded, size: 10, color: _oasisGreen.withValues(alpha: 0.9)),
+                        Icon(Icons.shield_rounded, size: 10, color: _sage),
                         const SizedBox(width: 4),
                         Text("${selectedApps.length} blocked",
-                            style: TextStyle(color: _oasisGreen, fontSize: 11, fontWeight: FontWeight.w600)),
+                            style: TextStyle(color: _sageDark, fontSize: 11, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -5659,7 +5118,7 @@ class _BlockerTab extends ConsumerWidget {
                 const SizedBox(height: 16),
 
                 Text("🔒 Existing apps are locked · Tap to add new apps",
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 12)),
+                    style: TextStyle(color: _textSoft, fontSize: 12)),
                 const SizedBox(height: 12),
 
                 // Pack apps with toggle
@@ -5686,7 +5145,7 @@ class _BlockerTab extends ConsumerWidget {
                         HapticFeedback.heavyImpact();
                         ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
                           content: const Text("🔒 Active blocked apps can't be removed"),
-                          backgroundColor: Colors.white.withValues(alpha: 0.1),
+                          backgroundColor: _textSoft,
                           behavior: SnackBarBehavior.floating,
                           duration: const Duration(seconds: 1),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -5697,21 +5156,21 @@ class _BlockerTab extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: !isInstalled
-                              ? Colors.white.withValues(alpha: 0.02)
+                              ? _bg
                               : isLocked
-                                  ? packColor.withValues(alpha: 0.18)
+                                  ? packColor.withValues(alpha: 0.12)
                                   : isSelected
-                                      ? packColor.withValues(alpha: 0.12)
-                                      : Colors.white.withValues(alpha: 0.04),
+                                      ? packColor.withValues(alpha: 0.10)
+                                      : _bg,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: !isInstalled
-                                ? Colors.white.withValues(alpha: 0.04)
+                                ? _border
                                 : isLocked
                                     ? packColor.withValues(alpha: 0.5)
                                     : isSelected
                                         ? packColor.withValues(alpha: 0.3)
-                                        : Colors.white.withValues(alpha: 0.06),
+                                        : _border,
                           ),
                         ),
                         child: Row(
@@ -5722,19 +5181,19 @@ class _BlockerTab extends ConsumerWidget {
                             else if (isSelected && isInstalled)
                               Icon(Icons.check_circle_rounded, size: 15, color: packColor.withValues(alpha: 0.8))
                             else if (!isInstalled)
-                              Icon(Icons.block_rounded, size: 15, color: Colors.white.withValues(alpha: 0.15))
+                              Icon(Icons.block_rounded, size: 15, color: _border)
                             else
-                              Icon(Icons.circle_outlined, size: 15, color: Colors.white.withValues(alpha: 0.2)),
+                              Icon(Icons.circle_outlined, size: 15, color: _textSoft),
                             const SizedBox(width: 6),
                             Text(name,
                                 style: TextStyle(
                                     color: !isInstalled
-                                        ? Colors.white.withValues(alpha: 0.2)
+                                        ? _textSoft
                                         : isLocked
-                                            ? Colors.white.withValues(alpha: 0.9)
+                                            ? _text
                                             : isSelected
-                                                ? Colors.white.withValues(alpha: 0.8)
-                                                : Colors.white.withValues(alpha: 0.4),
+                                                ? _text
+                                                : _textSoft,
                                     fontSize: 12,
                                     fontWeight: isLocked ? FontWeight.w600 : isSelected ? FontWeight.w500 : FontWeight.w400)),
                             if (isLocked) ...[
@@ -5745,7 +5204,7 @@ class _BlockerTab extends ConsumerWidget {
                             if (!isInstalled) ...[
                               const SizedBox(width: 4),
                               Text("not installed",
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.15), fontSize: 9)),
+                                  style: TextStyle(color: _textSoft, fontSize: 9)),
                             ],
                           ],
                         ),
@@ -5778,7 +5237,7 @@ class _BlockerTab extends ConsumerWidget {
                       HapticFeedback.lightImpact();
                       ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
                         content: Text('$packName updated · ${selectedApps.length} apps blocked'),
-                        backgroundColor: _oasisGreen,
+                        backgroundColor: _sage,
                         behavior: SnackBarBehavior.floating,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ));
@@ -5808,15 +5267,15 @@ class _BlockerTab extends ConsumerWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
-          color: isActive ? color.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.04),
+          color: isActive ? color.withValues(alpha: 0.10) : _bg,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isActive ? color.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.06),
+            color: isActive ? color.withValues(alpha: 0.3) : _border,
           ),
         ),
         child: Text(label,
             style: TextStyle(
-                color: isActive ? color : Colors.white.withValues(alpha: 0.4),
+                color: isActive ? color : _textSoft,
                 fontSize: 12,
                 fontWeight: FontWeight.w500)),
       ),
@@ -5833,12 +5292,12 @@ class _BlockerTab extends ConsumerWidget {
         Row(children: [
           Text('Apps to Block',
               style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                  color: _textSoft, fontSize: 13)),
           const Spacer(),
           if (selectedApps.isNotEmpty)
             Text('${selectedApps.length} selected',
                 style: TextStyle(
-                    color: _desertSunset.withValues(alpha: 0.6), fontSize: 11)),
+                    color: _sage, fontSize: 11)),
         ]),
         const SizedBox(height: 8),
         // Selected app chips
@@ -5855,24 +5314,24 @@ class _BlockerTab extends ConsumerWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _desertSunset.withValues(alpha: 0.08),
+                  color: _sage.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: _desertSunset.withValues(alpha: 0.2)),
+                      color: _sage.withValues(alpha: 0.15)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(appName,
                         style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
+                            color: _text,
                             fontSize: 12)),
                     const SizedBox(width: 4),
                     GestureDetector(
                       onTap: () => setBS(() => selectedApps.remove(pkg)),
                       child: Icon(Icons.close,
                           size: 14,
-                          color: Colors.white.withValues(alpha: 0.3)),
+                          color: _textSoft),
                     ),
                   ],
                 ),
@@ -5914,20 +5373,20 @@ class _BlockerTab extends ConsumerWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
+              color: _bg,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              border: Border.all(color: _border),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.add_rounded,
-                    color: _desertSunset.withValues(alpha: 0.6), size: 18),
+                    color: _sage, size: 18),
                 const SizedBox(width: 8),
                 Text(
                   selectedApps.isEmpty ? 'Add Apps' : 'Change Apps',
                   style: TextStyle(
-                      color: _desertSunset.withValues(alpha: 0.7),
+                      color: _sageDark,
                       fontSize: 13,
                       fontWeight: FontWeight.w500),
                 ),
@@ -5943,7 +5402,7 @@ class _BlockerTab extends ConsumerWidget {
   void _showHardModeInfo(BuildContext ctx, VoidCallback onConfirm) {
     showModalBottomSheet(
       context: ctx,
-      backgroundColor: const Color(0xFF111111),
+      backgroundColor: _card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -5961,17 +5420,17 @@ class _BlockerTab extends ConsumerWidget {
               width: 56, height: 56,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFD93025).withValues(alpha: 0.08),
-                border: Border.all(color: const Color(0xFFD93025).withValues(alpha: 0.2)),
+                color: const Color(0xFFD93025).withValues(alpha: 0.06),
+                border: Border.all(color: const Color(0xFFD93025).withValues(alpha: 0.15)),
               ),
               child: Icon(Icons.lock_rounded, color: const Color(0xFFD93025).withValues(alpha: 0.7), size: 26),
             ),
             const SizedBox(height: 18),
-            const Text('Hard Mode',
-              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
+            Text('Hard Mode',
+              style: TextStyle(color: _text, fontSize: 20, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
             Text('This cannot be undone easily',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13)),
+              style: TextStyle(color: _textSoft, fontSize: 13)),
             const SizedBox(height: 24),
             // Rules
             _hardModeRule(Icons.block_rounded, "Can't disable or delete this rule"),
@@ -6011,7 +5470,7 @@ class _BlockerTab extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Center(
                   child: Text('Cancel',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 14)),
+                    style: TextStyle(color: _textSoft, fontSize: 14)),
                 ),
               ),
             ),
@@ -6027,15 +5486,15 @@ class _BlockerTab extends ConsumerWidget {
         Container(
           width: 36, height: 36,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.04),
+            color: _bg,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: Colors.white.withValues(alpha: 0.35), size: 18),
+          child: Icon(icon, color: _textSoft, size: 18),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(text,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
+            style: TextStyle(color: _text, fontSize: 14)),
         ),
       ],
     );
@@ -6049,7 +5508,7 @@ class _BlockerTab extends ConsumerWidget {
       children: [
         Text('Break Difficulty',
             style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                color: _textSoft, fontSize: 13)),
         const SizedBox(height: 8),
         Row(children: [
           // Easy
@@ -6061,34 +5520,34 @@ class _BlockerTab extends ConsumerWidget {
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: difficulty == 0
-                      ? _oasisGreen.withValues(alpha: 0.08)
-                      : Colors.white.withValues(alpha: 0.03),
+                      ? _sage.withValues(alpha: 0.08)
+                      : _bg,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: difficulty == 0
-                        ? _oasisGreen.withValues(alpha: 0.3)
-                        : Colors.white.withValues(alpha: 0.06),
+                        ? _sage.withValues(alpha: 0.3)
+                        : _border,
                   ),
                 ),
                 child: Column(children: [
                   Icon(Icons.lock_open_rounded,
                       size: 22,
                       color: difficulty == 0
-                          ? _oasisGreen
-                          : Colors.white.withValues(alpha: 0.3)),
+                          ? _sage
+                          : _textSoft),
                   const SizedBox(height: 6),
                   Text('Easy',
                       style: TextStyle(
                           color: difficulty == 0
-                              ? _oasisGreen
-                              : Colors.white.withValues(alpha: 0.5),
+                              ? _sageDark
+                              : _textSoft,
                           fontSize: 13,
                           fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
                   Text('Can take breaks\n& pause anytime',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.25),
+                          color: _textSoft,
                           fontSize: 10)),
                 ]),
               ),
@@ -6099,12 +5558,6 @@ class _BlockerTab extends ConsumerWidget {
           Expanded(
             child: GestureDetector(
               onTap: () {
-                final isPremium = ref.read(premiumProvider).isPremium;
-                if (!isPremium) {
-                  Navigator.pop(ctx);
-                  showPremiumPaywall(ctx, triggerFeature: 'Hard Block');
-                  return;
-                }
                 HapticFeedback.selectionClick();
                 // Show Hard Mode info page first
                 _showHardModeInfo(ctx, () => onChanged(1));
@@ -6114,13 +5567,13 @@ class _BlockerTab extends ConsumerWidget {
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: difficulty == 1
-                      ? _desertSunset.withValues(alpha: 0.08)
-                      : Colors.white.withValues(alpha: 0.03),
+                      ? _desertSunset.withValues(alpha: 0.06)
+                      : _bg,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: difficulty == 1
                         ? _desertSunset.withValues(alpha: 0.3)
-                        : Colors.white.withValues(alpha: 0.06),
+                        : _border,
                   ),
                 ),
                 child: Column(children: [
@@ -6129,37 +5582,21 @@ class _BlockerTab extends ConsumerWidget {
                         size: 22,
                         color: difficulty == 1
                             ? _desertSunset
-                            : Colors.white.withValues(alpha: 0.3)),
-                    if (!ref.read(premiumProvider).isPremium) ...[
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _sandGold.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text('PRO',
-                            style: TextStyle(
-                                color: _sandGold.withValues(alpha: 0.8),
-                                fontSize: 8,
-                                fontWeight: FontWeight.w700)),
-                      ),
-                    ],
+                            : _textSoft),
                   ]),
                   const SizedBox(height: 6),
                   Text('Hard',
                       style: TextStyle(
                           color: difficulty == 1
                               ? _desertSunset
-                              : Colors.white.withValues(alpha: 0.5),
+                              : _textSoft,
                           fontSize: 13,
                           fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
                   Text("Can't break, leave\nor uninstall app",
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.25),
+                          color: _textSoft,
                           fontSize: 10)),
                 ]),
               ),
@@ -6167,67 +5604,6 @@ class _BlockerTab extends ConsumerWidget {
           ),
         ]),
       ],
-    );
-  }
-}
-
-// ─── Block Type Chooser Option ──────────────────────────────────────────────
-
-class _BlockTypeOption extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  const _BlockTypeOption({
-    required this.icon, required this.color, required this.title,
-    required this.subtitle, required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () { HapticFeedback.lightImpact(); onTap(); },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.15)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color.withValues(alpha: 0.8), size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 2),
-                  Text(subtitle,
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.35),
-                          fontSize: 12)),
-                ],
-              ),
-            ),
-            Icon(Icons.arrow_forward_ios,
-                size: 14, color: Colors.white.withValues(alpha: 0.15)),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -6244,6 +5620,14 @@ class _DeactivateRuleConfirmScreen extends ConsumerStatefulWidget {
 }
 
 class _DeactivateRuleConfirmScreenState extends ConsumerState<_DeactivateRuleConfirmScreen> {
+  // ── Theme-aware colors ──
+  bool get _isLight => ref.watch(themeColorProvider).isLight;
+  Color get _bg => _isLight ? const Color(0xFFF5F5F5) : _ftBg;
+  Color get _card => _isLight ? Colors.black.withValues(alpha: 0.04) : _ftCard;
+  Color get _text => _isLight ? const Color(0xFF0D0D0D) : _ftText;
+  Color get _textSoft => _isLight ? const Color(0xFF6B6B6B) : _ftTextSoft;
+  Color get _border => _isLight ? Colors.black.withValues(alpha: 0.08) : _ftBorder;
+
   int _tapCount = 0;
   static const int _requiredTaps = 100;
 
@@ -6271,7 +5655,7 @@ class _DeactivateRuleConfirmScreenState extends ConsumerState<_DeactivateRuleCon
     final remaining = _requiredTaps - _tapCount;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
+      backgroundColor: _bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -6285,18 +5669,19 @@ class _DeactivateRuleConfirmScreenState extends ConsumerState<_DeactivateRuleCon
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.04),
+                        color: _card,
                         borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _border),
                       ),
                       child: Icon(Icons.arrow_back_ios_new,
-                          color: Colors.white.withValues(alpha: 0.4), size: 16),
+                          color: _textSoft, size: 16),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text('Deactivate Blocker',
                         style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: _text,
                             fontSize: 18,
                             fontWeight: FontWeight.w600)),
                   ),
@@ -6316,7 +5701,7 @@ class _DeactivateRuleConfirmScreenState extends ConsumerState<_DeactivateRuleCon
                       Container(
                         width: 80, height: 80,
                         decoration: BoxDecoration(
-                          color: _desertSunset.withValues(alpha: 0.08),
+                          color: _desertSunset.withValues(alpha: 0.06),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(Icons.shield_outlined, size: 40,
@@ -6326,7 +5711,7 @@ class _DeactivateRuleConfirmScreenState extends ConsumerState<_DeactivateRuleCon
                       Text(
                         'Stay focused?',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: _text,
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
                         ),
@@ -6336,7 +5721,7 @@ class _DeactivateRuleConfirmScreenState extends ConsumerState<_DeactivateRuleCon
                         'Deactivating "${widget.ruleName}" removes\nyour focus protection.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.4),
+                          color: _textSoft,
                           fontSize: 13,
                           height: 1.5,
                         ),
@@ -6349,7 +5734,7 @@ class _DeactivateRuleConfirmScreenState extends ConsumerState<_DeactivateRuleCon
                         child: LinearProgressIndicator(
                           value: progress,
                           minHeight: 8,
-                          backgroundColor: Colors.white.withValues(alpha: 0.06),
+                          backgroundColor: _border,
                           color: Color.lerp(
                             _desertSunset.withValues(alpha: 0.3),
                             _desertSunset.withValues(alpha: 0.8),
@@ -6361,7 +5746,7 @@ class _DeactivateRuleConfirmScreenState extends ConsumerState<_DeactivateRuleCon
                       Text(
                         '$remaining taps remaining',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.35),
+                          color: _textSoft,
                           fontSize: 12,
                         ),
                       ),
@@ -6377,13 +5762,13 @@ class _DeactivateRuleConfirmScreenState extends ConsumerState<_DeactivateRuleCon
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Color.lerp(
-                              _desertSunset.withValues(alpha: 0.06),
-                              _desertSunset.withValues(alpha: 0.25),
+                              _desertSunset.withValues(alpha: 0.04),
+                              _desertSunset.withValues(alpha: 0.18),
                               progress,
                             ),
                             border: Border.all(
                               color: Color.lerp(
-                                _desertSunset.withValues(alpha: 0.15),
+                                _desertSunset.withValues(alpha: 0.12),
                                 _desertSunset.withValues(alpha: 0.5),
                                 progress,
                               )!,
@@ -6418,7 +5803,7 @@ class _DeactivateRuleConfirmScreenState extends ConsumerState<_DeactivateRuleCon
                       Text(
                         'Tap the button $_requiredTaps times to deactivate',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: _textSoft,
                           fontSize: 11,
                           fontStyle: FontStyle.italic,
                         ),
@@ -6447,6 +5832,14 @@ class _DeleteRuleConfirmScreen extends ConsumerStatefulWidget {
 }
 
 class _DeleteRuleConfirmScreenState extends ConsumerState<_DeleteRuleConfirmScreen> {
+  // ── Theme-aware colors ──
+  bool get _isLight => ref.watch(themeColorProvider).isLight;
+  Color get _bg => _isLight ? const Color(0xFFF5F5F5) : _ftBg;
+  Color get _card => _isLight ? Colors.black.withValues(alpha: 0.04) : _ftCard;
+  Color get _text => _isLight ? const Color(0xFF0D0D0D) : _ftText;
+  Color get _textSoft => _isLight ? const Color(0xFF6B6B6B) : _ftTextSoft;
+  Color get _border => _isLight ? Colors.black.withValues(alpha: 0.08) : _ftBorder;
+
   int _tapCount = 0;
   static const int _requiredTaps = 100;
 
@@ -6474,7 +5867,7 @@ class _DeleteRuleConfirmScreenState extends ConsumerState<_DeleteRuleConfirmScre
     final remaining = _requiredTaps - _tapCount;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
+      backgroundColor: _bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -6488,18 +5881,19 @@ class _DeleteRuleConfirmScreenState extends ConsumerState<_DeleteRuleConfirmScre
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.04),
+                        color: _card,
                         borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _border),
                       ),
                       child: Icon(Icons.arrow_back_ios_new,
-                          color: Colors.white.withValues(alpha: 0.4), size: 16),
+                          color: _textSoft, size: 16),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text('Delete Rule',
                         style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: _text,
                             fontSize: 18,
                             fontWeight: FontWeight.w600)),
                   ),
@@ -6519,7 +5913,7 @@ class _DeleteRuleConfirmScreenState extends ConsumerState<_DeleteRuleConfirmScre
                       Container(
                         width: 80, height: 80,
                         decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.08),
+                          color: Colors.red.withValues(alpha: 0.06),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(Icons.warning_amber_rounded, size: 40,
@@ -6529,7 +5923,7 @@ class _DeleteRuleConfirmScreenState extends ConsumerState<_DeleteRuleConfirmScre
                       Text(
                         'Are you absolutely sure?',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: _text,
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
                         ),
@@ -6539,7 +5933,7 @@ class _DeleteRuleConfirmScreenState extends ConsumerState<_DeleteRuleConfirmScre
                         'Deleting "${widget.ruleName}" means removing\nyour focus protection.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.4),
+                          color: _textSoft,
                           fontSize: 13,
                           height: 1.5,
                         ),
@@ -6552,7 +5946,7 @@ class _DeleteRuleConfirmScreenState extends ConsumerState<_DeleteRuleConfirmScre
                         child: LinearProgressIndicator(
                           value: progress,
                           minHeight: 8,
-                          backgroundColor: Colors.white.withValues(alpha: 0.06),
+                          backgroundColor: _border,
                           color: Color.lerp(
                             Colors.red.withValues(alpha: 0.3),
                             Colors.red.withValues(alpha: 0.8),
@@ -6564,7 +5958,7 @@ class _DeleteRuleConfirmScreenState extends ConsumerState<_DeleteRuleConfirmScre
                       Text(
                         '$remaining taps remaining',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.35),
+                          color: _textSoft,
                           fontSize: 12,
                         ),
                       ),
@@ -6580,13 +5974,13 @@ class _DeleteRuleConfirmScreenState extends ConsumerState<_DeleteRuleConfirmScre
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Color.lerp(
-                              Colors.red.withValues(alpha: 0.06),
-                              Colors.red.withValues(alpha: 0.25),
+                              Colors.red.withValues(alpha: 0.04),
+                              Colors.red.withValues(alpha: 0.18),
                               progress,
                             ),
                             border: Border.all(
                               color: Color.lerp(
-                                Colors.red.withValues(alpha: 0.15),
+                                Colors.red.withValues(alpha: 0.12),
                                 Colors.red.withValues(alpha: 0.5),
                                 progress,
                               )!,
@@ -6621,7 +6015,7 @@ class _DeleteRuleConfirmScreenState extends ConsumerState<_DeleteRuleConfirmScre
                       Text(
                         'Tap the button $_requiredTaps times to delete',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: _textSoft,
                           fontSize: 11,
                           fontStyle: FontStyle.italic,
                         ),
@@ -6640,16 +6034,31 @@ class _DeleteRuleConfirmScreenState extends ConsumerState<_DeleteRuleConfirmScre
 
 // ─── Full-Screen App Selection ──────────────────────────────────────────────
 
-class _AppSelectionScreen extends StatefulWidget {
+class _AppSelectionScreen extends ConsumerStatefulWidget {
   final List<InstalledApp> allApps;
   final Set<String> preSelected;
   const _AppSelectionScreen({required this.allApps, required this.preSelected});
 
   @override
-  State<_AppSelectionScreen> createState() => _AppSelectionScreenState();
+  ConsumerState<_AppSelectionScreen> createState() => _AppSelectionScreenState();
 }
 
-class _AppSelectionScreenState extends State<_AppSelectionScreen> {
+class _AppSelectionScreenState extends ConsumerState<_AppSelectionScreen> {
+  // ── Theme-aware colors ──
+  bool get _isLight => ref.watch(themeColorProvider).isLight;
+  Color get _bg => _isLight ? const Color(0xFFF5F5F5) : _ftBg;
+  Color get _card => _isLight ? Colors.black.withValues(alpha: 0.04) : _ftCard;
+  Color get _text => _isLight ? const Color(0xFF0D0D0D) : _ftText;
+  Color get _textSoft => _isLight ? const Color(0xFF6B6B6B) : _ftTextSoft;
+  Color get _border => _isLight ? Colors.black.withValues(alpha: 0.08) : _ftBorder;
+  Color get _sage => ref.watch(themeColorProvider).color;
+  Color get _sageDark {
+    final themeColor = ref.watch(themeColorProvider).color;
+    final hslColor = HSLColor.fromColor(themeColor);
+    return hslColor
+        .withLightness((hslColor.lightness * 0.85).clamp(0.0, 1.0))
+        .toColor();
+  }
   late Set<String> _selected;
   String _searchQuery = '';
 
@@ -6672,7 +6081,7 @@ class _AppSelectionScreenState extends State<_AppSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: _bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -6685,11 +6094,12 @@ class _AppSelectionScreenState extends State<_AppSelectionScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.04),
+                      color: _card,
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _border),
                     ),
                     child: Icon(Icons.arrow_back_ios_new,
-                        color: Colors.white.withValues(alpha: 0.4), size: 16),
+                        color: _textSoft, size: 16),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -6699,12 +6109,12 @@ class _AppSelectionScreenState extends State<_AppSelectionScreen> {
                     children: [
                       Text('Select Apps',
                           style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
+                              color: _text,
                               fontSize: 18,
                               fontWeight: FontWeight.w600)),
                       Text('${_selected.length} app${_selected.length == 1 ? '' : 's'} selected',
                           style: TextStyle(
-                              color: _desertSunset.withValues(alpha: 0.6),
+                              color: _sage,
                               fontSize: 12)),
                     ],
                   ),
@@ -6718,12 +6128,12 @@ class _AppSelectionScreenState extends State<_AppSelectionScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: _sandGold.withValues(alpha: 0.2),
+                      color: _sage.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text('Done',
+                    child: Text('Done',
                         style: TextStyle(
-                            color: _sandGold,
+                            color: _sageDark,
                             fontSize: 13,
                             fontWeight: FontWeight.w600)),
                   ),
@@ -6735,19 +6145,23 @@ class _AppSelectionScreenState extends State<_AppSelectionScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: TextField(
                 onChanged: (v) => setState(() => _searchQuery = v),
-                style: const TextStyle(color: Colors.white, fontSize: 14),
+                style: TextStyle(color: _text, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: 'Search apps...',
-                  hintStyle:
-                      TextStyle(color: Colors.white.withValues(alpha: 0.25)),
-                  prefixIcon: Icon(Icons.search,
-                      color: Colors.white.withValues(alpha: 0.2)),
+                  hintStyle: TextStyle(color: _textSoft),
+                  prefixIcon: Icon(Icons.search, color: _textSoft),
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.05),
+                  fillColor: _card,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
+                      borderSide: BorderSide(color: _border)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: _border)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: _sage)),
                 ),
               ),
             ),
@@ -6763,7 +6177,7 @@ class _AppSelectionScreenState extends State<_AppSelectionScreen> {
                   }),
                   child: Text('Select All',
                       style: TextStyle(
-                          color: _sandGold.withValues(alpha: 0.5),
+                          color: _sage,
                           fontSize: 12)),
                 ),
                 const SizedBox(width: 16),
@@ -6771,7 +6185,7 @@ class _AppSelectionScreenState extends State<_AppSelectionScreen> {
                   onTap: () => setState(() => _selected.clear()),
                   child: Text('Clear',
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: _textSoft,
                           fontSize: 12)),
                 ),
               ]),
@@ -6800,12 +6214,12 @@ class _AppSelectionScreenState extends State<_AppSelectionScreen> {
                     title: Text(app.appName,
                         style: TextStyle(
                             color: isSelected
-                                ? Colors.white.withValues(alpha: 0.9)
-                                : Colors.white.withValues(alpha: 0.6),
+                                ? _text
+                                : _textSoft,
                             fontSize: 14)),
                     subtitle: Text(app.packageName,
                         style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.2),
+                            color: _textSoft,
                             fontSize: 10)),
                     trailing: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
@@ -6814,16 +6228,16 @@ class _AppSelectionScreenState extends State<_AppSelectionScreen> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(7),
                         color: isSelected
-                            ? _desertSunset.withValues(alpha: 0.2)
-                            : Colors.white.withValues(alpha: 0.04),
+                            ? _sage.withValues(alpha: 0.15)
+                            : _bg,
                         border: Border.all(
                             color: isSelected
-                                ? _desertSunset.withValues(alpha: 0.5)
-                                : Colors.white.withValues(alpha: 0.1)),
+                                ? _sage.withValues(alpha: 0.5)
+                                : _border),
                       ),
                       child: isSelected
-                          ? const Icon(Icons.check_rounded,
-                              color: _desertSunset, size: 16)
+                          ? Icon(Icons.check_rounded,
+                              color: _sage, size: 16)
                           : null,
                     ),
                   );
@@ -6841,7 +6255,7 @@ class _AppSelectionScreenState extends State<_AppSelectionScreen> {
 // 🔧 SHARED WIDGETS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-class _AddButton extends StatelessWidget {
+class _AddButton extends ConsumerWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
@@ -6849,7 +6263,8 @@ class _AddButton extends StatelessWidget {
   const _AddButton({required this.label, required this.icon, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sage = ref.watch(themeColorProvider).color;
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -6859,19 +6274,19 @@ class _AddButton extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: _sandGold.withValues(alpha: 0.08),
+          color: sage.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _sandGold.withValues(alpha: 0.15)),
+          border: Border.all(color: sage.withValues(alpha: 0.18)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 16, color: _sandGold.withValues(alpha: 0.6)),
+            Icon(icon, size: 16, color: sage.withValues(alpha: 0.7)),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                color: _sandGold.withValues(alpha: 0.7),
+                color: sage.withValues(alpha: 0.8),
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
@@ -6883,301 +6298,7 @@ class _AddButton extends StatelessWidget {
   }
 }
 
-class _PresetChip extends StatelessWidget {
-  final String label;
-  final String subtitle;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _PresetChip({
-    required this.label,
-    required this.subtitle,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? _sandGold.withValues(alpha: 0.12)
-              : Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? _sandGold.withValues(alpha: 0.35)
-                : Colors.white.withValues(alpha: 0.06),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? _sandGold : Colors.white.withValues(alpha: 0.5),
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 9,
-                color: isSelected
-                    ? _sandGold.withValues(alpha: 0.6)
-                    : Colors.white.withValues(alpha: 0.25),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CircleButton extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final double size;
-  final double iconSize;
-  final VoidCallback onTap;
-
-  const _CircleButton({
-    required this.icon,
-    required this.color,
-    this.size = 48,
-    this.iconSize = 24,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        child: Icon(icon, size: iconSize, color: Colors.white.withValues(alpha: 0.8)),
-      ),
-    );
-  }
-}
-
-class _LinkTodoRow extends StatelessWidget {
-  final String? activeTodoId;
-  final List<TodoItem> todos;
-  final void Function(String) onSelect;
-
-  const _LinkTodoRow({
-    this.activeTodoId,
-    required this.todos,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        showModalBottomSheet(
-          context: context,
-          backgroundColor: const Color(0xFF1A1A1A),
-          shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-          builder: (ctx) => SizedBox(
-            height: 300,
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: todos.length,
-              itemBuilder: (ctx, i) => ListTile(
-                dense: true,
-                leading: Icon(Icons.check_circle_outline,
-                    size: 16, color: _sandGold.withValues(alpha: 0.4)),
-                title: Text(todos[i].title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 13)),
-                onTap: () {
-                  onSelect(todos[i].id);
-                  Navigator.pop(ctx);
-                },
-              ),
-            ),
-          ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.link, size: 14,
-                color: activeTodoId != null
-                    ? _sandGold
-                    : Colors.white.withValues(alpha: 0.3)),
-            const SizedBox(width: 6),
-            Text(
-              activeTodoId != null ? 'Linked to task ✓' : 'Focus on a task',
-              style: TextStyle(
-                fontSize: 12,
-                color: activeTodoId != null
-                    ? _sandGold
-                    : Colors.white.withValues(alpha: 0.3),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Minimalist +/- setting row for focus settings
-class _SettingRow extends StatelessWidget {
-  final String label;
-  final int value;
-  final String suffix;
-  final Color color;
-  final VoidCallback onMinus;
-  final VoidCallback onPlus;
-
-  const _SettingRow({
-    required this.label,
-    required this.value,
-    required this.suffix,
-    required this.color,
-    required this.onMinus,
-    required this.onPlus,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(label,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
-          ),
-          GestureDetector(
-            onTap: () { HapticFeedback.selectionClick(); onMinus(); },
-            child: Container(
-              width: 32, height: 32,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.remove_rounded, color: Colors.white.withValues(alpha: 0.4), size: 16),
-            ),
-          ),
-          SizedBox(
-            width: 52,
-            child: Center(
-              child: Text(
-                suffix.isNotEmpty ? '$value$suffix' : '$value',
-                style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: () { HapticFeedback.selectionClick(); onPlus(); },
-            child: Container(
-              width: 32, height: 32,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.add_rounded, color: Colors.white.withValues(alpha: 0.4), size: 16),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SliderRow extends StatelessWidget {
-  final String label;
-  final int value;
-  final int min;
-  final int max;
-  final String suffix;
-  final Color color;
-  final void Function(int) onChanged;
-
-  const _SliderRow({
-    required this.label,
-    required this.value,
-    required this.min,
-    required this.max,
-    required this.suffix,
-    required this.color,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(label,
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6), fontSize: 12)),
-          ),
-          Expanded(
-            child: SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                activeTrackColor: color.withValues(alpha: 0.5),
-                inactiveTrackColor: Colors.white.withValues(alpha: 0.08),
-                thumbColor: color,
-                overlayColor: color.withValues(alpha: 0.1),
-                trackHeight: 3,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              ),
-              child: Slider(
-                value: value.toDouble(),
-                min: min.toDouble(),
-                max: max.toDouble(),
-                divisions: max - min,
-                onChanged: (v) => onChanged(v.round()),
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 40,
-            child: Text(
-              '$value$suffix',
-              textAlign: TextAlign.right,
-              style: TextStyle(color: color, fontSize: 12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WeekStrip extends StatefulWidget {
+class _WeekStrip extends ConsumerStatefulWidget {
   final DateTime selected;
   final Set<DateTime> eventDates;
   final void Function(DateTime) onSelect;
@@ -7189,10 +6310,10 @@ class _WeekStrip extends StatefulWidget {
   });
 
   @override
-  State<_WeekStrip> createState() => _WeekStripState();
+  ConsumerState<_WeekStrip> createState() => _WeekStripState();
 }
 
-class _WeekStripState extends State<_WeekStrip> {
+class _WeekStripState extends ConsumerState<_WeekStrip> {
   late ScrollController _scrollController;
   static const int _totalDays = 21; // 10 past + today + 10 future
   static const int _pastDays = 10;
@@ -7237,6 +6358,7 @@ class _WeekStripState extends State<_WeekStrip> {
 
   @override
   Widget build(BuildContext context) {
+    final accent = ref.watch(themeColorProvider).color;
     final today = DateTime.now();
     final startDate = DateTime(today.year, today.month, today.day)
         .subtract(Duration(days: _pastDays));
@@ -7269,12 +6391,12 @@ class _WeekStripState extends State<_WeekStrip> {
               margin: const EdgeInsets.symmetric(horizontal: 1),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? _sandGold.withValues(alpha: 0.15)
+                    ? accent.withValues(alpha: 0.15)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(10),
                 border: isToday && !isSelected
                     ? Border.all(
-                        color: _sandGold.withValues(alpha: 0.2))
+                        color: accent.withValues(alpha: 0.2))
                     : null,
               ),
               child: Column(
@@ -7285,7 +6407,7 @@ class _WeekStripState extends State<_WeekStrip> {
                     style: TextStyle(
                       fontSize: 10,
                       color: isSelected
-                          ? _sandGold
+                          ? accent
                           : Colors.white.withValues(alpha: 0.3),
                     ),
                   ),
@@ -7307,9 +6429,9 @@ class _WeekStripState extends State<_WeekStrip> {
                     Container(
                       width: 4,
                       height: 4,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _sandGold,
+                        color: accent,
                       ),
                     )
                   else
@@ -7319,52 +6441,6 @@ class _WeekStripState extends State<_WeekStrip> {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-class _TimePickerRow extends StatelessWidget {
-  final String label;
-  final DateTime time;
-  final VoidCallback onPick;
-
-  const _TimePickerRow({
-    required this.label,
-    required this.time,
-    required this.onPick,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: GestureDetector(
-        onTap: onPick,
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            children: [
-              Text(label,
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      fontSize: 12)),
-              const Spacer(),
-              Text(
-                DateFormat('EEE, MMM d · h:mm a').format(time),
-                style: const TextStyle(color: Colors.white, fontSize: 13),
-              ),
-              const SizedBox(width: 4),
-              Icon(Icons.chevron_right,
-                  size: 16,
-                  color: Colors.white.withValues(alpha: 0.3)),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -7456,11 +6532,11 @@ class _BlockerPermissionScreenState extends State<_BlockerPermissionScreen>
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.06),
+                    color: _ftCard,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(Icons.arrow_back_rounded,
-                      color: Colors.white.withValues(alpha: 0.6), size: 20),
+                      color: _ftTextSoft, size: 20),
                 ),
               ),
 
@@ -7487,7 +6563,7 @@ class _BlockerPermissionScreenState extends State<_BlockerPermissionScreen>
                 child: Text(
                   'Setup App Blocker',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.95),
+                    color: _ftText,
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
                   ),
@@ -7501,7 +6577,7 @@ class _BlockerPermissionScreenState extends State<_BlockerPermissionScreen>
                   'To block apps from all entry points —\nnotifications, recent apps & more',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
+                    color: _ftTextSoft,
                     fontSize: 14,
                     height: 1.5,
                   ),
@@ -7722,7 +6798,7 @@ class _PermissionCard extends StatelessWidget {
                       Text(
                         title,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: _ftText,
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),
@@ -7764,7 +6840,7 @@ class _PermissionCard extends StatelessWidget {
                   Text(
                     description,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.35),
+                      color: _ftTextSoft,
                       fontSize: 12,
                       height: 1.5,
                     ),

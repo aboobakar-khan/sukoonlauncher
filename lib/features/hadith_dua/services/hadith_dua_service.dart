@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/hadith_dua_models.dart';
 
@@ -44,9 +45,12 @@ class HadithDuaService {
 
   /// Fetch hadiths from a specific collection
   Future<List<Hadith>> fetchHadiths(HadithCollection collection) async {
+    // Cache key includes API key to support multiple languages per collection
+    final cacheKey = collection.apiKey;
+    
     // Return cached if available
-    if (_hadithCache.containsKey(collection.id)) {
-      return _hadithCache[collection.id]!;
+    if (_hadithCache.containsKey(cacheKey)) {
+      return _hadithCache[cacheKey]!;
     }
 
     try {
@@ -88,7 +92,7 @@ class HadithDuaService {
           }
         }
 
-        _hadithCache[collection.id] = hadiths;
+        _hadithCache[cacheKey] = hadiths;
         return hadiths;
       }
     } catch (e) {
@@ -100,20 +104,20 @@ class HadithDuaService {
   /// Download hadiths for offline storage - ALWAYS fetches fresh from API
   /// This bypasses the in-memory cache to ensure we get the actual data
   Future<List<Hadith>> downloadHadithsForOffline(HadithCollection collection, {Function(int, int)? onProgress}) async {
-    print('HadithDuaService: Starting FRESH download for ${collection.name}...');
+    debugPrint('HadithDuaService: Starting FRESH download for ${collection.name}...');
     
     try {
       final url = '/editions/${collection.apiKey}.min.json';
-      print('HadithDuaService: Fetching from $url');
+      debugPrint('HadithDuaService: Fetching from $url');
       
       final response = await _fetchWithFallback(url);
       
       if (response == null) {
-        print('HadithDuaService: Failed to fetch ${collection.name} - no response');
+        debugPrint('HadithDuaService: Failed to fetch ${collection.name} - no response');
         return [];
       }
       
-      print('HadithDuaService: Got response for ${collection.name}, parsing...');
+      debugPrint('HadithDuaService: Got response for ${collection.name}, parsing...');
       final data = json.decode(response.body) as Map<String, dynamic>;
       
       // Get sections for reference
@@ -127,7 +131,7 @@ class HadithDuaService {
       final hadithsData = data['hadiths'] as List<dynamic>? ?? [];
       final hadiths = <Hadith>[];
       
-      print('HadithDuaService: Parsing ${hadithsData.length} hadiths from ${collection.name}...');
+      debugPrint('HadithDuaService: Parsing ${hadithsData.length} hadiths from ${collection.name}...');
       
       for (int i = 0; i < hadithsData.length; i++) {
         final h = hadithsData[i];
@@ -156,13 +160,13 @@ class HadithDuaService {
         }
       }
 
-      // Also update in-memory cache
-      _hadithCache[collection.id] = hadiths;
+      // Also update in-memory cache (use apiKey for language-aware caching)
+      _hadithCache[collection.apiKey] = hadiths;
       
-      print('HadithDuaService: ✓ Downloaded ${hadiths.length} hadiths from ${collection.name}');
+      debugPrint('HadithDuaService: ✓ Downloaded ${hadiths.length} hadiths from ${collection.name}');
       return hadiths;
     } catch (e) {
-      print('HadithDuaService: Error downloading ${collection.name}: $e');
+      debugPrint('HadithDuaService: Error downloading ${collection.name}: $e');
       return [];
     }
   }
@@ -262,13 +266,20 @@ class HadithDuaService {
 
   String? _getSectionForHadith(String collectionId, int hadithNumber) {
     final sections = _sectionsCache[collectionId];
-    if (sections == null) return null;
+    if (sections == null || sections.isEmpty) return null;
     
-    // Find the section this hadith belongs to
-    if (sections.isNotEmpty) {
-      return sections.values.first; // Return first section name for now
-    }
+    // The API sections are keyed by book number (e.g. "1", "2", …).
+    // Each hadith has a `reference.book` field that indicates which book
+    // it belongs to. We can't determine book from hadith number alone
+    // without the reference, so return null here — the mapping is done
+    // in fromJson via sectionDetails + reference.book → chapterName.
     return null;
+  }
+
+  /// Get cached sections for a collection (book number → chapter name).
+  /// Returns null if not yet fetched.
+  Map<String, String>? getSections(String collectionId) {
+    return _sectionsCache[collectionId];
   }
 
   /// Get a random hadith from a collection
@@ -277,9 +288,9 @@ class HadithDuaService {
         ? HadithCollection.fromId(collectionId)
         : HadithCollection.collections[Random().nextInt(HadithCollection.collections.length)];
 
-    // Try to get from cache first
-    if (_hadithCache.containsKey(collection.id) && _hadithCache[collection.id]!.isNotEmpty) {
-      final hadiths = _hadithCache[collection.id]!;
+    // Try to get from cache first (use apiKey for language-aware lookup)
+    if (_hadithCache.containsKey(collection.apiKey) && _hadithCache[collection.apiKey]!.isNotEmpty) {
+      final hadiths = _hadithCache[collection.apiKey]!;
       return hadiths[Random().nextInt(hadiths.length)];
     }
 
@@ -749,6 +760,98 @@ class HadithDuaService {
       source: 'Tirmidhi',
     ),
     
+    // Ramadan - Fasting, Suhoor, Iftar, Laylatul Qadr
+    Dua(
+      id: 'ramadan_suhoor',
+      title: 'Dua for Suhoor',
+      arabicText: 'نَوَيْتُ صَوْمَ غَدٍ عَنْ أَدَاءِ فَرْضِ شَهْرِ رَمَضَانَ هَذِهِ السَّنَةِ لِلَّهِ تَعَالَى',
+      transliteration: "Nawaitu sauma ghadin 'an adaa'i fardi shahri Ramadana hadhihis-sanati lillahi ta'ala",
+      translation: "I intend to keep the fast for tomorrow in the month of Ramadan this year for Allah, the Most High.",
+      category: 'Ramadan',
+      source: 'Traditional',
+    ),
+    Dua(
+      id: 'ramadan_iftar',
+      title: 'Dua for Breaking Fast (Iftar)',
+      arabicText: 'اللَّهُمَّ إِنِّي لَكَ صُمْتُ وَبِكَ آمَنْتُ وَعَلَيْكَ تَوَكَّلْتُ وَعَلَى رِزْقِكَ أَفْطَرْتُ',
+      transliteration: "Allahumma inni laka sumtu wa bika amantu wa 'alayka tawakkaltu wa 'ala rizqika aftartu",
+      translation: "O Allah, I fasted for You and I believe in You, and I put my trust in You, and I break my fast with Your sustenance.",
+      category: 'Ramadan',
+      source: 'Abu Dawud',
+    ),
+    Dua(
+      id: 'ramadan_iftar_short',
+      title: 'Short Iftar Dua',
+      arabicText: 'ذَهَبَ الظَّمَأُ وَابْتَلَّتِ الْعُرُوقُ وَثَبَتَ الْأَجْرُ إِنْ شَاءَ اللَّهُ',
+      transliteration: "Dhahaba al-zama'u, wabtallatil-'uruqu, wa thabatal-ajru in sha Allah",
+      translation: "Thirst has gone, the veins are moistened, and the reward is confirmed, if Allah wills.",
+      category: 'Ramadan',
+      source: 'Abu Dawud',
+    ),
+    Dua(
+      id: 'ramadan_before_iftar',
+      title: 'Before Breaking Fast',
+      arabicText: 'اللَّهُمَّ لَكَ صُمْتُ وَعَلَى رِزْقِكَ أَفْطَرْتُ',
+      transliteration: "Allahumma laka sumtu wa 'ala rizqika aftartu",
+      translation: "O Allah, for You I have fasted and with Your provision I break my fast.",
+      category: 'Ramadan',
+      source: 'Abu Dawud',
+    ),
+    Dua(
+      id: 'ramadan_laylatul_qadr_1',
+      title: 'Laylatul Qadr - Best Dua',
+      arabicText: 'اللَّهُمَّ إِنَّكَ عَفُوٌّ تُحِبُّ الْعَفْوَ فَاعْفُ عَنِّي',
+      transliteration: "Allahumma innaka 'afuwwun tuhibbul-'afwa fa'fu 'anni",
+      translation: "O Allah, You are Forgiving and love forgiveness, so forgive me.",
+      category: 'Ramadan',
+      source: 'Tirmidhi, Ibn Majah',
+    ),
+    Dua(
+      id: 'ramadan_general_1',
+      title: 'During Ramadan',
+      arabicText: 'اللَّهُمَّ بَلِّغْنَا رَمَضَانَ',
+      transliteration: "Allahumma ballighna Ramadan",
+      translation: "O Allah, allow us to reach Ramadan.",
+      category: 'Ramadan',
+      source: 'Traditional',
+    ),
+    Dua(
+      id: 'ramadan_acceptance',
+      title: 'For Accepted Fasting',
+      arabicText: 'اللَّهُمَّ تَقَبَّلْ مِنَّا صِيَامَنَا وَقِيَامَنَا',
+      transliteration: "Allahumma taqabbal minna siyamana wa qiyamana",
+      translation: "O Allah, accept from us our fasting and our standing in prayer.",
+      category: 'Ramadan',
+      source: 'Traditional',
+    ),
+    Dua(
+      id: 'ramadan_taraweeh',
+      title: 'After Taraweeh Prayer',
+      arabicText: 'سُبْحَانَ ذِي الْمُلْكِ وَالْمَلَكُوتِ، سُبْحَانَ ذِي الْعِزَّةِ وَالْعَظَمَةِ وَالْهَيْبَةِ وَالْقُدْرَةِ وَالْكِبْرِيَاءِ وَالْجَبَرُوتِ',
+      transliteration: "Subhana dhil-mulki wal-malakut, subhana dhil-'izzati wal-'azamati wal-haybati wal-qudratti wal-kibriya'i wal-jabarut",
+      translation: "Glory be to the Possessor of the dominion and sovereignty. Glory be to the Possessor of might, greatness, magnificence, power, pride, and majesty.",
+      category: 'Ramadan',
+      source: 'Nasai',
+    ),
+    Dua(
+      id: 'ramadan_forgiveness',
+      title: 'Seeking Forgiveness in Ramadan',
+      arabicText: 'اللَّهُمَّ اغْفِرْ لِي ذَنْبِي كُلَّهُ، دِقَّهُ وَجِلَّهُ، وَأَوَّلَهُ وَآخِرَهُ، وَعَلَانِيَتَهُ وَسِرَّهُ',
+      transliteration: "Allahummaghfir li dhanbi kullahu, diqqahu wa jillahu, wa awwalahu wa akhirahu, wa 'alaniyatahu wa sirrahu",
+      translation: "O Allah, forgive all my sins, the small and the great, the first and the last, the open and the secret.",
+      category: 'Ramadan',
+      source: 'Muslim',
+    ),
+    Dua(
+      id: 'ramadan_last_ten_nights',
+      title: 'Last Ten Nights of Ramadan',
+      arabicText: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ مِنْ خَيْرِ هَذِهِ اللَّيْلَةِ وَأَعُوذُ بِكَ مِنْ شَرِّهَا',
+      transliteration: "Allahumma inni as'aluka min khayri hadhihil-laylati wa a'udhu bika min sharriha",
+      translation: "O Allah, I ask You for the good of this night and seek refuge in You from its evil.",
+      category: 'Ramadan',
+      source: 'Traditional',
+    ),
+    
     // Parents
     Dua(
       id: 'parents_1',
@@ -823,6 +926,191 @@ class HadithDuaService {
       translation: "O Allah, I ask You from Your bounty.",
       category: 'General',
       source: 'Muslim',
+    ),
+    
+    // After Salah (Fard) - To be recited after every obligatory prayer
+    Dua(
+      id: 'after_salah_1',
+      title: 'Takbir after Tasleem',
+      arabicText: 'اللَّهُ أَكْبَـرُ',
+      transliteration: "Allah-hu Akbar",
+      translation: "Allah is the greatest.",
+      category: 'After Salah',
+      source: 'Al-Bukhari, Muslim 3/1685 At Trimidi 2/1038 & Ahmed 5/218',
+      repeatCount: 1,
+    ),
+    Dua(
+      id: 'after_salah_2',
+      title: 'Istighfar (3 times)',
+      arabicText: 'أَسْتَغْفِرُ اللَّهَ',
+      transliteration: "Astaghfirullah",
+      translation: "I seek forgiveness from Allah.",
+      category: 'After Salah',
+      source: 'Muslim',
+      repeatCount: 3,
+    ),
+    Dua(
+      id: 'after_salah_3',
+      title: 'Peace and Glory',
+      arabicText: 'اللَّهُمَّ أَنْتَ السَّلَامُ وَمِنْكَ السَّلَامُ، تَبَارَكْتَ يَا ذَا الْجَلَالِ وَالْإِكْرَامِ',
+      transliteration: "Allahumma antas-salam wa minkas-salam, tabarakta ya dhal-jalali wal-ikram",
+      translation: "O Allah, You are Peace and from You comes peace. Blessed are You, O Owner of majesty and honor.",
+      category: 'After Salah',
+      source: 'Muslim',
+    ),
+    Dua(
+      id: 'after_salah_4',
+      title: 'Tawheed Declaration',
+      arabicText: 'لَا إِلَٰهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
+      transliteration: "La ilaha illallahu wahdahu la shareeka lahu, lahul-mulku wa lahul-hamdu wa huwa 'ala kulli shay'in qadeer",
+      translation: "There is no god but Allah alone, without any partner. To Him belongs the dominion, and to Him belongs all praise, and He has power over all things.",
+      category: 'After Salah',
+      source: 'Muslim',
+    ),
+    Dua(
+      id: 'after_salah_5',
+      title: 'Nullifying Dua',
+      arabicText: 'اللَّهُمَّ لَا مَانِعَ لِمَا أَعْطَيْتَ، وَلَا مُعْطِيَ لِمَا مَنَعْتَ، وَلَا يَنْفَعُ ذَا الْجَدِّ مِنْكَ الْجَدُّ',
+      transliteration: "Allahumma la mani'a lima a'tayta, wa la mu'tiya lima mana'ta, wa la yanfa'u dhal-jaddi minkal-jadd",
+      translation: "O Allah, there is no preventer of what You give, and no giver of what You prevent. And the might of the mighty person cannot benefit him against You.",
+      category: 'After Salah',
+      source: 'Bukhari, Muslim',
+    ),
+    Dua(
+      id: 'after_salah_6',
+      title: 'Seeking Forgiveness and Help',
+      arabicText: 'لَا إِلَٰهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ، لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ، لَا إِلَٰهَ إِلَّا اللَّهُ وَلَا نَعْبُدُ إِلَّا إِيَّاهُ، لَهُ النِّعْمَةُ وَلَهُ الْفَضْلُ وَلَهُ الثَّنَاءُ الْحَسَنُ، لَا إِلَٰهَ إِلَّا اللَّهُ مُخْلِصِينَ لَهُ الدِّينَ وَلَوْ كَرِهَ الْكَافِرُونَ',
+      transliteration: "La ilaha illallahu wahdahu la shareeka lahu, lahul-mulku wa lahul-hamdu wa huwa 'ala kulli shay'in qadeer. La hawla wa la quwwata illa billah. La ilaha illallahu wa la na'budu illa iyyah. Lahun-ni'matu wa lahul-fadlu wa lahuth-thana'ul-hasan. La ilaha illallahu mukhliseena lahud-deena wa law karihal-kafiroon",
+      translation: "There is no god but Allah alone, without partner. To Him belongs the dominion and to Him belongs all praise, and He has power over all things. There is no power and no might except with Allah. There is no god but Allah, and we worship none except Him. To Him belong blessings and grace and fine praise. There is no god but Allah - we are sincere in making our religious devotion to Him, even though the disbelievers may detest it.",
+      category: 'After Salah',
+      source: 'Muslim',
+    ),
+    Dua(
+      id: 'after_salah_7',
+      title: 'Subhanallah (33 times)',
+      arabicText: 'سُبْحَانَ اللَّهِ',
+      transliteration: "SubhanAllah",
+      translation: "Glory be to Allah.",
+      category: 'After Salah',
+      source: 'Muslim',
+      repeatCount: 33,
+    ),
+    Dua(
+      id: 'after_salah_8',
+      title: 'Alhamdulillah (33 times)',
+      arabicText: 'الْحَمْدُ لِلَّهِ',
+      transliteration: "Alhamdulillah",
+      translation: "All praise is due to Allah.",
+      category: 'After Salah',
+      source: 'Muslim',
+      repeatCount: 33,
+    ),
+    Dua(
+      id: 'after_salah_9',
+      title: 'Allahu Akbar (33 times)',
+      arabicText: 'اللَّهُ أَكْبَرُ',
+      transliteration: "Allahu Akbar",
+      translation: "Allah is the Greatest.",
+      category: 'After Salah',
+      source: 'Muslim',
+      repeatCount: 33,
+    ),
+    Dua(
+      id: 'after_salah_10',
+      title: 'Completing to 100',
+      arabicText: 'لَا إِلَٰهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
+      transliteration: "La ilaha illallahu wahdahu la shareeka lahu, lahul-mulku wa lahul-hamdu wa huwa 'ala kulli shay'in qadeer",
+      translation: "There is no god but Allah alone, without any partner. To Him belongs the dominion and to Him belongs all praise, and He has power over all things.",
+      category: 'After Salah',
+      source: 'Muslim',
+      repeatCount: 1,
+      benefit: "Whoever says these after every Fard Salah, his sins will be forgiven even if they are like the foam of the sea.",
+    ),
+    Dua(
+      id: 'after_salah_11',
+      title: 'Ayatul Kursi',
+      arabicText: 'اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ ۚ لَّهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ ۗ مَن ذَا الَّذِي يَشْفَعُ عِندَهُ إِلَّا بِإِذْنِهِ ۚ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ ۖ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ ۚ وَسِعَ كُرْسِيُّهُ السَّمَاوَاتِ وَالْأَرْضَ ۖ وَلَا يَئُودُهُ حِفْظُهُمَا ۚ وَهُوَ الْعَلِيُّ الْعَظِيمُ',
+      transliteration: "Allahu la ilaha illa huwal-hayyul-qayyum, la ta'khudhuhu sinatun wa la nawm, lahu ma fis-samawati wa ma fil-ard, man dhal-ladhi yashfa'u 'indahu illa bi-idhnih, ya'lamu ma bayna aydeehim wa ma khalfahum, wa la yuheetoona bi-shay'in min 'ilmihi illa bima sha'a, wasi'a kursiyyuhus-samawati wal-ard, wa la ya'uduhu hifdhuhuma, wa huwal-'aliyyul-'adheem",
+      translation: "Allah - there is no deity except Him, the Ever-Living, the Sustainer of existence. Neither drowsiness overtakes Him nor sleep. To Him belongs whatever is in the heavens and whatever is on the earth. Who is it that can intercede with Him except by His permission? He knows what is before them and what will be after them, and they encompass not a thing of His knowledge except for what He wills. His Kursi extends over the heavens and the earth, and their preservation tires Him not. And He is the Most High, the Most Great.",
+      category: 'After Salah',
+      source: 'Quran 2:255',
+      benefit: "Whoever recites this after every Fard Salah, nothing prevents him from entering Paradise except death.",
+    ),
+    
+    // Darood & Salawat - Special category with count functionality
+    Dua(
+      id: 'darood_1',
+      title: 'Darood Ibrahim',
+      arabicText: 'اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ، كَمَا صَلَّيْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ، إِنَّكَ حَمِيدٌ مَجِيدٌ، اللَّهُمَّ بَارِكْ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ، كَمَا بَارَكْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ، إِنَّكَ حَمِيدٌ مَجِيدٌ',
+      transliteration: "Allahumma salli 'ala Muhammadin wa 'ala ali Muhammad, kama sallayta 'ala Ibrahima wa 'ala ali Ibrahim, innaka Hamidun Majid. Allahumma barik 'ala Muhammadin wa 'ala ali Muhammad, kama barakta 'ala Ibrahima wa 'ala ali Ibrahim, innaka Hamidun Majid",
+      translation: "O Allah, send prayers upon Muhammad and the family of Muhammad, as You sent prayers upon Ibrahim and the family of Ibrahim; You are indeed Worthy of Praise, Full of Glory. O Allah, send blessings upon Muhammad and the family of Muhammad, as You sent blessings upon Ibrahim and the family of Ibrahim; You are indeed Worthy of Praise, Full of Glory.",
+      category: 'Darood & Salawat',
+      source: 'Bukhari, Muslim',
+      benefit: "Sending blessings upon the Prophet ﷺ brings immense reward. The Prophet ﷺ said: 'Whoever sends blessings upon me once, Allah will send blessings upon him ten times.'",
+    ),
+    Dua(
+      id: 'darood_2',
+      title: 'Simple Salawat',
+      arabicText: 'صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ',
+      transliteration: "Sallallahu 'alayhi wa sallam",
+      translation: "May Allah's peace and blessings be upon him.",
+      category: 'Darood & Salawat',
+      source: 'Traditional',
+      benefit: "The shortest and most common form of sending blessings. Allah commanded us to send blessings upon the Prophet ﷺ.",
+    ),
+    Dua(
+      id: 'darood_3',
+      title: 'Darood Lakhi (100,000 rewards)',
+      arabicText: 'اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ عَبْدِكَ وَنَبِيِّكَ وَرَسُولِكَ النَّبِيِّ الْأُمِّيِّ وَعَلَى آلِهِ وَصَحْبِهِ وَسَلِّمْ تَسْلِيمًا',
+      transliteration: "Allahumma salli 'ala Muhammadin 'abdika wa nabiyyika wa rasulikan-nabiyyil-ummiyyi wa 'ala alihi wa sahbihi wa sallim taslima",
+      translation: "O Allah, send blessings upon Muhammad, Your servant, Your Prophet, Your Messenger, the unlettered Prophet, and upon his family and companions, and send abundant peace.",
+      category: 'Darood & Salawat',
+      source: 'Tirmidhi',
+      benefit: "Reciting this once equals the reward of reciting regular Durood 100,000 times. Especially beneficial on Friday.",
+    ),
+    Dua(
+      id: 'darood_4',
+      title: 'Durood Tunajjina (Dua of Safety)',
+      arabicText: 'اللَّهُمَّ صَلِّ عَلَى سَيِّدِنَا مُحَمَّدٍ صَلَاةً تُنْجِينَا بِهَا مِنْ جَمِيعِ الْأَهْوَالِ وَالْآفَاتِ، وَتَقْضِي لَنَا بِهَا جَمِيعَ الْحَاجَاتِ، وَتُطَهِّرُنَا بِهَا مِنْ جَمِيعِ السَّيِّئَاتِ، وَتَرْفَعُنَا بِهَا عِنْدَكَ أَعْلَى الدَّرَجَاتِ، وَتُبَلِّغُنَا بِهَا أَقْصَى الْغَايَاتِ مِنْ جَمِيعِ الْخَيْرَاتِ فِي الْحَيَاةِ وَبَعْدَ الْمَمَاتِ',
+      transliteration: "Allahumma salli 'ala sayyidina Muhammadin salatan tunajjina biha min jami'il-ahwali wal-afat, wa taqdi lana biha jami'al-hajat, wa tutahhiruna biha min jami'is-sayyi'at, wa tarfa'una biha 'indaka a'lad-darajat, wa tuballighuna biha aqsal-ghayati min jami'il-khayrati fil-hayati wa ba'dal-mamat",
+      translation: "O Allah, send blessings upon our master Muhammad, a prayer by means of which You will rescue us from all fears and calamities, fulfill all our needs, purify us from all evils, raise us to the highest ranks in Your presence, and cause us to reach the ultimate goal of all goodness in this life and after death.",
+      category: 'Darood & Salawat',
+      source: 'Traditional',
+      benefit: "A comprehensive Durood that encompasses protection, fulfillment of needs, purification, and high ranks. Recite 10 times daily for maximum benefit.",
+      repeatCount: 10,
+    ),
+    Dua(
+      id: 'darood_5',
+      title: 'Durood Nariya (Dua of Light)',
+      arabicText: 'اللَّهُمَّ صَلِّ صَلَاةً كَامِلَةً وَسَلِّمْ سَلَامًا تَامًّا عَلَى سَيِّدِنَا مُحَمَّدٍ الَّذِي تَنْحَلُّ بِهِ الْعُقَدُ وَتَنْفَرِجُ بِهِ الْكُرَبُ وَتُقْضَى بِهِ الْحَوَائِجُ وَتُنَالُ بِهِ الرَّغَائِبُ وَحُسْنُ الْخَوَاتِمِ وَيُسْتَسْقَى الْغَمَامُ بِوَجْهِهِ الْكَرِيمِ وَعَلَى آلِهِ وَصَحْبِهِ فِي كُلِّ لَمْحَةٍ وَنَفَسٍ بِعَدَدِ كُلِّ مَعْلُومٍ لَكَ',
+      transliteration: "Allahumma salli salatan kamilatan wa sallim salaman tamman 'ala sayyidina Muhammadil-ladhi tanhullu bihil-'uqadu wa tanfariju bihil-kurabu wa tuqda bihil-hawa'iju wa tunalu bihir-ragha'ibu wa husnul-khawatimi wa yustasqal-ghamamu bi-wajhihil-karimi wa 'ala alihi wa sahbihi fi kulli lamhatin wa nafasin bi-'adadi kulli ma'lumin lak",
+      translation: "O Allah, send complete blessings and perfect peace upon our master Muhammad, by whom difficulties are solved, anxieties are removed, needs are fulfilled, and desires are attained, and through whom good endings are granted and rain is sought by virtue of his noble countenance, and upon his family and companions, in every moment and breath, by the number of all that is known to You.",
+      category: 'Darood & Salawat',
+      source: "Traditional (from Dala'il al-Khayrat)",
+      benefit: "Known as the 'Durood of Light' - extremely powerful for removing difficulties and fulfilling needs. Recite 4444 times for opening of closed matters, or 11 times daily for general blessings.",
+      repeatCount: 11,
+    ),
+    Dua(
+      id: 'darood_6',
+      title: 'Friday Special Darood',
+      arabicText: 'اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ',
+      transliteration: "Allahumma salli 'ala Muhammadin wa 'ala ali Muhammad",
+      translation: "O Allah, send blessings upon Muhammad and the family of Muhammad.",
+      category: 'Darood & Salawat',
+      source: 'Abu Dawud, Nasai',
+      benefit: "The Prophet ﷺ said: 'Send abundant blessings upon me on Friday, for it is witnessed by the angels.' Sending Durood on Friday is especially meritorious. Recommended: 80-100 times on Friday.",
+      repeatCount: 80,
+    ),
+    Dua(
+      id: 'darood_7',
+      title: 'Morning & Evening Darood',
+      arabicText: 'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
+      transliteration: "Allahumma salli wa sallim 'ala nabiyyina Muhammad",
+      translation: "O Allah, send blessings and peace upon our Prophet Muhammad.",
+      category: 'Darood & Salawat',
+      source: 'Abu Dawud',
+      benefit: "The Prophet ﷺ said: 'Whoever sends blessings upon me ten times in the morning and ten times in the evening will attain my intercession on the Day of Resurrection.'",
+      repeatCount: 10,
     ),
   ];
 }

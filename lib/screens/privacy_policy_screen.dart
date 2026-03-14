@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/swipe_back_wrapper.dart';
 
 /// Privacy Policy Screen - Full privacy policy for Play Store compliance
 class PrivacyPolicyScreen extends StatelessWidget {
@@ -6,7 +7,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return SwipeBackWrapper(
+      child: Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
@@ -21,6 +23,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -51,102 +54,151 @@ class PrivacyPolicyScreen extends StatelessWidget {
   }
 
   Widget _buildPrivacyPolicyContent(BuildContext context) {
-    final today = DateTime.now();
-    final formattedDate = '${today.day}/${today.month}/${today.year}';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSection(
-          title: 'Last updated: $formattedDate',
+          title: 'Last updated: 2 March 2026',
           content:
-              'Sukoon Launcher ("we", "our", or "the app") is a peaceful Islamic launcher application. Your privacy is very important to us. This Privacy Policy explains how we handle information when you use our application.\n\nBy using this app, you agree to the practices described in this policy.',
+              'Sukoon Launcher ("we", "our", or "the app") is a peaceful Islamic launcher application designed for a focused, mindful digital life. Your privacy is very important to us. This Privacy Policy explains how we handle information when you use our application.\n\nBy using this app, you agree to the practices described in this policy.',
         ),
         const SizedBox(height: 24),
         _buildSection(
           title: '1. Information We Collect',
           content:
               '• We do not collect, store, or sell any personal data.\n\n'
-              '• All user preferences such as wallpaper selection, favorites, and settings are stored locally on your device only.\n\n'
-              '• We do not require you to create an account.',
+              '• All user preferences — including wallpaper selection, favorites, hidden apps, prayer records, dhikr counts, Pomodoro history, app block rules, fasting logs, charity logs, and settings — are stored locally on your device only using Hive local storage.\n\n'
+              '• We do not require you to create an account.\n\n'
+              '• No analytics, tracking, or telemetry data is collected or transmitted.',
         ),
         const SizedBox(height: 24),
         _buildSection(
-          title: '2. Microphone & Voice Recognition',
+          title: '2. Location Access',
           content:
-              '• The app uses the device microphone only when you manually activate the voice unlock feature.\n\n'
-              '• The microphone is used temporarily to recognize spoken app names.\n\n'
-              '• Audio data is not recorded, stored, transmitted, or shared.\n\n'
-              '• Voice processing is handled by the device or operating system\'s speech recognition service.\n\n'
-              '• The microphone is never accessed in the background.',
+              '• The app requests location permission (GPS and network) solely to calculate accurate prayer times (Salah times) and Qibla direction based on your geographic coordinates.\n\n'
+              '• Location data is processed on-device only and is never transmitted, stored on any server, or shared with third parties.\n\n'
+              '• Granting location permission is optional — you can manually set your location in settings if preferred.',
         ),
         const SizedBox(height: 24),
         _buildSection(
           title: '3. App Usage Access Permission',
           content:
-              '• If you enable smart features such as automatic hiding of unused apps, the app may request Usage Access permission.\n\n'
-              '• Usage data is processed only on your device.\n\n'
-              '• We do not collect, store, or transmit app usage information.\n\n'
-              '• This data is used only to improve launcher functionality (e.g., hiding unused apps).\n\n'
-              '• Granting this permission is optional.',
+              '• If you enable the Screen Time Tracker or App Blocker features, the app may request Usage Access permission.\n\n'
+              '• Usage data is processed only on your device to show you how long you spend in each app and to enforce time limits you set.\n\n'
+              '• We do not collect, store, or transmit app usage information to any server.\n\n'
+              '• Granting this permission is entirely optional.',
         ),
         const SizedBox(height: 24),
         _buildSection(
-          title: '4. Installed Apps Information',
+          title: '4. Notification Access',
           content:
-              '• The app accesses the list of installed applications on your device in order to display and launch apps as part of the launcher functionality.\n\n'
+              '• If you enable the Notification Filter feature, the app requests Notification Listener permission to capture and display your notifications inside the launcher.\n\n'
+              '• Notification data is cached locally on your device and never transmitted externally.\n\n'
+              '• This feature allows you to manage, filter, and dismiss notifications without leaving the launcher.\n\n'
+              '• Granting this permission is entirely optional.',
+        ),
+        const SizedBox(height: 24),
+        _buildSection(
+          title: '5. Installed Apps Information',
+          content:
+              '• The app accesses the list of installed applications on your device (QUERY_ALL_PACKAGES) in order to display, search, and launch apps as part of the launcher functionality.\n\n'
               '• This information remains on your device and is not transmitted or shared.',
         ),
         const SizedBox(height: 24),
         _buildSection(
-          title: '5. Qur\'an Content',
+          title: '6. Alarms, Notifications & Background Services',
           content:
-              '• The app displays Qur\'an verses for inspiration and reading purposes.\n\n'
-              '• Qur\'an text is stored locally for offline use.\n\n'
+              '• The app uses exact alarm scheduling (SCHEDULE_EXACT_ALARM) to deliver Prayer Alarms (Salah Wake) at precise prayer times.\n\n'
+              '• The app uses a foreground service for the App Blocker feature to monitor and enforce app time limits you configure.\n\n'
+              '• The app may show notifications for prayer reminders, Pomodoro timer completion, and app time-limit alerts.\n\n'
+              '• Wake Lock permission is used to ensure alarm sounds play reliably even when the screen is off.\n\n'
+              '• Boot Completed permission is used to restart the App Blocker service after device reboot.\n\n'
+              '• All alarm and notification data is stored and processed locally.',
+        ),
+        const SizedBox(height: 24),
+        _buildSection(
+          title: '7. Overlay & Do Not Disturb',
+          content:
+              '• The app uses System Alert Window (overlay) permission for the Muraqaba feature, which displays a full-screen focus overlay and blocks notification bar pull-down during focus sessions.\n\n'
+              '• Do Not Disturb (DND) access is requested to silence notifications during Muraqaba sessions.\n\n'
+              '• These permissions are only used when you actively start a Muraqaba session.\n\n'
+              '• Granting these permissions is entirely optional.',
+        ),
+        const SizedBox(height: 24),
+        _buildSection(
+          title: '8. Device Admin',
+          content:
+              '• The app optionally requests Device Admin privilege solely for the double-tap-to-lock-screen feature.\n\n'
+              '• This permission is never used to control, wipe, or modify your device in any other way.\n\n'
+              '• You can revoke Device Admin at any time in Android Settings.',
+        ),
+        const SizedBox(height: 24),
+        _buildSection(
+          title: '9. Qur\'an & Islamic Content',
+          content:
+              '• The app displays Qur\'an verses, Hadith, Duas, and Adhkar for inspiration and reading purposes.\n\n'
+              '• All Islamic content is stored locally for offline use.\n\n'
               '• Translation sources are credited in the app\'s Credits section.\n\n'
               '• We do not track or collect reading activity.',
         ),
         const SizedBox(height: 24),
         _buildSection(
-          title: '6. In-App Purchases',
+          title: '10. Voluntary Donations',
           content:
-              '• The app may offer optional in-app purchases to unlock premium features.\n\n'
-              '• Payments are processed securely by Google Play.\n\n'
-              '• We do not store or process payment information.',
+              '• The app offers optional voluntary donations to support development.\n\n'
+              '• Donations are processed securely by Razorpay, a trusted payment gateway.\n\n'
+              '• We do not store, access, or process any payment card or billing information — all transactions are handled entirely by Razorpay.\n\n'
+              '• Donating is completely optional and does not unlock or restrict any features — the entire app is free.',
         ),
         const SizedBox(height: 24),
         _buildSection(
-          title: '7. Third-Party Services',
+          title: '11. Internet Access',
+          content:
+              '• Internet permission is used for:\n\n'
+              '  – Fetching prayer times from the Aladhan API based on your location.\n\n'
+              '  – Processing voluntary donations via Razorpay.\n\n'
+              '  – No personal data is ever transmitted over the network.',
+        ),
+        const SizedBox(height: 24),
+        _buildSection(
+          title: '12. Storage & Media Access',
+          content:
+              '• The app may request storage/media access to let you select custom alarm sounds from your device.\n\n'
+              '• Files are read locally and never uploaded or transmitted.',
+        ),
+        const SizedBox(height: 24),
+        _buildSection(
+          title: '13. Third-Party Services',
           content:
               'The app may use trusted third-party services such as:\n\n'
-              '• Google Play Services (for purchases and system integration)\n\n'
-              '• Android speech recognition services\n\n'
-              'These services operate under their own privacy policies.',
+              '• Aladhan API (for prayer time calculation)\n\n'
+              '• Razorpay (for voluntary donation processing)\n\n'
+              'These services operate under their own privacy policies. No personal data is shared with any third-party service.',
         ),
         const SizedBox(height: 24),
         _buildSection(
-          title: '8. Children\'s Privacy',
+          title: '14. Children\'s Privacy',
           content:
               'This app does not knowingly collect any personal information from children under the age of 13.',
         ),
         const SizedBox(height: 24),
         _buildSection(
-          title: '9. Data Security',
+          title: '15. Data Security',
           content:
-              'All user data and settings are stored locally on the device. We take reasonable steps to protect the app from unauthorized access.',
+              'All user data and settings are stored locally on the device using encrypted local storage. No data is transmitted to external servers. We take reasonable steps to protect the app from unauthorized access.',
         ),
         const SizedBox(height: 24),
         _buildSection(
-          title: '10. Changes to This Policy',
+          title: '16. Changes to This Policy',
           content:
-              'We may update this Privacy Policy from time to time. Any changes will be reflected on this page.',
+              'We may update this Privacy Policy from time to time. Any changes will be reflected on this page with an updated date.',
         ),
         const SizedBox(height: 24),
         _buildSection(
-          title: '11. Contact Us',
+          title: '17. Contact Us',
           content:
               'If you have any questions about this Privacy Policy, you may contact us at:\n\n'
-              '📧 [sukoonlauncher@gmail.com]',
+              '📧 mewatxpro2@gmail.com',
         ),
         const SizedBox(height: 40),
       ],

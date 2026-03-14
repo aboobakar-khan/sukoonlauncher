@@ -33,12 +33,34 @@ class WidgetCard extends ConsumerWidget {
         height: height,
         padding: padding ?? const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.80),
+          // Subtle gradient background with theme color tint for visual depth
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.black.withValues(alpha: 0.85),
+              Colors.black.withValues(alpha: 0.75),
+            ],
+          ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.6),
-            width: 1,
+            // Theme-aware border with subtle glow effect
+            color: themeColor.color.withValues(alpha: 0.3),
+            width: 1.5,
           ),
+          // Soft shadow for card elevation
+          boxShadow: [
+            BoxShadow(
+              color: themeColor.color.withValues(alpha: 0.15),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,13 +70,22 @@ class WidgetCard extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  title.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 12,
-                    letterSpacing: 2,
-                    fontWeight: FontWeight.w400,
-                    color: themeColor.color.withValues(alpha: 0.5),
+                // Enhanced title with theme color gradient
+                ShaderMask(
+                  shaderCallback: (bounds) => LinearGradient(
+                    colors: [
+                      themeColor.color.withValues(alpha: 0.7),
+                      themeColor.color.withValues(alpha: 0.4),
+                    ],
+                  ).createShader(bounds),
+                  child: Text(
+                    title.toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      letterSpacing: 2,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white, // Will be masked by gradient
+                    ),
                   ),
                 ),
                 Row(
@@ -62,22 +93,42 @@ class WidgetCard extends ConsumerWidget {
                     if (onDelete != null)
                       GestureDetector(
                         onTap: onDelete,
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 12),
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Colors.red.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
                           child: Icon(
                             Icons.delete_outline,
-                            size: 16,
-                            color: Colors.white.withValues(alpha: 0.3),
+                            size: 14,
+                            color: Colors.red.withValues(alpha: 0.7),
                           ),
                         ),
                       ),
                     if (onEdit != null)
                       GestureDetector(
                         onTap: onEdit,
-                        child: Icon(
-                          Icons.edit,
-                          size: 16,
-                          color: Colors.white.withValues(alpha: 0.3),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: themeColor.color.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: themeColor.color.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.edit,
+                            size: 14,
+                            color: themeColor.color.withValues(alpha: 0.7),
+                          ),
                         ),
                       ),
                   ],
@@ -114,40 +165,75 @@ class EmptyCardState extends ConsumerWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 32, color: Colors.white.withValues(alpha: 0.2)),
-          const SizedBox(height: 12),
+          // Enhanced icon with theme color glow
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: themeColor.color.withValues(alpha: 0.08),
+              border: Border.all(
+                color: themeColor.color.withValues(alpha: 0.2),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              icon,
+              size: 32,
+              color: themeColor.color.withValues(alpha: 0.4),
+            ),
+          ),
+          const SizedBox(height: 16),
           Text(
             message,
             style: TextStyle(
-              color: themeColor.color.withValues(alpha: 0.3),
+              color: themeColor.color.withValues(alpha: 0.5),
               fontSize: 14,
               letterSpacing: 1.2,
+              fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
           ),
           if (onAdd != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             GestureDetector(
               onTap: onAdd,
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
+                  horizontal: 20,
+                  vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(8),
+                  gradient: LinearGradient(
+                    colors: [
+                      themeColor.color.withValues(alpha: 0.15),
+                      themeColor.color.withValues(alpha: 0.08),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: themeColor.color.withValues(alpha: 0.3),
+                    width: 1.5,
                   ),
                 ),
-                child: Text(
-                  'Add',
-                  style: TextStyle(
-                    color: themeColor.color.withValues(alpha: 0.5),
-                    fontSize: 12,
-                    letterSpacing: 1.2,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.add_circle_outline,
+                      size: 16,
+                      color: themeColor.color.withValues(alpha: 0.7),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Add',
+                      style: TextStyle(
+                        color: themeColor.color.withValues(alpha: 0.7),
+                        fontSize: 13,
+                        letterSpacing: 1.2,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

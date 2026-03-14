@@ -155,15 +155,9 @@ class PremiumBadge extends ConsumerWidget {
               ),
               child: Column(
                 children: [
-                  _buildDetailRow('Plan', state.subscriptionType?.toUpperCase() ?? 'N/A'),
+                  _buildDetailRow('Plan', 'Lifetime — Free'),
                   const SizedBox(height: 12),
-                  if (state.expiryDate != null)
-                    _buildDetailRow(
-                      'Expires',
-                      '${state.expiryDate!.day}/${state.expiryDate!.month}/${state.expiryDate!.year}',
-                    )
-                  else
-                    _buildDetailRow('Expires', 'Never (Lifetime)'),
+                  _buildDetailRow('Status', 'All features unlocked'),
                 ],
               ),
             ),
@@ -383,25 +377,12 @@ class _PremiumStatusSheet extends StatelessWidget {
           const SizedBox(height: 8),
           
           Text(
-            state.subscriptionType == 'lifetime'
-                ? 'Lifetime access'
-                : 'Plan: ${state.subscriptionType?.toUpperCase() ?? 'N/A'}',
+            'All features unlocked — Free forever',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.6),
               fontSize: 14,
             ),
           ),
-          
-          if (state.expiryDate != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Renews: ${state.expiryDate!.day}/${state.expiryDate!.month}/${state.expiryDate!.year}',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
-                fontSize: 13,
-              ),
-            ),
-          ],
           
           SizedBox(height: MediaQuery.of(context).padding.bottom + 24),
         ],

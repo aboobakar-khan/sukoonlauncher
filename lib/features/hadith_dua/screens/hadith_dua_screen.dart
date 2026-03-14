@@ -405,7 +405,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
 
               return ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                physics: const BouncingScrollPhysics(),
+                physics: const ClampingScrollPhysics(),
                 itemCount: hadiths.length.clamp(0, 100),
                 itemBuilder: (context, index) {
                   return Padding(
@@ -416,7 +416,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
               );
             },
             loading: () => _buildEmptyState('Loading hadiths...'),
-            error: (_, __) => _buildEmptyState('Failed to load hadiths'),
+            error: (_, _) => _buildEmptyState('Failed to load hadiths'),
           ),
         ),
       ],
@@ -578,7 +578,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      physics: const BouncingScrollPhysics(),
+      physics: const ClampingScrollPhysics(),
       children: [
         for (final category in categories) ...[
           _buildCategorySection(category),
@@ -628,7 +628,7 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      physics: const BouncingScrollPhysics(),
+      physics: const ClampingScrollPhysics(),
       children: [
         if (searchState.duaResults.isNotEmpty) ...[
           _buildSectionHeader('Duas (${searchState.duaResults.length})', Icons.favorite_outline),
@@ -658,51 +658,6 @@ class _HadithDuaScreenState extends ConsumerState<HadithDuaScreen>
           ),
         const SizedBox(height: 20),
       ],
-    );
-  }
-
-  Widget _buildLoadingCard(String message) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        children: [
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation(Color(0xFFC2A366)),
-            strokeWidth: 2,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            style: TextStyle(color: Colors.grey[500], fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorCard(String message) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 24),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            style: TextStyle(color: Colors.grey[500], fontSize: 12),
-          ),
-        ],
-      ),
     );
   }
 

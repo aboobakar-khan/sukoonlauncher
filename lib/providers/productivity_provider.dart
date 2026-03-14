@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../models/productivity_models.dart';
+import '../utils/hive_box_manager.dart';
 import '../services/native_app_blocker_service.dart';
 
 const _uuid = Uuid();
@@ -18,7 +20,7 @@ class TodoNotifier extends StateNotifier<List<TodoItem>> {
   }
 
   Future<void> _init() async {
-    _box = await Hive.openBox<TodoItem>('productivity_todos');
+    _box = await HiveBoxManager.get<TodoItem>('productivity_todos');
     state = _box!.values.toList()..sort(_sortTodos);
   }
 
@@ -121,24 +123,58 @@ final todoProvider = StateNotifierProvider<TodoNotifier, List<TodoItem>>(
 
 enum PomodoroState { idle, focusing, shortBreak, longBreak, paused }
 
+/// Individual session log entry
+class FocusSessionLog {
+  final DateTime startTime;
+  final int durationMinutes;
+  final String type; // 'focus', 'short_break', 'long_break'
+  final String? category;
+
+  FocusSessionLog({
+    required this.startTime,
+    required this.durationMinutes,
+    required this.type,
+    this.category,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'start': startTime.millisecondsSinceEpoch,
+    'dur': durationMinutes,
+    'type': type,
+    'cat': category,
+  };
+
+  factory FocusSessionLog.fromJson(Map<String, dynamic> json) => FocusSessionLog(
+    startTime: DateTime.fromMillisecondsSinceEpoch(json['start'] as int),
+    durationMinutes: json['dur'] as int,
+    type: json['type'] as String,
+    category: json['cat'] as String?,
+  );
+}
+
 class PomodoroTimerState {
   final PomodoroState state;
-  final PomodoroState? previousState; // Track what was running before pause
+  final PomodoroState? previousState;
   final int remainingSeconds;
   final int completedSessions;
   final int totalFocusMinutesToday;
+  final int totalBreakMinutesToday;
   final String? activeTodoId;
   final PomodoroSettings settings;
+  final List<FocusSessionLog> todayLogs;
 
   PomodoroTimerState({
     this.state = PomodoroState.idle,
     this.previousState,
-    this.remainingSeconds = 1500, // 25 min
+    this.remainingSeconds = 1500,
     this.completedSessions = 0,
     this.totalFocusMinutesToday = 0,
+    this.totalBreakMinutesToday = 0,
     this.activeTodoId,
     PomodoroSettings? settings,
-  }) : settings = settings ?? PomodoroSettings();
+    List<FocusSessionLog>? todayLogs,
+  }) : settings = settings ?? PomodoroSettings(),
+       todayLogs = todayLogs ?? [];
 
   PomodoroTimerState copyWith({
     PomodoroState? state,
@@ -146,8 +182,10 @@ class PomodoroTimerState {
     int? remainingSeconds,
     int? completedSessions,
     int? totalFocusMinutesToday,
+    int? totalBreakMinutesToday,
     String? activeTodoId,
     PomodoroSettings? settings,
+    List<FocusSessionLog>? todayLogs,
     bool clearTodoId = false,
     bool clearPreviousState = false,
   }) {
@@ -157,8 +195,10 @@ class PomodoroTimerState {
       remainingSeconds: remainingSeconds ?? this.remainingSeconds,
       completedSessions: completedSessions ?? this.completedSessions,
       totalFocusMinutesToday: totalFocusMinutesToday ?? this.totalFocusMinutesToday,
+      totalBreakMinutesToday: totalBreakMinutesToday ?? this.totalBreakMinutesToday,
       activeTodoId: clearTodoId ? null : (activeTodoId ?? this.activeTodoId),
       settings: settings ?? this.settings,
+      todayLogs: todayLogs ?? this.todayLogs,
     );
   }
 
@@ -169,7 +209,6 @@ class PomodoroTimerState {
   }
 
   double get progress {
-    // Use previousState for paused to show accurate progress
     final effectiveState = state == PomodoroState.paused ? previousState ?? PomodoroState.focusing : state;
     final total = effectiveState == PomodoroState.focusing
         ? settings.focusMinutes * 60
@@ -179,17 +218,70 @@ class PomodoroTimerState {
     if (total == 0) return 0;
     return 1.0 - (remainingSeconds / total);
   }
+
+  /// Total work+break time today
+  int get totalTimeToday => totalFocusMinutesToday + totalBreakMinutesToday;
+
+  /// Average session length from logs
+  double get avgSessionMinutes {
+    final focusLogs = todayLogs.where((l) => l.type == 'focus').toList();
+    if (focusLogs.isEmpty) return 0;
+    return focusLogs.fold<int>(0, (sum, l) => sum + l.durationMinutes) / focusLogs.length;
+  }
+
+  /// Short break count today
+  int get shortBreakCount => todayLogs.where((l) => l.type == 'short_break').length;
+
+  /// Long break count today
+  int get longBreakCount => todayLogs.where((l) => l.type == 'long_break').length;
 }
 
 class PomodoroNotifier extends StateNotifier<PomodoroTimerState> {
   PomodoroNotifier() : super(PomodoroTimerState()) {
     _loadSettings();
+    _loadDailyStats();
+    _loadCumulativeMinutes();
+  }
+
+  DateTime? _sessionStartTime;
+  Timer? _internalTimer;
+  Box? _dailyStatsBox;
+  Box<PomodoroSettings>? _settingsBox;
+
+  /// Wall-clock anchor for drift-free timing
+  DateTime? _timerAnchor;
+  int _anchorRemainingSeconds = 0;
+
+  /// Cumulative all-time focus minutes (persisted)
+  int _cumulativeFocusMinutes = 0;
+  int get cumulativeFocusMinutes => _cumulativeFocusMinutes;
+
+  @override
+  void dispose() {
+    _internalTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Start the internal 1-second ticker (wall-clock anchored)
+  void _ensureTickerRunning() {
+    _internalTimer?.cancel();
+    _timerAnchor = DateTime.now();
+    _anchorRemainingSeconds = state.remainingSeconds;
+    _internalTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      tick();
+    });
+  }
+
+  /// Stop the internal ticker
+  void _stopTicker() {
+    _internalTimer?.cancel();
+    _internalTimer = null;
   }
 
   Future<void> _loadSettings() async {
-    final box = await Hive.openBox<PomodoroSettings>('pomodoro_settings');
-    if (box.isNotEmpty) {
-      final settings = box.getAt(0)!;
+    _settingsBox = await HiveBoxManager.get<PomodoroSettings>('pomodoro_settings');
+    if (_settingsBox!.isNotEmpty) {
+      final settings = _settingsBox!.getAt(0)!;
       state = state.copyWith(
         settings: settings,
         remainingSeconds: settings.focusMinutes * 60,
@@ -197,74 +289,281 @@ class PomodoroNotifier extends StateNotifier<PomodoroTimerState> {
     }
   }
 
+  /// Load cumulative all-time focus minutes
+  Future<void> _loadCumulativeMinutes() async {
+    _dailyStatsBox ??= await HiveBoxManager.get('pomodoro_daily_stats');
+    _cumulativeFocusMinutes = _dailyStatsBox!.get('cumulativeFocusMinutes', defaultValue: 0) as int;
+  }
+
+  /// Persist cumulative all-time focus minutes
+  Future<void> _saveCumulativeMinutes() async {
+    _dailyStatsBox ??= await HiveBoxManager.get('pomodoro_daily_stats');
+    _dailyStatsBox!.put('cumulativeFocusMinutes', _cumulativeFocusMinutes);
+  }
+
+  /// Load persisted daily stats (resets if it's a new day)
+  Future<void> _loadDailyStats() async {
+    _dailyStatsBox ??= await HiveBoxManager.get('pomodoro_daily_stats');
+    final box = _dailyStatsBox!;
+    final savedDate = box.get('date', defaultValue: '');
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+
+    if (savedDate == today) {
+      final focusMins = box.get('focusMinutes', defaultValue: 0) as int;
+      final breakMins = box.get('breakMinutes', defaultValue: 0) as int;
+      final sessions = box.get('sessions', defaultValue: 0) as int;
+      final logsRaw = box.get('logs', defaultValue: <dynamic>[]) as List<dynamic>;
+      final logs = logsRaw.map((e) {
+        if (e is Map) return FocusSessionLog.fromJson(Map<String, dynamic>.from(e));
+        return null;
+      }).whereType<FocusSessionLog>().toList();
+      state = state.copyWith(
+        totalFocusMinutesToday: focusMins,
+        totalBreakMinutesToday: breakMins,
+        completedSessions: sessions,
+        todayLogs: logs,
+      );
+    } else {
+      // New day — reset stats
+      await box.put('date', today);
+      await box.put('focusMinutes', 0);
+      await box.put('breakMinutes', 0);
+      await box.put('sessions', 0);
+      await box.put('logs', <dynamic>[]);
+    }
+  }
+
+  /// Persist daily stats to Hive
+  Future<void> _saveDailyStats() async {
+    _dailyStatsBox ??= await HiveBoxManager.get('pomodoro_daily_stats');
+    final box = _dailyStatsBox!;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    box.put('date', today);
+    box.put('focusMinutes', state.totalFocusMinutesToday);
+    box.put('breakMinutes', state.totalBreakMinutesToday);
+    box.put('sessions', state.completedSessions);
+    box.put('logs', state.todayLogs.map((l) => l.toJson()).toList());
+    // Also save per-date logs for the history date pills
+    await _saveLogsForDate(today, state.todayLogs);
+  }
+
   void startFocus({String? todoId}) {
+    _sessionStartTime = DateTime.now();
     state = state.copyWith(
       state: PomodoroState.focusing,
       remainingSeconds: state.settings.focusMinutes * 60,
       activeTodoId: todoId,
     );
+    _ensureTickerRunning();
   }
 
   void startBreak() {
-    final isLong = (state.completedSessions + 1) %
-            state.settings.sessionsBeforeLongBreak ==
-        0;
+    _sessionStartTime = DateTime.now();
+    // Always short break — no long break system
     state = state.copyWith(
-      state: isLong ? PomodoroState.longBreak : PomodoroState.shortBreak,
-      remainingSeconds: isLong
-          ? state.settings.longBreakMinutes * 60
-          : state.settings.shortBreakMinutes * 60,
+      state: PomodoroState.shortBreak,
+      remainingSeconds: state.settings.shortBreakMinutes * 60,
     );
+    _ensureTickerRunning();
+  }
+
+  /// Skip forward: if focusing → log partial focus then start short break;
+  ///               if on break → log partial break then start focus
+  void skipForward() {
+    _stopTicker();
+    final now = DateTime.now();
+    if (state.state == PomodoroState.focusing || state.state == PomodoroState.paused) {
+      // Log partial focus session
+      final elapsed = _sessionStartTime != null
+          ? (now.difference(_sessionStartTime!).inSeconds / 60).round()
+          : 0;
+      final actualMins = elapsed.clamp(0, state.settings.focusMinutes);
+      if (actualMins >= _minSessionMinutes) {
+        final newLogs = List<FocusSessionLog>.from(state.todayLogs)
+          ..add(FocusSessionLog(
+            startTime: _sessionStartTime ?? now,
+            durationMinutes: actualMins,
+            type: 'focus',
+          ));
+        _cumulativeFocusMinutes += actualMins;
+        state = state.copyWith(
+          completedSessions: state.completedSessions + 1,
+          totalFocusMinutesToday: state.totalFocusMinutesToday + actualMins,
+          todayLogs: newLogs,
+        );
+        _saveDailyStats();
+        _saveCumulativeMinutes();
+      }
+      _sessionStartTime = null;
+      _timerAnchor = null;
+      startBreak();
+    } else if (state.state == PomodoroState.shortBreak) {
+      // Log partial break
+      final elapsed = _sessionStartTime != null
+          ? (now.difference(_sessionStartTime!).inSeconds / 60).round()
+          : 0;
+      final actualMins = elapsed.clamp(0, state.settings.shortBreakMinutes);
+      if (actualMins >= _minSessionMinutes) {
+        final newLogs = List<FocusSessionLog>.from(state.todayLogs)
+          ..add(FocusSessionLog(
+            startTime: _sessionStartTime ?? now,
+            durationMinutes: actualMins,
+            type: 'short_break',
+          ));
+        state = state.copyWith(
+          totalBreakMinutesToday: state.totalBreakMinutesToday + actualMins,
+          todayLogs: newLogs,
+        );
+        _saveDailyStats();
+      }
+      _sessionStartTime = null;
+      _timerAnchor = null;
+      startFocus(todoId: state.activeTodoId);
+    }
+  }
+
+  /// Skip backward: restart current phase from full duration
+  void skipBackward() {
+    _stopTicker();
+    _sessionStartTime = DateTime.now();
+    _timerAnchor = null;
+    if (state.state == PomodoroState.shortBreak) {
+      state = state.copyWith(
+        remainingSeconds: state.settings.shortBreakMinutes * 60,
+      );
+    } else {
+      state = state.copyWith(
+        state: PomodoroState.focusing,
+        remainingSeconds: state.settings.focusMinutes * 60,
+      );
+    }
+    _ensureTickerRunning();
   }
 
   void tick() {
     if (state.state == PomodoroState.idle || state.state == PomodoroState.paused) return;
-    if (state.remainingSeconds <= 0) {
-      _onTimerComplete();
-      return;
+
+    // Wall-clock calculation — immune to Timer.periodic drift
+    if (_timerAnchor != null) {
+      final elapsed = DateTime.now().difference(_timerAnchor!).inSeconds;
+      final computed = _anchorRemainingSeconds - elapsed;
+      final remaining = computed < 0 ? 0 : computed;
+      if (remaining <= 0) {
+        _onTimerComplete();
+        return;
+      }
+      state = state.copyWith(remainingSeconds: remaining);
+    } else {
+      // Fallback: simple decrement
+      if (state.remainingSeconds <= 0) {
+        _onTimerComplete();
+        return;
+      }
+      state = state.copyWith(remainingSeconds: state.remainingSeconds - 1);
     }
-    state = state.copyWith(remainingSeconds: state.remainingSeconds - 1);
   }
 
+  /// Minimum duration (minutes) a session must reach to be recorded in stats.
+  /// Sessions shorter than this are discarded as accidental/noise.
+  static const int _minSessionMinutes = 3;
+
   void _onTimerComplete() {
+    _stopTicker();
+    _timerAnchor = null;
+    final now = DateTime.now();
     if (state.state == PomodoroState.focusing) {
-      // Focus complete → increment session
-      state = state.copyWith(
-        completedSessions: state.completedSessions + 1,
-        totalFocusMinutesToday:
-            state.totalFocusMinutesToday + state.settings.focusMinutes,
-        state: PomodoroState.idle,
-      );
+      final focusMins = state.settings.focusMinutes;
+      final actualMins = _sessionStartTime != null
+          ? (now.difference(_sessionStartTime!).inSeconds / 60).round().clamp(1, focusMins)
+          : focusMins;
+      // Only record sessions that are at least _minSessionMinutes long
+      if (actualMins >= _minSessionMinutes) {
+        final newLogs = List<FocusSessionLog>.from(state.todayLogs)
+          ..add(FocusSessionLog(
+            startTime: _sessionStartTime ?? now,
+            durationMinutes: actualMins,
+            type: 'focus',
+          ));
+        _cumulativeFocusMinutes += actualMins;
+        state = state.copyWith(
+          completedSessions: state.completedSessions + 1,
+          totalFocusMinutesToday: state.totalFocusMinutesToday + actualMins,
+          state: PomodoroState.idle,
+          todayLogs: newLogs,
+        );
+        _saveDailyStats();
+        _saveCumulativeMinutes();
+      } else {
+        state = state.copyWith(state: PomodoroState.idle);
+      }
       if (state.settings.autoStartBreaks) {
         startBreak();
       }
     } else {
-      // Break complete → go idle or auto-start focus
-      state = state.copyWith(state: PomodoroState.idle);
+      // Short break complete (no long break)
+      final breakMins = state.settings.shortBreakMinutes;
+      final actualMins = _sessionStartTime != null
+          ? (now.difference(_sessionStartTime!).inSeconds / 60).round().clamp(1, breakMins)
+          : breakMins;
+      // Only record breaks that are at least _minSessionMinutes long
+      if (actualMins >= _minSessionMinutes) {
+        final newLogs = List<FocusSessionLog>.from(state.todayLogs)
+          ..add(FocusSessionLog(
+            startTime: _sessionStartTime ?? now,
+            durationMinutes: actualMins,
+            type: 'short_break',
+          ));
+        state = state.copyWith(
+          state: PomodoroState.idle,
+          totalBreakMinutesToday: state.totalBreakMinutesToday + actualMins,
+          todayLogs: newLogs,
+        );
+        _saveDailyStats();
+      } else {
+        state = state.copyWith(state: PomodoroState.idle);
+      }
       if (state.settings.autoStartFocus) {
         startFocus(todoId: state.activeTodoId);
       }
     }
+    _sessionStartTime = null;
   }
 
   void pause() {
-    // Save the current state so we can resume from it
-    state = state.copyWith(
-      previousState: state.state,
-      state: PomodoroState.paused,
-    );
+    _stopTicker();
+    // Snapshot the remaining seconds at pause time (wall-clock accurate)
+    if (_timerAnchor != null) {
+      final elapsed = DateTime.now().difference(_timerAnchor!).inSeconds;
+      final computed = _anchorRemainingSeconds - elapsed;
+      final remaining = computed < 0 ? 0 : computed;
+      state = state.copyWith(
+        previousState: state.state,
+        state: PomodoroState.paused,
+        remainingSeconds: remaining,
+      );
+    } else {
+      state = state.copyWith(
+        previousState: state.state,
+        state: PomodoroState.paused,
+      );
+    }
+    _timerAnchor = null;
   }
 
-  /// Resume from paused — continues the timer from where it left off
   void resume() {
     if (state.state != PomodoroState.paused || state.previousState == null) return;
     state = state.copyWith(
       state: state.previousState,
       clearPreviousState: true,
     );
+    _ensureTickerRunning();
   }
 
   void reset() {
+    _stopTicker();
+    _sessionStartTime = null;
+    _timerAnchor = null;
+    _anchorRemainingSeconds = 0;
     state = state.copyWith(
       state: PomodoroState.idle,
       remainingSeconds: state.settings.focusMinutes * 60,
@@ -274,16 +573,38 @@ class PomodoroNotifier extends StateNotifier<PomodoroTimerState> {
   }
 
   Future<void> updateSettings(PomodoroSettings settings) async {
-    final box = await Hive.openBox<PomodoroSettings>('pomodoro_settings');
-    if (box.isEmpty) {
-      await box.add(settings);
+    _settingsBox ??= await HiveBoxManager.get<PomodoroSettings>('pomodoro_settings');
+    if (_settingsBox!.isEmpty) {
+      await _settingsBox!.add(settings);
     } else {
-      await box.putAt(0, settings);
+      await _settingsBox!.putAt(0, settings);
     }
     state = state.copyWith(settings: settings);
     if (state.state == PomodoroState.idle) {
       state = state.copyWith(remainingSeconds: settings.focusMinutes * 60);
     }
+  }
+
+  /// Save logs for a specific date key (yyyy-MM-dd) for historic day pills
+  Future<void> _saveLogsForDate(String dateKey, List<FocusSessionLog> logs) async {
+    _dailyStatsBox ??= await HiveBoxManager.get('pomodoro_daily_stats');
+    _dailyStatsBox!.put('logs_$dateKey', logs.map((l) => l.toJson()).toList());
+  }
+
+  /// Load logs for a specific date key — returns empty list if none stored
+  Future<List<FocusSessionLog>> logsForDate(String dateKey) async {
+    _dailyStatsBox ??= await HiveBoxManager.get('pomodoro_daily_stats');
+    final raw = _dailyStatsBox!.get('logs_$dateKey', defaultValue: <dynamic>[]) as List<dynamic>;
+    return raw.map((e) {
+      if (e is Map) return FocusSessionLog.fromJson(Map<String, dynamic>.from(e));
+      return null;
+    }).whereType<FocusSessionLog>().toList();
+  }
+
+  /// Total focus minutes for a date key (yyyy-MM-dd)
+  Future<int> focusMinutesForDate(String dateKey) async {
+    final logs = await logsForDate(dateKey);
+    return logs.where((l) => l.type == 'focus').fold<int>(0, (s, l) => s + l.durationMinutes);
   }
 }
 
@@ -304,7 +625,7 @@ class AcademicDoubtNotifier extends StateNotifier<List<AcademicDoubt>> {
   }
 
   Future<void> _init() async {
-    _box = await Hive.openBox<AcademicDoubt>('academic_doubts');
+    _box = await HiveBoxManager.get<AcademicDoubt>('academic_doubts');
     state = _box!.values.toList()
       ..sort((a, b) {
         if (a.isResolved != b.isResolved) return a.isResolved ? 1 : -1;
@@ -396,7 +717,7 @@ class ProductivityEventNotifier extends StateNotifier<List<ProductivityEvent>> {
   }
 
   Future<void> _init() async {
-    _box = await Hive.openBox<ProductivityEvent>('productivity_events');
+    _box = await HiveBoxManager.get<ProductivityEvent>('productivity_events');
     state = _box!.values.toList()
       ..sort((a, b) => a.startTime.compareTo(b.startTime));
   }
@@ -521,47 +842,126 @@ final eventsForDateProvider = Provider.family<List<ProductivityEvent>, DateTime>
 
 class AppBlockRuleNotifier extends StateNotifier<List<AppBlockRule>> {
   Box<AppBlockRule>? _box;
+  Timer? _expiryTimer;
 
   AppBlockRuleNotifier() : super([]) {
     _init();
   }
 
   Future<void> _init() async {
-    _box = await Hive.openBox<AppBlockRule>('app_block_rules');
+    _box = await HiveBoxManager.get<AppBlockRule>('app_block_rules');
+    // Clean up any already-expired rules on startup
+    await _cleanExpiredRules();
     state = _box!.values.toList();
     // Sync to native blocker on startup
     _syncToNativeBlocker();
+    // Only start the expiry timer if there are rules that actually need it
+    _scheduleExpiryTimerIfNeeded();
+  }
+
+  @override
+  void dispose() {
+    _expiryTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Start the periodic expiry checker ONLY when there are enabled
+  /// duration-based rules that can expire. Stops the timer when none
+  /// remain — avoids a 15-second poll loop running the entire app
+  /// lifetime for nothing (battery waste).
+  void _scheduleExpiryTimerIfNeeded() {
+    final hasExpirableRules = state.any(
+      (r) => r.isEnabled && r.expiresAt != null,
+    );
+
+    if (hasExpirableRules && _expiryTimer == null) {
+      _expiryTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+        _checkAndExpireRules();
+      });
+    } else if (!hasExpirableRules && _expiryTimer != null) {
+      _expiryTimer?.cancel();
+      _expiryTimer = null;
+    }
+  }
+
+  /// Check for expired duration-based rules and disable them.
+  /// Called periodically by the timer to ensure blocks don't persist
+  /// after their duration has elapsed.
+  Future<void> _checkAndExpireRules() async {
+    if (_box == null) return;
+    final now = DateTime.now();
+    bool changed = false;
+
+    for (final rule in _box!.values) {
+      if (rule.isEnabled && rule.expiresAt != null && now.isAfter(rule.expiresAt!)) {
+        rule.isEnabled = false;
+        await rule.save();
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      state = _box!.values.toList();
+      _syncToNativeBlocker();
+      // Re-evaluate whether the timer is still needed
+      _scheduleExpiryTimerIfNeeded();
+    }
+  }
+
+  /// Remove rules that have already expired (cleanup on startup).
+  Future<void> _cleanExpiredRules() async {
+    if (_box == null) return;
+    final now = DateTime.now();
+    for (final rule in _box!.values.toList()) {
+      if (rule.isEnabled && rule.expiresAt != null && now.isAfter(rule.expiresAt!)) {
+        rule.isEnabled = false;
+        await rule.save();
+      }
+    }
+  }
+
+  /// Check if a rule is currently active (not expired).
+  bool _isRuleActive(AppBlockRule rule) {
+    if (!rule.isEnabled) return false;
+
+    // Check expiry first — duration-based rules have an absolute deadline
+    if (rule.expiresAt != null) {
+      if (DateTime.now().isAfter(rule.expiresAt!)) return false;
+      // If not expired yet, it's active (duration-based rules are always
+      // active until their expiresAt, regardless of hour:minute matching)
+      return true;
+    }
+
+    final now = DateTime.now();
+    if (rule.isTimeBased) {
+      // Scheduled (recurring) rule — check day + time window
+      if (rule.startHour == null || rule.endHour == null) return false;
+      if (!rule.activeDays.contains(now.weekday)) return false;
+
+      final startMin = rule.startHour! * 60 + (rule.startMinute ?? 0);
+      final endMin = rule.endHour! * 60 + (rule.endMinute ?? 0);
+      final nowMin = now.hour * 60 + now.minute;
+
+      if (startMin <= endMin) {
+        return nowMin >= startMin && nowMin <= endMin;
+      } else {
+        // Overnight (e.g. 22:00 → 06:00)
+        return nowMin >= startMin || nowMin <= endMin;
+      }
+    } else {
+      // Manual toggle — always active when enabled
+      return true;
+    }
   }
 
   /// Sync all currently-blocked packages to the native foreground service.
   /// This is the key integration point — the native service will monitor
   /// the foreground app and block any that are in this list.
   void _syncToNativeBlocker() {
-    final now = DateTime.now();
     final allBlockedPackages = <String>{};
 
     for (final rule in state) {
-      if (!rule.isEnabled) continue;
-
-      if (rule.isTimeBased) {
-        if (rule.startHour == null || rule.endHour == null) continue;
-        if (!rule.activeDays.contains(now.weekday)) continue;
-
-        final startMin = rule.startHour! * 60 + (rule.startMinute ?? 0);
-        final endMin = rule.endHour! * 60 + (rule.endMinute ?? 0);
-        final nowMin = now.hour * 60 + now.minute;
-
-        bool inWindow;
-        if (startMin <= endMin) {
-          inWindow = nowMin >= startMin && nowMin <= endMin;
-        } else {
-          inWindow = nowMin >= startMin || nowMin <= endMin;
-        }
-        if (inWindow) {
-          allBlockedPackages.addAll(rule.blockedPackages);
-        }
-      } else {
-        // Manual toggle — always active when enabled
+      if (_isRuleActive(rule)) {
         allBlockedPackages.addAll(rule.blockedPackages);
       }
     }
@@ -582,6 +982,7 @@ class AppBlockRuleNotifier extends StateNotifier<List<AppBlockRule>> {
     String blockMessage = 'Stay focused! 🌙',
     bool allowBreaks = true,
     bool isHardBlock = false,
+    DateTime? expiresAt,
   }) async {
     final rule = AppBlockRule(
       id: _uuid.v4(),
@@ -597,10 +998,12 @@ class AppBlockRuleNotifier extends StateNotifier<List<AppBlockRule>> {
       blockMessage: blockMessage,
       allowBreaks: allowBreaks,
       isHardBlock: isHardBlock,
+      expiresAt: expiresAt,
     );
     await _box?.put(rule.id, rule);
     state = [...state, rule];
     _syncToNativeBlocker();
+    _scheduleExpiryTimerIfNeeded();
     return rule;
   }
 
@@ -614,6 +1017,7 @@ class AppBlockRuleNotifier extends StateNotifier<List<AppBlockRule>> {
       await rule.save();
       state = _box!.values.toList();
       _syncToNativeBlocker();
+      _scheduleExpiryTimerIfNeeded();
     }
   }
 
@@ -654,6 +1058,7 @@ class AppBlockRuleNotifier extends StateNotifier<List<AppBlockRule>> {
     await _box?.delete(id);
     state = state.where((r) => r.id != id).toList();
     _syncToNativeBlocker();
+    _scheduleExpiryTimerIfNeeded();
   }
 
   Future<void> takeBreak(String id) async {
@@ -667,30 +1072,9 @@ class AppBlockRuleNotifier extends StateNotifier<List<AppBlockRule>> {
 
   /// Check if a package is currently blocked by ANY active rule
   bool isAppBlocked(String packageName) {
-    final now = DateTime.now();
     for (final rule in state) {
-      if (!rule.isEnabled) continue;
       if (!rule.blockedPackages.contains(packageName)) continue;
-
-      if (rule.isTimeBased) {
-        // Check time window
-        if (rule.startHour == null || rule.endHour == null) continue;
-        if (!rule.activeDays.contains(now.weekday)) continue;
-
-        final startMin = rule.startHour! * 60 + (rule.startMinute ?? 0);
-        final endMin = rule.endHour! * 60 + (rule.endMinute ?? 0);
-        final nowMin = now.hour * 60 + now.minute;
-
-        if (startMin <= endMin) {
-          if (nowMin >= startMin && nowMin <= endMin) return true;
-        } else {
-          // Overnight rule (e.g. 22:00 → 06:00)
-          if (nowMin >= startMin || nowMin <= endMin) return true;
-        }
-      } else {
-        // Manual toggle — always active when enabled
-        return true;
-      }
+      if (_isRuleActive(rule)) return true;
     }
     return false;
   }
@@ -698,31 +1082,15 @@ class AppBlockRuleNotifier extends StateNotifier<List<AppBlockRule>> {
   /// Get the block message for a blocked app
   String? getBlockMessage(String packageName) {
     for (final rule in state) {
-      if (!rule.isEnabled) continue;
-      if (rule.blockedPackages.contains(packageName)) {
-        return rule.blockMessage;
-      }
+      if (!rule.blockedPackages.contains(packageName)) continue;
+      if (_isRuleActive(rule)) return rule.blockMessage;
     }
     return null;
   }
 
   /// Get all active rules right now
   List<AppBlockRule> get activeRules {
-    final now = DateTime.now();
-    return state.where((rule) {
-      if (!rule.isEnabled) return false;
-      if (!rule.isTimeBased) return true;
-      if (rule.startHour == null || rule.endHour == null) return false;
-      if (!rule.activeDays.contains(now.weekday)) return false;
-      final startMin = rule.startHour! * 60 + (rule.startMinute ?? 0);
-      final endMin = rule.endHour! * 60 + (rule.endMinute ?? 0);
-      final nowMin = now.hour * 60 + now.minute;
-      if (startMin <= endMin) {
-        return nowMin >= startMin && nowMin <= endMin;
-      } else {
-        return nowMin >= startMin || nowMin <= endMin;
-      }
-    }).toList();
+    return state.where(_isRuleActive).toList();
   }
 }
 
@@ -757,26 +1125,28 @@ class FocusCategoryState {
 }
 
 class FocusCategoryNotifier extends StateNotifier<FocusCategoryState> {
+  Box<List>? _box;
+  
   FocusCategoryNotifier() : super(const FocusCategoryState()) {
     _init();
   }
 
   Future<void> _init() async {
-    final box = await Hive.openBox<List>('focus_categories');
-    final saved = box.get('categories');
+    _box = await HiveBoxManager.get<List>('focus_categories');
+    final saved = _box!.get('categories');
     if (saved != null && saved.isNotEmpty) {
       state = state.copyWith(categories: saved.cast<String>());
     }
-    final active = box.get('activeCategory');
+    final active = _box!.get('activeCategory');
     if (active != null && active.isNotEmpty) {
       state = state.copyWith(activeCategory: active.first as String);
     }
   }
 
   Future<void> _save() async {
-    final box = await Hive.openBox<List>('focus_categories');
-    await box.put('categories', state.categories);
-    await box.put('activeCategory',
+    _box ??= await HiveBoxManager.get<List>('focus_categories');
+    _box!.put('categories', state.categories);
+    _box!.put('activeCategory',
         state.activeCategory != null ? [state.activeCategory] : []);
   }
 
@@ -813,14 +1183,16 @@ final focusCategoryProvider =
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class FocusStreakNotifier extends StateNotifier<int> {
+  Box? _box;
+  
   FocusStreakNotifier() : super(0) {
     _init();
   }
 
   Future<void> _init() async {
-    final box = await Hive.openBox('focus_streak');
-    final lastDate = box.get('lastFocusDate') as String?;
-    final streak = box.get('streak') as int? ?? 0;
+    _box = await HiveBoxManager.get('focus_streak');
+    final lastDate = _box!.get('lastFocusDate') as String?;
+    final streak = _box!.get('streak') as int? ?? 0;
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month}-${today.day}';
     final yesterday = today.subtract(const Duration(days: 1));
@@ -832,29 +1204,28 @@ class FocusStreakNotifier extends StateNotifier<int> {
       state = streak; // hasn't focused today yet, but streak preserved
     } else {
       state = 0; // streak broken
-      await box.put('streak', 0);
+      _box!.put('streak', 0);
     }
   }
 
   Future<void> recordSession() async {
-    final box = await Hive.openBox('focus_streak');
+    _box ??= await HiveBoxManager.get('focus_streak');
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month}-${today.day}';
-    final lastDate = box.get('lastFocusDate') as String?;
+    final lastDate = _box!.get('lastFocusDate') as String?;
 
     if (lastDate != todayStr) {
-      // First session today — increment streak
       final yesterday = today.subtract(const Duration(days: 1));
       final yesterdayStr = '${yesterday.year}-${yesterday.month}-${yesterday.day}';
-      final currentStreak = box.get('streak') as int? ?? 0;
+      final currentStreak = _box!.get('streak') as int? ?? 0;
 
       if (lastDate == yesterdayStr || lastDate == null) {
         state = currentStreak + 1;
       } else {
         state = 1; // streak was broken, start fresh
       }
-      await box.put('streak', state);
-      await box.put('lastFocusDate', todayStr);
+      _box!.put('streak', state);
+      _box!.put('lastFocusDate', todayStr);
     }
   }
 }

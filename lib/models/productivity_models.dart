@@ -424,6 +424,9 @@ class AppBlockRule extends HiveObject {
   @HiveField(15)
   bool isHardBlock; // Premium: cannot be deleted, toggled, or edited
 
+  @HiveField(16)
+  DateTime? expiresAt; // For duration-based blocks — auto-disable after this time
+
   AppBlockRule({
     required this.id,
     required this.name,
@@ -441,6 +444,7 @@ class AppBlockRule extends HiveObject {
     this.breaksTaken = 0,
     this.maxBreaksPerSession = 3,
     this.isHardBlock = false,
+    this.expiresAt,
   })  : blockedPackages = blockedPackages ?? [],
         activeDays = activeDays ?? [1, 2, 3, 4, 5, 6, 7];
 }
@@ -473,12 +477,15 @@ class AppBlockRuleAdapter extends TypeAdapter<AppBlockRule> {
       breaksTaken: fields[13] as int? ?? 0,
       maxBreaksPerSession: fields[14] as int? ?? 3,
       isHardBlock: fields[15] as bool? ?? false,
+      expiresAt: fields.containsKey(16) && fields[16] != null
+          ? DateTime.fromMillisecondsSinceEpoch(fields[16] as int)
+          : null,
     );
   }
 
   @override
   void write(BinaryWriter writer, AppBlockRule obj) {
-    writer.writeByte(16);
+    writer.writeByte(17);
     writer.writeByte(0); writer.write(obj.id);
     writer.writeByte(1); writer.write(obj.name);
     writer.writeByte(2); writer.write(obj.blockedPackages);
@@ -495,6 +502,7 @@ class AppBlockRuleAdapter extends TypeAdapter<AppBlockRule> {
     writer.writeByte(13); writer.write(obj.breaksTaken);
     writer.writeByte(14); writer.write(obj.maxBreaksPerSession);
     writer.writeByte(15); writer.write(obj.isHardBlock);
+    writer.writeByte(16); writer.write(obj.expiresAt?.millisecondsSinceEpoch);
   }
 }
 

@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive/hive.dart';
+import '../utils/hive_box_manager.dart';
 
 /// Clock opacity levels
 enum ClockOpacity {
@@ -41,29 +41,29 @@ enum ClockOpacity {
 }
 
 class ClockOpacityNotifier extends StateNotifier<ClockOpacity> {
-  ClockOpacityNotifier() : super(ClockOpacity.medium) {
+  ClockOpacityNotifier() : super(ClockOpacity.high) {
     _loadOpacity();
   }
 
   Future<void> _loadOpacity() async {
     try {
-      final box = await Hive.openBox('settings');
-      final savedOpacity = box.get('clockOpacity', defaultValue: 'medium');
+      final box = await HiveBoxManager.get('settings');
+      final savedOpacity = box.get('clockOpacity', defaultValue: 'high');
       if (savedOpacity != null) {
         final opacity = ClockOpacity.values.firstWhere(
           (o) => o.toString().split('.').last == savedOpacity.toString(),
-          orElse: () => ClockOpacity.medium,
+          orElse: () => ClockOpacity.high,
         );
         state = opacity;
       }
     } catch (e) {
-      state = ClockOpacity.medium;
+      state = ClockOpacity.high;
     }
   }
 
   Future<void> setOpacity(ClockOpacity opacity) async {
     try {
-      final box = await Hive.openBox('settings');
+      final box = await HiveBoxManager.get('settings');
       await box.put('clockOpacity', opacity.toString().split('.').last);
       state = opacity;
     } catch (e) {

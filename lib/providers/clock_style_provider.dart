@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../utils/hive_box_manager.dart';
 
 /// Available clock styles for the app
 enum ClockStyle {
@@ -12,6 +13,13 @@ enum ClockStyle {
   retro,
   elegant,
   binary,
+  progress,
+  vertical,
+  word,
+  dotMatrix,
+  zen,
+  typewriter,
+  arc,
 }
 
 extension ClockStyleExtension on ClockStyle {
@@ -35,6 +43,20 @@ extension ClockStyleExtension on ClockStyle {
         return 'Elegant';
       case ClockStyle.binary:
         return 'Binary';
+      case ClockStyle.progress:
+        return 'Progress';
+      case ClockStyle.vertical:
+        return 'Vertical';
+      case ClockStyle.word:
+        return 'Word';
+      case ClockStyle.dotMatrix:
+        return 'Dot Matrix';
+      case ClockStyle.zen:
+        return 'Zen';
+      case ClockStyle.typewriter:
+        return 'Typewriter';
+      case ClockStyle.arc:
+        return 'Arc';
     }
   }
 
@@ -58,6 +80,20 @@ extension ClockStyleExtension on ClockStyle {
         return 'Refined and sophisticated';
       case ClockStyle.binary:
         return 'Geek mode - binary time';
+      case ClockStyle.progress:
+        return 'Circular arc fills with time';
+      case ClockStyle.vertical:
+        return 'Stacked digits, editorial feel';
+      case ClockStyle.word:
+        return 'Time spoken in words';
+      case ClockStyle.dotMatrix:
+        return 'LED dot-grid display';
+      case ClockStyle.zen:
+        return 'Breathing minimal presence';
+      case ClockStyle.typewriter:
+        return 'Monospaced typed-out look';
+      case ClockStyle.arc:
+        return 'Time curved along an arc';
     }
   }
 }
@@ -73,30 +109,30 @@ class ClockStyleNotifier extends StateNotifier<ClockStyle> {
   static const String _clockKey = 'clockStyle';
   Box? _box;
 
-  ClockStyleNotifier() : super(ClockStyle.digital) {
+  ClockStyleNotifier() : super(ClockStyle.minimalist) {
     _init();
   }
 
   Future<void> _init() async {
     try {
-      _box = await Hive.openBox(_boxName);
+      _box = await HiveBoxManager.get(_boxName);
       final savedStyle = _box?.get(_clockKey) as String?;
 
       if (savedStyle != null) {
         final style = ClockStyle.values.firstWhere(
           (s) => s.name == savedStyle,
-          orElse: () => ClockStyle.digital,
+          orElse: () => ClockStyle.minimalist,
         );
         state = style;
       }
     } catch (e) {
       // Handle error, use default style
-      state = ClockStyle.digital;
+      state = ClockStyle.minimalist;
     }
   }
 
   Future<void> setClockStyle(ClockStyle style) async {
-    _box ??= await Hive.openBox(_boxName);
+    _box ??= await HiveBoxManager.get(_boxName);
     await _box?.put(_clockKey, style.name);
     state = style;
   }

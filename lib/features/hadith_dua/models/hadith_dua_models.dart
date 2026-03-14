@@ -377,6 +377,8 @@ class Dua {
   final String? source;
   final bool isBookmarked;
   final String? bookmarkCollection;
+  final int? repeatCount; // For duas with recommended repetition count
+  final String? benefit; // Description of the benefits/rewards
 
   Dua({
     required this.id,
@@ -388,6 +390,8 @@ class Dua {
     this.source,
     this.isBookmarked = false,
     this.bookmarkCollection,
+    this.repeatCount,
+    this.benefit,
   });
 
   Dua copyWith({
@@ -400,6 +404,8 @@ class Dua {
     String? source,
     bool? isBookmarked,
     String? bookmarkCollection,
+    int? repeatCount,
+    String? benefit,
   }) {
     return Dua(
       id: id ?? this.id,
@@ -411,6 +417,8 @@ class Dua {
       source: source ?? this.source,
       isBookmarked: isBookmarked ?? this.isBookmarked,
       bookmarkCollection: bookmarkCollection ?? this.bookmarkCollection,
+      repeatCount: repeatCount ?? this.repeatCount,
+      benefit: benefit ?? this.benefit,
     );
   }
 
@@ -424,6 +432,8 @@ class Dua {
     'source': source,
     'isBookmarked': isBookmarked,
     'bookmarkCollection': bookmarkCollection,
+    'repeatCount': repeatCount,
+    'benefit': benefit,
   };
 
   factory Dua.fromJson(Map<String, dynamic> json) {
@@ -437,6 +447,8 @@ class Dua {
       source: json['source'] as String?,
       isBookmarked: json['isBookmarked'] as bool? ?? false,
       bookmarkCollection: json['bookmarkCollection'] as String?,
+      repeatCount: json['repeatCount'] as int?,
+      benefit: json['benefit'] as String?,
     );
   }
 

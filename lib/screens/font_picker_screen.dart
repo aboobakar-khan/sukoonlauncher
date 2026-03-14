@@ -1,26 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/font_provider.dart';
+import '../providers/theme_provider.dart';
+import '../widgets/swipe_back_wrapper.dart';
 
-/// Font Picker Screen — categorized with pair previews
+/// Font Picker Screen — categorized with pair previews, theme-aware accent
 class FontPickerScreen extends ConsumerWidget {
   const FontPickerScreen({super.key});
-
-  static const _gold = Color(0xFFC2A366);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentFont = ref.watch(fontProvider);
+    final themeColor = ref.watch(themeColorProvider);
+    final accent = themeColor.color;
+    final isLight = themeColor.isLight;
+    final bgColor = isLight ? const Color(0xFFF5F5F5) : Colors.black;
+    final primaryText = isLight ? const Color(0xFF0D0D0D) : Colors.white;
     final grouped = AppFonts.grouped;
     final categories = [FontCategory.sansSerif, FontCategory.serif, FontCategory.display];
 
-    return Scaffold(
-      backgroundColor: Colors.black,
+    return SwipeBackWrapper(
+      child: Scaffold(
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Column(
           children: [
             // Header
-            _buildHeader(context),
+            _buildHeader(context, isLight: isLight, primaryText: primaryText),
 
             // Font list grouped by category
             Expanded(
@@ -29,10 +35,10 @@ class FontPickerScreen extends ConsumerWidget {
                 children: [
                   for (final category in categories) ...[
                     if (grouped[category] != null) ...[
-                      _buildCategoryHeader(AppFonts.categoryName(category)),
+                      _buildCategoryHeader(AppFonts.categoryName(category), accent),
                       const SizedBox(height: 10),
                       for (final font in grouped[category]!)
-                        _buildFontOption(context, ref, font, font.name == currentFont.name),
+                        _buildFontOption(context, ref, font, font.name == currentFont.name, accent, isLight: isLight, primaryText: primaryText),
                       const SizedBox(height: 20),
                     ],
                   ],
@@ -42,10 +48,11 @@ class FontPickerScreen extends ConsumerWidget {
           ],
         ),
       ),
+    ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, {required bool isLight, required Color primaryText}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 20, 8),
       child: Row(
@@ -55,12 +62,12 @@ class FontPickerScreen extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
+                color: primaryText.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 Icons.arrow_back_ios_new,
-                color: Colors.white.withValues(alpha: 0.7),
+                color: primaryText.withValues(alpha: 0.7),
                 size: 18,
               ),
             ),
@@ -69,12 +76,12 @@ class FontPickerScreen extends ConsumerWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Font Style',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  color: primaryText,
                 ),
               ),
               const SizedBox(height: 2),
@@ -82,7 +89,7 @@ class FontPickerScreen extends ConsumerWidget {
                 'Choose your typography',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.white.withValues(alpha: 0.4),
+                  color: primaryText.withValues(alpha: 0.4),
                 ),
               ),
             ],
@@ -92,7 +99,7 @@ class FontPickerScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCategoryHeader(String title) {
+  Widget _buildCategoryHeader(String title, Color accent) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, top: 8),
       child: Row(
@@ -101,7 +108,7 @@ class FontPickerScreen extends ConsumerWidget {
             width: 3,
             height: 14,
             decoration: BoxDecoration(
-              color: _gold.withValues(alpha: 0.5),
+              color: accent.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -112,7 +119,7 @@ class FontPickerScreen extends ConsumerWidget {
               fontSize: 11,
               letterSpacing: 1.5,
               fontWeight: FontWeight.w600,
-              color: _gold.withValues(alpha: 0.6),
+              color: accent.withValues(alpha: 0.6),
             ),
           ),
         ],
@@ -125,8 +132,13 @@ class FontPickerScreen extends ConsumerWidget {
     WidgetRef ref,
     AppFont font,
     bool isSelected,
-  ) {
+    Color accent, {
+    required bool isLight,
+    required Color primaryText,
+  }) {
     final bool isPair = font.headingFontFamily != null && font.headingFontFamily != font.fontFamily;
+    final itemBg = isLight ? Colors.black.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.03);
+    final itemBorder = isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.04);
 
     return GestureDetector(
       onTap: () {
@@ -138,13 +150,13 @@ class FontPickerScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected
-              ? _gold.withValues(alpha: 0.06)
-              : Colors.white.withValues(alpha: 0.03),
+              ? accent.withValues(alpha: 0.06)
+              : itemBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? _gold.withValues(alpha: 0.3)
-                : Colors.white.withValues(alpha: 0.04),
+                ? accent.withValues(alpha: 0.3)
+                : itemBorder,
             width: 1,
           ),
         ),
@@ -159,7 +171,7 @@ class FontPickerScreen extends ConsumerWidget {
                     font.name,
                     style: TextStyle(
                       fontFamily: font.headingFamily,
-                      color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.8),
+                      color: isSelected ? primaryText : primaryText.withValues(alpha: 0.8),
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -171,7 +183,7 @@ class FontPickerScreen extends ConsumerWidget {
                       'Heading Preview',
                       style: TextStyle(
                         fontFamily: font.headingFamily,
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: primaryText.withValues(alpha: 0.6),
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
@@ -183,7 +195,7 @@ class FontPickerScreen extends ConsumerWidget {
                     'The quick brown fox jumps over the lazy dog',
                     style: TextStyle(
                       fontFamily: font.fontFamily,
-                      color: Colors.white.withValues(alpha: 0.35),
+                      color: primaryText.withValues(alpha: 0.35),
                       fontSize: 13,
                       height: 1.4,
                     ),
@@ -193,9 +205,9 @@ class FontPickerScreen extends ConsumerWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        _buildPairChip('H', font.headingFontFamily),
+                        _buildPairChip('H', font.headingFontFamily, accent, primaryText: primaryText),
                         const SizedBox(width: 8),
-                        _buildPairChip('B', font.fontFamily),
+                        _buildPairChip('B', font.fontFamily, accent, primaryText: primaryText),
                       ],
                     ),
                   ],
@@ -203,9 +215,9 @@ class FontPickerScreen extends ConsumerWidget {
               ),
             ),
             if (isSelected)
-              const Icon(
+              Icon(
                 Icons.check_circle_rounded,
-                color: _gold,
+                color: accent,
                 size: 22,
               ),
           ],
@@ -214,11 +226,11 @@ class FontPickerScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPairChip(String label, String? fontFamily) {
+  Widget _buildPairChip(String label, String? fontFamily, Color accent, {required Color primaryText}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: _gold.withValues(alpha: 0.08),
+        color: accent.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
@@ -227,7 +239,7 @@ class FontPickerScreen extends ConsumerWidget {
           Text(
             label,
             style: TextStyle(
-              color: _gold.withValues(alpha: 0.7),
+              color: accent.withValues(alpha: 0.7),
               fontSize: 10,
               fontWeight: FontWeight.w700,
             ),
@@ -236,7 +248,7 @@ class FontPickerScreen extends ConsumerWidget {
           Text(
             fontFamily ?? 'System',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.4),
+              color: primaryText.withValues(alpha: 0.4),
               fontSize: 10,
             ),
           ),

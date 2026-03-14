@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import '../providers/prayer_provider.dart';
 import '../providers/tasbih_provider.dart';
 
@@ -69,7 +68,7 @@ class _SubtleIslamicReminderState extends ConsumerState<SubtleIslamicReminder> {
   }
 
   void _startRotation() {
-    _rotationTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _rotationTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (mounted) {
         setState(() {
           _currentReminderIndex = (_currentReminderIndex + 1) % _reminders.length;
@@ -99,7 +98,7 @@ class _SubtleIslamicReminderState extends ConsumerState<SubtleIslamicReminder> {
             style: TextStyle(
               fontFamily: 'Amiri',
               fontSize: 18,
-              color: widget.themeColor.withOpacity(0.35 * widget.opacityMultiplier),
+              color: widget.themeColor.withValues(alpha: 0.35 * widget.opacityMultiplier),
               letterSpacing: 2,
             ),
           ),
@@ -111,7 +110,7 @@ class _SubtleIslamicReminderState extends ConsumerState<SubtleIslamicReminder> {
             style: TextStyle(
               fontSize: 12,
               letterSpacing: 1,
-              color: widget.themeColor.withOpacity(0.25 * widget.opacityMultiplier),
+              color: widget.themeColor.withValues(alpha: 0.25 * widget.opacityMultiplier),
             ),
           ),
           
@@ -141,7 +140,7 @@ class _SubtleIslamicReminderState extends ConsumerState<SubtleIslamicReminder> {
           value,
           style: TextStyle(
             fontSize: 11,
-            color: widget.themeColor.withOpacity(0.2 * widget.opacityMultiplier),
+            color: widget.themeColor.withValues(alpha: 0.2 * widget.opacityMultiplier),
           ),
         ),
       ],
@@ -182,8 +181,8 @@ class MinimalIslamicStatus extends ConsumerWidget {
           margin: const EdgeInsets.symmetric(horizontal: 3),
           decoration: BoxDecoration(
             color: prayers[i] 
-                ? const Color(0xFFC2A366).withOpacity(opacity)
-                : themeColor.withOpacity(0.15),
+                ? const Color(0xFFC2A366).withValues(alpha: opacity)
+                : themeColor.withValues(alpha: 0.15),
             shape: BoxShape.circle,
           ),
         )),

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/tasbih_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/islamic_theme_provider.dart';
 
 import '../screens/dhikr_history_pro_dashboard_redesigned.dart';
 
@@ -11,7 +12,7 @@ import '../screens/dhikr_history_pro_dashboard_redesigned.dart';
 /// 
 /// Principles:
 /// 1. Ultra-minimal — no visual noise, pure focus
-/// 2. Theme-consistent — matches app dark tokens (0xFF0A0A0A, 0xFF111111)
+/// 2. Theme-consistent — adapts to light/dark mode
 /// 3. Tap anywhere on counter → increment
 /// 4. Smooth progress arc + haptic feedback
 /// 5. Compact: header + dhikr pills + counter circle + actions
@@ -26,17 +27,6 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
     with TickerProviderStateMixin {
   late AnimationController _countAnimController;
   late Animation<double> _scaleAnimation;
-
-  // ☪️ Sukoon brand design tokens — consistent with app theme
-  static const Color _cardBg = Color(0xFF111111);
-  static const Color _surfaceBg = Color(0xFF0A0A0A);
-  static const Color _borderColor = Color(0xFF1E1E1E);
-  static const Color _gold = Color(0xFFC2A366);       // Sand gold
-  static const Color _goldLight = Color(0xFFE8D5B7);   // Sand beige
-  static const Color _green = Color(0xFF7BAE6E);       // Oasis green
-  static const Color _textPrimary = Color(0xFFE6EDF3);
-  static const Color _textSecondary = Color(0xFF8B949E);
-  static const Color _textMuted = Color(0xFF484F58);
 
   // Dhikr list with Arabic and virtues — authentic from Hadith
   static const List<Map<String, String>> _dhikrList = [
@@ -141,6 +131,7 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
   @override
   Widget build(BuildContext context) {
     final themeColor = ref.watch(themeColorProvider);
+    final tc = ref.watch(islamicThemeColorsProvider);
     final tasbih = ref.watch(tasbihProvider);
     final dhikr = _dhikrList[tasbih.selectedDhikrIndex % _dhikrList.length];
     final progress = tasbih.currentCount / tasbih.targetCount;
@@ -150,34 +141,33 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
       mainAxisSize: MainAxisSize.min,
       children: [
         // ── Header — tap to open dashboard ──
-        _buildHeader(themeColor.color, tasbih),
+        _buildHeader(themeColor.color, tasbih, tc),
 
         const SizedBox(height: 8),
 
         // ── Dhikr selector — horizontal pills ──
-        _buildDhikrSelector(tasbih.selectedDhikrIndex),
+        _buildDhikrSelector(tasbih.selectedDhikrIndex, themeColor.color, tc),
 
         const SizedBox(height: 16),
 
         // ── Main counter — tap area ──
-        _buildCounter(dhikr, tasbih, progress, done),
+        _buildCounter(dhikr, tasbih, progress, done, themeColor.color, tc),
 
         const SizedBox(height: 10),
 
         // ── Quick actions ──
-        _buildActions(tasbih),
+        _buildActions(tasbih, tc),
       ],
     );
   }
 
-  Widget _buildHeader(Color accent, dynamic tasbih) {
+  Widget _buildHeader(Color accent, dynamic tasbih, IslamicThemeColors tc) {
     return GestureDetector(
       onTap: () {
-        HapticFeedback.lightImpact();
         Navigator.of(context).push(
           PageRouteBuilder(
-            pageBuilder: (_, __, ___) => const DhikrHistoryProDashboard(),
-            transitionsBuilder: (_, anim, __, child) {
+            pageBuilder: (_, _, _) => const DhikrHistoryProDashboard(),
+            transitionsBuilder: (_, anim, _, child) {
               return FadeTransition(
                 opacity: anim,
                 child: SlideTransition(
@@ -204,26 +194,28 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
                 fontSize: 11,
                 letterSpacing: 1.8,
                 fontWeight: FontWeight.w600,
-                color: accent.withOpacity(0.7),
+                color: accent.withValues(alpha: 0.7),
               ),
             ),
             if (tasbih.streakDays > 0) ...[
               const SizedBox(width: 8),
-              Text('🔥 ${tasbih.streakDays}',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _gold.withOpacity(0.7))),
+              Icon(Icons.local_fire_department_rounded, size: 11, color: accent.withValues(alpha: 0.7)),
+              const SizedBox(width: 2),
+              Text('${tasbih.streakDays}',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: accent.withValues(alpha: 0.7))),
             ],
             const Spacer(),
-            Text('${_formatNumber(tasbih.totalAllTime)}',
-              style: const TextStyle(fontSize: 11, color: _textMuted)),
+            Text(_formatNumber(tasbih.totalAllTime),
+              style: TextStyle(fontSize: 11, color: tc.textSecondary.withValues(alpha: 0.6))),
             const SizedBox(width: 6),
-            Icon(Icons.chevron_right_rounded, color: _textMuted.withOpacity(0.5), size: 16),
+            Icon(Icons.chevron_right_rounded, color: tc.textSecondary.withValues(alpha: 0.4), size: 16),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDhikrSelector(int selectedIndex) {
+  Widget _buildDhikrSelector(int selectedIndex, Color accent, IslamicThemeColors tc) {
     return SizedBox(
       height: 28,
       child: ListView.builder(
@@ -243,10 +235,10 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
                 duration: const Duration(milliseconds: 180),
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
-                  color: selected ? _gold.withOpacity(0.12) : Colors.transparent,
+                  color: selected ? accent.withValues(alpha: 0.12) : Colors.transparent,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: selected ? _gold.withOpacity(0.4) : _borderColor,
+                    color: selected ? accent.withValues(alpha: 0.4) : tc.surface.withValues(alpha: 0.3),
                   ),
                 ),
                 alignment: Alignment.center,
@@ -255,7 +247,7 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                    color: selected ? _goldLight : _textMuted,
+                    color: selected ? Colors.white.withValues(alpha: 0.95) : tc.textSecondary.withValues(alpha: 0.6),
                   ),
                 ),
               ),
@@ -266,7 +258,7 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
     );
   }
 
-  Widget _buildCounter(Map<String, String> dhikr, dynamic tasbih, double progress, bool done) {
+  Widget _buildCounter(Map<String, String> dhikr, dynamic tasbih, double progress, bool done, Color accent, IslamicThemeColors tc) {
     return GestureDetector(
       onTap: _incrementCount,
       child: ScaleTransition(
@@ -276,10 +268,10 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
             // Arabic text
             Text(
               dhikr['arabic']!,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w400,
-                color: _textPrimary,
+                color: tc.text.withValues(alpha: 0.95),
                 height: 1.6,
               ),
               textDirection: TextDirection.rtl,
@@ -288,7 +280,7 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
             const SizedBox(height: 2),
             Text(
               dhikr['meaning']!,
-              style: const TextStyle(fontSize: 11, color: _textSecondary, fontStyle: FontStyle.italic),
+              style: TextStyle(fontSize: 11, color: tc.textSecondary.withValues(alpha: 0.7), fontStyle: FontStyle.italic),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -304,13 +296,13 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
                     tween: Tween(begin: 0, end: math.min(progress, 1.0)),
                     duration: const Duration(milliseconds: 250),
                     curve: Curves.easeOutCubic,
-                    builder: (_, val, __) {
+                    builder: (_, val, _) {
                       return CustomPaint(
                         size: const Size(80, 80),
                         painter: _ArcPainter(
                           progress: val,
-                          bgColor: _borderColor,
-                          fgColor: done ? _green : _gold,
+                          bgColor: tc.surface.withValues(alpha: 0.3),
+                          fgColor: done ? tc.green : accent,
                           stroke: 4,
                         ),
                       );
@@ -329,13 +321,13 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
                           style: TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w300,
-                            color: done ? _green : _textPrimary,
+                            color: done ? tc.green : tc.text.withValues(alpha: 0.9),
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                       ),
                       Text('/ ${tasbih.targetCount}',
-                        style: const TextStyle(fontSize: 10, color: _textMuted)),
+                        style: TextStyle(fontSize: 10, color: tc.textSecondary.withValues(alpha: 0.6))),
                     ],
                   ),
                 ],
@@ -347,7 +339,7 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
               dhikr['virtue']!,
               style: TextStyle(
                 fontSize: 9,
-                color: done ? _green.withOpacity(0.7) : _textMuted.withOpacity(0.7),
+                color: done ? tc.green.withValues(alpha: 0.7) : tc.textSecondary.withValues(alpha: 0.6),
                 letterSpacing: 0.3,
               ),
               textAlign: TextAlign.center,
@@ -358,7 +350,7 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
     );
   }
 
-  Widget _buildActions(dynamic tasbih) {
+  Widget _buildActions(dynamic tasbih, IslamicThemeColors tc) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
       child: Row(
@@ -374,29 +366,29 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.refresh_rounded, color: _textMuted.withOpacity(0.6), size: 13),
+                  Icon(Icons.refresh_rounded, color: tc.textSecondary.withValues(alpha: 0.5), size: 13),
                   const SizedBox(width: 4),
                   Text('Reset',
-                    style: TextStyle(fontSize: 11, color: _textMuted.withOpacity(0.6), fontWeight: FontWeight.w400)),
+                    style: TextStyle(fontSize: 11, color: tc.textSecondary.withValues(alpha: 0.5), fontWeight: FontWeight.w400)),
                 ],
               ),
             ),
           ),
           Container(
             width: 1, height: 12,
-            color: _borderColor,
+            color: tc.surface.withValues(alpha: 0.3),
           ),
           GestureDetector(
-            onTap: () => _showTargetPicker(context, ref, tasbih.targetCount),
+            onTap: () => _showTargetPicker(context, ref, tasbih.targetCount, tc),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.flag_rounded, color: _textMuted.withOpacity(0.6), size: 13),
+                  Icon(Icons.flag_rounded, color: tc.textSecondary.withValues(alpha: 0.5), size: 13),
                   const SizedBox(width: 4),
                   Text('${tasbih.targetCount}',
-                    style: TextStyle(fontSize: 11, color: _textMuted.withOpacity(0.6), fontWeight: FontWeight.w400)),
+                    style: TextStyle(fontSize: 11, color: tc.textSecondary.withValues(alpha: 0.5), fontWeight: FontWeight.w400)),
                 ],
               ),
             ),
@@ -406,11 +398,12 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
     );
   }
 
-  void _showTargetPicker(BuildContext context, WidgetRef ref, int currentTarget) {
+  void _showTargetPicker(BuildContext context, WidgetRef ref, int currentTarget, IslamicThemeColors tc) {
+    final themeColor = ref.read(themeColorProvider);
     final targets = [33, 99, 100, 500, 1000];
     showModalBottomSheet(
       context: context,
-      backgroundColor: _cardBg,
+      backgroundColor: tc.background,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -420,8 +413,8 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Set Target',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _textPrimary)),
+            Text('Set Target',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: tc.text)),
             const SizedBox(height: 16),
             Wrap(
               spacing: 10,
@@ -437,17 +430,17 @@ class _DhikrCounterWidgetState extends ConsumerState<DhikrCounterWidget>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                     decoration: BoxDecoration(
-                      color: sel ? _gold.withOpacity(0.12) : _surfaceBg,
+                      color: sel ? themeColor.color.withValues(alpha: 0.15) : tc.surface.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: sel ? _gold : _borderColor,
+                        color: sel ? themeColor.color : tc.surface.withValues(alpha: 0.5),
                         width: sel ? 1.5 : 1,
                       ),
                     ),
                     child: Text('$t',
                       style: TextStyle(
                         fontSize: 15, fontWeight: FontWeight.w600,
-                        color: sel ? _gold : _textSecondary)),
+                        color: sel ? themeColor.color : tc.textSecondary)),
                   ),
                 );
               }).toList(),

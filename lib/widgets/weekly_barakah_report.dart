@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import '../providers/tasbih_provider.dart';
 import '../providers/prayer_provider.dart';
@@ -31,10 +30,7 @@ class WeeklyBarakahReport extends ConsumerStatefulWidget {
   ConsumerState<WeeklyBarakahReport> createState() => _WeeklyBarakahReportState();
 }
 
-class _WeeklyBarakahReportState extends ConsumerState<WeeklyBarakahReport>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _shimmerController;
-  
+class _WeeklyBarakahReportState extends ConsumerState<WeeklyBarakahReport> {
   // Weekly stats
   int _weeklyDhikr = 0;
   int _weeklyPrayers = 0;
@@ -55,16 +51,15 @@ class _WeeklyBarakahReportState extends ConsumerState<WeeklyBarakahReport>
   @override
   void initState() {
     super.initState();
-    _shimmerController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    )..repeat();
+    // Removed: _shimmerController was created with .repeat() (infinite loop)
+    // but never referenced in the build tree — it was burning CPU+GPU
+    // for absolutely nothing.  The SingleTickerProviderStateMixin is
+    // kept in case a shimmer effect is added in the future.
     _loadWeeklyData();
   }
 
   @override
   void dispose() {
-    _shimmerController.dispose();
     super.dispose();
   }
 
@@ -123,7 +118,7 @@ class _WeeklyBarakahReportState extends ConsumerState<WeeklyBarakahReport>
     if (_spiritualScore >= 60) return _primaryGreen;
     if (_spiritualScore >= 40) return _calmTeal;
     if (_spiritualScore >= 20) return _lavender;
-    return Colors.white.withOpacity(0.5);
+    return Colors.white.withValues(alpha: 0.5);
   }
 
   Future<void> _shareReport() async {
@@ -169,19 +164,19 @@ May Allah bless our efforts. 🤲
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            _getLevelColor().withOpacity(0.1),
+            _getLevelColor().withValues(alpha: 0.1),
             _cardBg,
             _deepBlack,
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: _getLevelColor().withOpacity(0.3),
+          color: _getLevelColor().withValues(alpha: 0.3),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: _getLevelColor().withOpacity(0.1),
+            color: _getLevelColor().withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -270,7 +265,7 @@ May Allah bless our efforts. 🤲
             Text(
               'Calculating your Barakah...',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 fontSize: 12,
               ),
             ),
@@ -295,7 +290,7 @@ May Allah bless our efforts. 🤲
                 child: CircularProgressIndicator(
                   value: _spiritualScore / 100,
                   strokeWidth: 6,
-                  backgroundColor: Colors.white.withOpacity(0.08),
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
                   valueColor: AlwaysStoppedAnimation(_getLevelColor()),
                 ),
               ),
@@ -313,7 +308,7 @@ May Allah bless our efforts. 🤲
                   Text(
                     '/100',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                       fontSize: 10,
                     ),
                   ),
@@ -349,9 +344,9 @@ May Allah bless our efforts. 🤲
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _getLevelColor().withOpacity(0.15),
+                    color: _getLevelColor().withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _getLevelColor().withOpacity(0.3)),
+                    border: Border.all(color: _getLevelColor().withValues(alpha: 0.3)),
                   ),
                   child: Text(
                     _getSpiritualLevel(),
@@ -380,9 +375,9 @@ May Allah bless our efforts. 🤲
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -414,7 +409,7 @@ May Allah bless our efforts. 🤲
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.4),
+              color: Colors.white.withValues(alpha: 0.4),
               fontSize: 11,
             ),
           ),
@@ -430,12 +425,12 @@ May Allah bless our efforts. 🤲
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            _spiritualGold.withOpacity(0.15),
-            _spiritualGold.withOpacity(0.05),
+            _spiritualGold.withValues(alpha: 0.15),
+            _spiritualGold.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _spiritualGold.withOpacity(0.2)),
+        border: Border.all(color: _spiritualGold.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -454,7 +449,7 @@ May Allah bless our efforts. 🤲
           Text(
             'Keep it going!',
             style: TextStyle(
-              color: _spiritualGold.withOpacity(0.7),
+              color: _spiritualGold.withValues(alpha: 0.7),
               fontSize: 12,
             ),
           ),
@@ -471,12 +466,12 @@ May Allah bless our efforts. 🤲
         child: ElevatedButton.icon(
           onPressed: _shareReport,
           style: ElevatedButton.styleFrom(
-            backgroundColor: _primaryGreen.withOpacity(0.15),
+            backgroundColor: _primaryGreen.withValues(alpha: 0.15),
             foregroundColor: _primaryGreen,
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: _primaryGreen.withOpacity(0.3)),
+              side: BorderSide(color: _primaryGreen.withValues(alpha: 0.3)),
             ),
             elevation: 0,
           ),
@@ -509,12 +504,12 @@ class BarakahScoreBadge extends ConsumerWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFFC2A366).withOpacity(0.2),
-            const Color(0xFFC2A366).withOpacity(0.1),
+            const Color(0xFFC2A366).withValues(alpha: 0.2),
+            const Color(0xFFC2A366).withValues(alpha: 0.1),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFC2A366).withOpacity(0.3)),
+        border: Border.all(color: const Color(0xFFC2A366).withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

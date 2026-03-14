@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../models/prayer_record.dart';
+import '../utils/hive_box_manager.dart';
 
 const _uuid = Uuid();
 
@@ -44,7 +45,7 @@ class PrayerRecordListNotifier extends StateNotifier<List<PrayerRecord>> {
 
   Future<void> _init() async {
     try {
-      _box = await Hive.openBox<PrayerRecord>('prayer_records');
+      _box = await HiveBoxManager.get<PrayerRecord>('prayer_records');
       state = _box!.values.toList();
     } catch (e) {
       state = [];
@@ -53,7 +54,7 @@ class PrayerRecordListNotifier extends StateNotifier<List<PrayerRecord>> {
 
   /// Toggle a specific prayer for a given date
   Future<void> togglePrayer(DateTime date, String prayerName) async {
-    _box ??= await Hive.openBox<PrayerRecord>('prayer_records');
+    _box ??= await HiveBoxManager.get<PrayerRecord>('prayer_records');
 
     final dateOnly = PrayerRecord.dateOnly(date);
     final dateKey =

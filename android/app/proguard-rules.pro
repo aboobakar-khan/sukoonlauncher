@@ -16,5 +16,18 @@
 # AudioPlayers
 -keep class xyz.luan.audioplayers.** { *; }
 
+# Razorpay — payment gateway
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keepattributes JavascriptInterface
+-keepattributes *Annotation*
+-dontwarn com.razorpay.**
+-keep class com.razorpay.** { *; }
+-optimizations !method/inlining/*
+-keepclasseswithmembers class * {
+    public void onPayment*(...);
+}
+
 # Prevent stripping of native methods used by Flutter
 -keep class com.sukoon.launcher.** { *; }

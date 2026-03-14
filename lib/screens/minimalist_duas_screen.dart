@@ -131,27 +131,27 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: Icon(Icons.arrow_back, color: _richBrown.withOpacity(0.6), size: 22),
+            icon: Icon(Icons.arrow_back, color: _richBrown.withValues(alpha: 0.6), size: 22),
           ),
           const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('40 Duas',
-                style: TextStyle(color: _richBrown.withOpacity(0.85), fontSize: 20, fontWeight: FontWeight.w500)),
+                style: TextStyle(color: _richBrown.withValues(alpha: 0.85), fontSize: 20, fontWeight: FontWeight.w500)),
               Text('Essential supplications',
-                style: TextStyle(color: _warmBrown.withOpacity(0.4), fontSize: 12)),
+                style: TextStyle(color: _warmBrown.withValues(alpha: 0.4), fontSize: 12)),
             ],
           ),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: _islamicGreen.withOpacity(0.08),
+              color: _islamicGreen.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text('${_duas.length}',
-              style: TextStyle(color: _islamicGreen.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.w600)),
+              style: TextStyle(color: _islamicGreen.withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -173,10 +173,10 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: isExpanded ? _warmSand.withOpacity(0.5) : _warmSand.withOpacity(0.25),
+          color: isExpanded ? _warmSand.withValues(alpha: 0.5) : _warmSand.withValues(alpha: 0.25),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isExpanded ? _goldAccent.withOpacity(0.2) : _warmSand.withOpacity(0.3),
+            color: isExpanded ? _goldAccent.withValues(alpha: 0.2) : _warmSand.withValues(alpha: 0.3),
           ),
         ),
         child: Column(
@@ -187,15 +187,15 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: _islamicGreen.withOpacity(0.06),
+                  color: _islamicGreen.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(dua['category']!.toUpperCase(),
-                  style: TextStyle(color: _islamicGreen.withOpacity(0.5), fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.8)),
+                  style: TextStyle(color: _islamicGreen.withValues(alpha: 0.5), fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.8)),
               ),
               const Spacer(),
               Text('#${index + 1}',
-                style: TextStyle(color: _warmBrown.withOpacity(0.2), fontSize: 11)),
+                style: TextStyle(color: _warmBrown.withValues(alpha: 0.2), fontSize: 11)),
             ]),
             
             const SizedBox(height: 16),
@@ -204,7 +204,7 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
             Container(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: isExpanded ? 20 : 14),
               decoration: BoxDecoration(
-                color: isExpanded ? Colors.white.withOpacity(0.6) : Colors.white.withOpacity(0.35),
+                color: isExpanded ? Colors.white.withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.35),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -226,11 +226,11 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
               
               // Ornamental divider
               Center(child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Container(width: 30, height: 0.5, color: _goldAccent.withOpacity(0.2)),
+                Container(width: 30, height: 0.5, color: _goldAccent.withValues(alpha: 0.2)),
                 const SizedBox(width: 8),
-                Text('✦', style: TextStyle(fontSize: 8, color: _goldAccent.withOpacity(0.3))),
+                Text('✦', style: TextStyle(fontSize: 8, color: _goldAccent.withValues(alpha: 0.3))),
                 const SizedBox(width: 8),
-                Container(width: 30, height: 0.5, color: _goldAccent.withOpacity(0.2)),
+                Container(width: 30, height: 0.5, color: _goldAccent.withValues(alpha: 0.2)),
               ])),
               
               const SizedBox(height: 16),
@@ -238,7 +238,7 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
               // Transliteration
               Text(dua['transliteration']!,
                 style: TextStyle(
-                  color: _warmBrown.withOpacity(0.55),
+                  color: _warmBrown.withValues(alpha: 0.55),
                   fontSize: 14,
                   fontStyle: FontStyle.italic,
                   height: 1.6,
@@ -251,7 +251,7 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
               // Translation
               Text(dua['translation']!,
                 style: TextStyle(
-                  color: _richBrown.withOpacity(0.7),
+                  color: _richBrown.withValues(alpha: 0.7),
                   fontSize: 14,
                   height: 1.7,
                 ),
@@ -276,16 +276,16 @@ class _MinimalistDuasScreenState extends State<MinimalistDuasScreen> {
                     ));
                   },
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.copy_rounded, color: _warmBrown.withOpacity(0.3), size: 14),
+                    Icon(Icons.copy_rounded, color: _warmBrown.withValues(alpha: 0.3), size: 14),
                     const SizedBox(width: 6),
-                    Text('Copy', style: TextStyle(color: _warmBrown.withOpacity(0.4), fontSize: 12)),
+                    Text('Copy', style: TextStyle(color: _warmBrown.withValues(alpha: 0.4), fontSize: 12)),
                   ]),
                 ),
               ),
             ] else ...[
               const SizedBox(height: 8),
               Text('tap to read',
-                style: TextStyle(color: _warmBrown.withOpacity(0.15), fontSize: 10),
+                style: TextStyle(color: _warmBrown.withValues(alpha: 0.15), fontSize: 10),
                 textAlign: TextAlign.center),
             ],
           ],

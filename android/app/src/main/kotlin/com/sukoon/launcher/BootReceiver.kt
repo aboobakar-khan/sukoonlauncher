@@ -8,6 +8,7 @@ import android.util.Log
 /**
  * Restarts the AppBlockerService after device reboot,
  * if it was enabled before the reboot.
+ * Also restores Zen Mode lock screen if Zen was active when the device rebooted.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -16,10 +17,28 @@ class BootReceiver : BroadcastReceiver() {
             
             val blockedPackages = AppBlockerService.getBlockedPackages(context)
             val wasEnabled = AppBlockerService.isEnabled(context)
+            val wasZen = AppBlockerService.isZenMode(context)
+            val hasTimedSession = AppBlockerService.getTimedSession(context) != null
             
-            if (wasEnabled && blockedPackages.isNotEmpty()) {
+            // Only restart if there's actual work to do (blocked apps, timer, or zen).
+            // Don't restart an idle service — it just shows "running in background"
+            // and wastes battery.
+            if (wasEnabled && (blockedPackages.isNotEmpty() || hasTimedSession || wasZen)) {
                 Log.d("BootReceiver", "Restarting blocker service with ${blockedPackages.size} blocked apps")
                 AppBlockerService.start(context)
+            } else if (wasEnabled) {
+                // Was enabled but nothing to do — clear the enabled flag
+                Log.d("BootReceiver", "Service was enabled but idle — clearing flag to save battery")
+                AppBlockerService.getPrefs(context).edit()
+                    .putBoolean(AppBlockerService.KEY_SERVICE_ENABLED, false)
+                    .apply()
+            }
+
+            // If Zen Mode was active before reboot, re-show the Zen lock screen overlay
+            // so the phone wakes directly to the Zen countdown (not the normal lock screen)
+            if (wasZen) {
+                Log.d("BootReceiver", "Zen Mode was active — restoring ZenLockScreenActivity")
+                ZenLockScreenActivity.show(context)
             }
         }
     }

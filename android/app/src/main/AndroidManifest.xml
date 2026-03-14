@@ -3,12 +3,11 @@
     <!-- Permission to query installed apps -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
     
-    <!-- Permissions for voice interrupts -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.BLUETOOTH"/>
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    
+    <!-- Location for prayer times (GPS + network) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     
     <!-- Screen Time Analytics - Usage Stats Permission -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
@@ -23,30 +22,50 @@
     
     <!-- Zen Mode: overlay to block notification bar pull-down -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- Pull-down notification panel from swipe gesture -->
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
     
     <!-- Zen Mode: Do Not Disturb control (must be declared to appear in DND access list) -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+
+    <!-- Prayer Alarm: exact alarm scheduling (Android 12+) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- Prayer Alarm: vibrate for notification -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Prayer Alarm: show full-screen notification over lock screen (Android 10+) -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Prayer Alarm: allow activity launch from background (needed for AlarmActivity) -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Prayer Alarm: request battery optimization exemption (Samsung/Xiaomi/etc.) -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Custom audio: read audio files from device storage (Android 13+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- Custom audio: read storage for Android 12 and below -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
     
     <application
         android:label="Sukoon"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:enableOnBackInvokedCallback="false">
+        android:enableOnBackInvokedCallback="false"
+        android:resizeableActivity="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
             android:excludeFromRecents="true"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize">
-            <!-- Specifies an Android theme to apply to this Activity as soon as
-                 the Android process has started. This theme is visible to the user
-                 while the Flutter UI initializes. After that, this theme continues
-                 to determine the Window background behind the Flutter UI. -->
+            android:windowSoftInputMode="adjustResize"
+            android:resizeableActivity="true">
             <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
@@ -63,8 +82,6 @@
                 <category android:name="android.intent.category.DEFAULT"/>
             </intent-filter>
         </activity>
-        <!-- Don't delete the meta-data below.
-             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
@@ -89,17 +106,85 @@
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
-    </application>
-    <!-- Required to query activities that can process text, see:
-         https://developer.android.com/training/package-visibility and
-         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
 
-         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+        <!-- Prayer Alarm: android_alarm_manager_plus broadcast receiver + service -->
+        <service
+            android:name="dev.fluttercommunity.plus.androidalarmmanager.AlarmService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false" />
+        <receiver
+            android:name="dev.fluttercommunity.plus.androidalarmmanager.AlarmBroadcastReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="dev.fluttercommunity.plus.androidalarmmanager.RebootBroadcastReceiver"
+            android:enabled="false"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Prayer Alarm: native wake-screen trampoline Activity -->
+        <!-- Shows OVER the lock screen (no keyguard dismiss) — exactly like stock alarm -->
+        <activity
+            android:name=".AlarmActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity="com.sukoon.launcher.alarm"
+            android:launchMode="singleTop" />
+
+        <!-- Zen Mode: lock-screen overlay Activity shown over keyguard during Zen session -->
+        <!-- Uses FLAG_SHOW_WHEN_LOCKED so the Zen screen appears without unlocking -->
+        <activity
+            android:name=".ZenLockScreenActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity="com.sukoon.launcher.zen"
+            android:launchMode="singleTop" />
+
+        <!-- Prayer Alarm: BroadcastReceiver that wakes screen and launches AlarmActivity -->
+        <receiver
+            android:name=".AlarmBroadcastReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.sukoon.launcher.PRAYER_ALARM" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Device Admin: required for double-tap lock screen (dpm.lockNow()) -->
+        <receiver
+            android:name=".SukoonDeviceAdmin"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_policy" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Notification Filter: Captures notifications from all apps for the in-launcher feed -->
+        <service
+            android:name=".SukoonNotificationListenerService"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+    </application>
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'tasbih_provider.dart';
+import '../utils/hive_box_manager.dart';
 
 /// Represents a single dhikr session
 class DhikrSession {
@@ -176,7 +177,7 @@ class DhikrHistoryNotifier extends StateNotifier<DhikrHistoryState> {
   }
 
   Future<void> _init() async {
-    _box = await Hive.openBox<String>(_boxName);
+    _box = await HiveBoxManager.get<String>(_boxName);
     _load();
   }
 

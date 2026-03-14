@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../utils/hive_box_manager.dart';
 
 /// Available Arabic font styles for Quran
 class ArabicFont {
@@ -89,7 +90,7 @@ class ArabicFontNotifier extends StateNotifier<ArabicFont> {
   Box? _box;
 
   Future<void> _loadFont() async {
-    _box ??= await Hive.openBox('arabic_font');
+    _box ??= await HiveBoxManager.get('arabic_font');
     final savedFont = _box!.get('font_name');
 
     if (savedFont != null) {
@@ -103,7 +104,7 @@ class ArabicFontNotifier extends StateNotifier<ArabicFont> {
   }
 
   Future<void> setFont(ArabicFont font) async {
-    _box ??= await Hive.openBox('arabic_font');
+    _box ??= await HiveBoxManager.get('arabic_font');
     await _box!.put('font_name', font.name);
     state = font;
   }

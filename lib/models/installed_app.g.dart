@@ -20,19 +20,22 @@ class InstalledAppAdapter extends TypeAdapter<InstalledApp> {
       packageName: fields[0] as String,
       appName: fields[1] as String,
       lastUpdated: fields[2] as DateTime?,
+      customName: fields[3] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, InstalledApp obj) {
     writer
-      ..writeByte(3)
+      ..writeByte(4)
       ..writeByte(0)
       ..write(obj.packageName)
       ..writeByte(1)
       ..write(obj.appName)
       ..writeByte(2)
-      ..write(obj.lastUpdated);
+      ..write(obj.lastUpdated)
+      ..writeByte(3)
+      ..write(obj.customName);
   }
 
   @override

@@ -1,11 +1,41 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../models/surah.dart';
 import '../models/verse.dart';
+import 'alquran_api_service.dart';
 
 class QuranService {
-  Future<List<Surah>> loadSurahs() async {
+  final AlQuranApiService _apiService = AlQuranApiService();
+
+  /// Load surahs — tries API first (for current language), falls back to local JSON
+  Future<List<Surah>> loadSurahs({String lang = 'en'}) async {
+    // Try API for non-English or if we want fresh data
+    if (lang != 'en') {
+      try {
+        final apiSurahs = await _apiService.getAllSurahs(lang: lang);
+        if (apiSurahs.isNotEmpty) {
+          return apiSurahs
+              .map((s) => Surah(
+                    id: s.id,
+                    name: s.name,
+                    transliteration: s.transliteration,
+                    type: s.type,
+                    totalVerses: s.totalVerses,
+                  ))
+              .toList();
+        }
+      } catch (e) {
+        debugPrint('QuranService: API surah list failed, using local: $e');
+      }
+    }
+
+    // Fallback to local JSON
+    return _loadLocalSurahs();
+  }
+
+  Future<List<Surah>> _loadLocalSurahs() async {
     try {
       final String jsonString = await rootBundle.loadString(
         'assets/quran/quran_en.json',
@@ -19,7 +49,31 @@ class QuranService {
     }
   }
 
-  Future<List<Verse>> loadVerses(int surahId) async {
+  /// Load verses — API-first with local JSON fallback.
+  /// When [lang] != 'en', fetches translation from API.
+  /// Returns verses with translations in the requested language.
+  Future<List<Verse>> loadVerses(int surahId, {String lang = 'en'}) async {
+    // Try API (especially for non-English)
+    try {
+      final apiDetail = await _apiService.getSurah(surahId, lang: lang);
+      if (apiDetail != null && apiDetail.verses.isNotEmpty) {
+        return apiDetail.verses
+            .map((v) => Verse(
+                  id: v.id,
+                  arabic: v.text,
+                  translation: v.translation,
+                ))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('QuranService: API verse fetch failed, using local: $e');
+    }
+
+    // Fallback to local JSON (English only)
+    return _loadLocalVerses(surahId);
+  }
+
+  Future<List<Verse>> _loadLocalVerses(int surahId) async {
     try {
       final String jsonString = await rootBundle.loadString(
         'assets/quran/quran_en.json',
@@ -42,7 +96,20 @@ class QuranService {
     }
   }
 
-  Future<Map<String, dynamic>?> getRandomVerse() async {
+  /// Get audio recitations for a surah
+  Future<Map<String, AudioRecitation>> getAudioRecitations(int surahId) async {
+    try {
+      final detail = await _apiService.getSurah(surahId, lang: 'en');
+      if (detail != null) {
+        return detail.audio;
+      }
+    } catch (e) {
+      debugPrint('QuranService: Failed to get audio: $e');
+    }
+    return {};
+  }
+
+  Future<Map<String, dynamic>?> getRandomVerse({String lang = 'en'}) async {
     try {
       final String jsonString = await rootBundle.loadString(
         'assets/quran/quran_en.json',

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 /// Edge Swipe Wrapper - Enables right edge swipe to navigate to dashboard
 /// 
@@ -33,7 +32,6 @@ class EdgeSwipeWrapper extends StatelessWidget {
               final velocity = details.primaryVelocity ?? 0;
               if (velocity < -300) {
                 // Fast swipe left from right edge
-                HapticFeedback.lightImpact();
                 if (onSwipeRight != null) {
                   onSwipeRight!();
                 }

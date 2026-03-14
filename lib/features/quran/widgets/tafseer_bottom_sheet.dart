@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/quran_provider.dart';
+import '../services/tafseer_service.dart';
 import '../../../providers/tafseer_edition_provider.dart';
+import '../../../providers/islamic_theme_provider.dart';
 
 /// Bottom sheet for displaying Tafseer content with clean formatting
 class TafseerBottomSheet extends ConsumerWidget {
@@ -34,18 +36,11 @@ class TafseerBottomSheet extends ConsumerWidget {
     );
   }
 
-  // Warm reading palette
-  static const _creamBg = Color(0xFFFDF6EC);
-  static const _warmSand = Color(0xFFF5E6C8);
-  static const _richBrown = Color(0xFF2C1810);
-  static const _warmBrown = Color(0xFF5C4033);
-  static const _gold = Color(0xFFC2A366);
-  static const _islamicGreen = Color(0xFF2E7D32);
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tafseerAsync = ref.watch(tafseerProvider((surahId: surahId, ayahId: ayahId)));
     final selectedEdition = ref.watch(selectedTafseerEditionProvider);
+    final tc = ref.watch(islamicThemeColorsProvider);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
@@ -54,9 +49,9 @@ class TafseerBottomSheet extends ConsumerWidget {
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
-            color: _creamBg,
+            color: tc.background,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            border: Border.all(color: _warmSand, width: 1),
+            border: Border.all(color: tc.border, width: 1),
           ),
           child: Column(
             children: [
@@ -66,7 +61,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: _warmBrown.withOpacity(0.2),
+                  color: tc.textSecondary.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -79,12 +74,12 @@ class TafseerBottomSheet extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: _islamicGreen.withOpacity(0.08),
+                        color: tc.green.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         Icons.menu_book_rounded,
-                        color: _islamicGreen.withOpacity(0.6),
+                        color: tc.green.withValues(alpha: 0.6),
                         size: 20,
                       ),
                     ),
@@ -102,7 +97,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                                   child: Text(
                                     selectedEdition.name,
                                     style: TextStyle(
-                                      color: _richBrown.withOpacity(0.85),
+                                      color: tc.text.withValues(alpha: 0.85),
                                       fontSize: 15,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -113,7 +108,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                                 const SizedBox(width: 4),
                                 Icon(
                                   Icons.keyboard_arrow_down_rounded,
-                                  color: _gold.withOpacity(0.6),
+                                  color: tc.accent.withValues(alpha: 0.6),
                                   size: 18,
                                 ),
                               ],
@@ -122,7 +117,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                           Text(
                             '$surahName • Ayah $ayahId',
                             style: TextStyle(
-                              color: _warmBrown.withOpacity(0.45),
+                              color: tc.textSecondary.withValues(alpha: 0.45),
                               fontSize: 13,
                             ),
                           ),
@@ -138,7 +133,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: const Text('Copied to clipboard'),
-                              backgroundColor: _gold,
+                              backgroundColor: tc.accent,
                               behavior: SnackBarBehavior.floating,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
@@ -149,7 +144,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                       },
                       icon: Icon(
                         Icons.copy_outlined,
-                        color: _warmBrown.withOpacity(0.6),
+                        color: tc.textSecondary.withValues(alpha: 0.6),
                         size: 20,
                       ),
                     ),
@@ -157,14 +152,14 @@ class TafseerBottomSheet extends ConsumerWidget {
                       onPressed: () => Navigator.pop(context),
                       icon: Icon(
                         Icons.close,
-                        color: _warmBrown.withOpacity(0.5),
+                        color: tc.textSecondary.withValues(alpha: 0.5),
                       ),
                     ),
                   ],
                 ),
               ),
               
-              Divider(color: _warmSand, height: 1),
+              Divider(color: tc.border, height: 1),
               
               // Content
               Expanded(
@@ -177,14 +172,14 @@ class TafseerBottomSheet extends ConsumerWidget {
                           children: [
                             Icon(
                               Icons.info_outline,
-                              color: _warmBrown.withOpacity(0.4),
+                              color: tc.textSecondary.withValues(alpha: 0.4),
                               size: 48,
                             ),
                             const SizedBox(height: 16),
                             Text(
                               'Tafseer not available',
                               style: TextStyle(
-                                color: _warmBrown,
+                                color: tc.textSecondary,
                                 fontSize: 16,
                               ),
                             ),
@@ -192,7 +187,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                             Text(
                               'Try selecting a different edition in Settings',
                               style: TextStyle(
-                                color: _warmBrown.withOpacity(0.5),
+                                color: tc.textSecondary.withValues(alpha: 0.5),
                                 fontSize: 13,
                               ),
                             ),
@@ -208,7 +203,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                       child: Text(
                         tafseer.text,
                         style: TextStyle(
-                          color: _richBrown.withOpacity(0.85),
+                          color: tc.text.withValues(alpha: 0.85),
                           fontSize: 17,
                           height: 1.9,
                           letterSpacing: 0.2,
@@ -218,7 +213,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                   },
                   loading: () => Center(
                     child: CircularProgressIndicator(
-                      color: _islamicGreen.withOpacity(0.5),
+                      color: tc.green.withValues(alpha: 0.5),
                     ),
                   ),
                   error: (error, _) => Center(
@@ -227,14 +222,14 @@ class TafseerBottomSheet extends ConsumerWidget {
                       children: [
                         Icon(
                           Icons.cloud_off,
-                          color: _warmBrown.withOpacity(0.4),
+                          color: tc.textSecondary.withValues(alpha: 0.4),
                           size: 48,
                         ),
                         const SizedBox(height: 16),
                         Text(
                           'Could not load tafseer',
                           style: TextStyle(
-                            color: _warmBrown,
+                            color: tc.textSecondary,
                             fontSize: 16,
                           ),
                         ),
@@ -242,7 +237,7 @@ class TafseerBottomSheet extends ConsumerWidget {
                         Text(
                           'Check your internet connection',
                           style: TextStyle(
-                            color: _warmBrown.withOpacity(0.5),
+                            color: tc.textSecondary.withValues(alpha: 0.5),
                             fontSize: 13,
                           ),
                         ),
@@ -272,100 +267,229 @@ class TafseerBottomSheet extends ConsumerWidget {
 
       showModalBottomSheet(
         context: context,
-        backgroundColor: _creamBg,
+        backgroundColor: Colors.transparent,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         builder: (ctx) => Consumer(
           builder: (ctx, innerRef, _) {
             final selected = innerRef.watch(selectedTafseerEditionProvider);
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40, height: 4,
-                      decoration: BoxDecoration(
-                        color: _warmBrown.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(2),
+            final colors = innerRef.watch(islamicThemeColorsProvider);
+            return Container(
+              decoration: BoxDecoration(
+                color: colors.background,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40, height: 4,
+                        decoration: BoxDecoration(
+                          color: colors.textSecondary.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Choose Tafseer',
-                    style: TextStyle(
-                      color: _richBrown.withOpacity(0.85),
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(height: 16),
+                    Text(
+                      'Choose Tafseer',
+                      style: TextStyle(
+                        color: colors.text.withValues(alpha: 0.85),
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 300,
-                    child: ListView.builder(
-                      itemCount: sortedEditions.length,
-                      itemBuilder: (ctx, i) {
-                        final edition = sortedEditions[i];
-                        final isSelected = selected.slug == edition.slug;
-                        return GestureDetector(
-                          onTap: () {
-                            innerRef.read(selectedTafseerEditionProvider.notifier).setEdition(edition);
-                            Navigator.pop(ctx);
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: isSelected ? _islamicGreen.withOpacity(0.08) : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isSelected ? _islamicGreen.withOpacity(0.3) : _warmSand,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        edition.name,
-                                        style: TextStyle(
-                                          color: _richBrown.withOpacity(0.8),
-                                          fontSize: 14,
-                                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${edition.authorName} • ${edition.language}',
-                                        style: TextStyle(
-                                          color: _warmBrown.withOpacity(0.5),
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (isSelected)
-                                  Icon(Icons.check_rounded, color: _islamicGreen, size: 20),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 300,
+                      child: ListView.builder(
+                        itemCount: sortedEditions.length,
+                        itemBuilder: (ctx, i) {
+                          final edition = sortedEditions[i];
+                          final isSelected = selected.slug == edition.slug;
+                          return _EditionPickerTile(
+                            edition: edition,
+                            isSelected: isSelected,
+                            colors: colors,
+                            onSelect: () {
+                              innerRef.read(selectedTafseerEditionProvider.notifier).setEdition(edition);
+                              Navigator.pop(ctx);
+                            },
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },
         ),
       );
     });
+  }
+}
+
+/// Stateful tile for each edition with download support
+class _EditionPickerTile extends StatefulWidget {
+  final TafseerEdition edition;
+  final bool isSelected;
+  final IslamicThemeColors colors;
+  final VoidCallback onSelect;
+
+  const _EditionPickerTile({
+    required this.edition,
+    required this.isSelected,
+    required this.colors,
+    required this.onSelect,
+  });
+
+  @override
+  State<_EditionPickerTile> createState() => _EditionPickerTileState();
+}
+
+class _EditionPickerTileState extends State<_EditionPickerTile> {
+  bool _isDownloading = false;
+  bool _isFullDownloaded = false;
+  int _downloadedCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkDownloadStatus();
+  }
+
+  Future<void> _checkDownloadStatus() async {
+    final service = TafseerService();
+    final isFullDownloaded = await service.isFullTafseerDownloaded(edition: widget.edition.slug);
+    final count = await service.getDownloadedSurahCount(edition: widget.edition.slug);
+    if (mounted) {
+      setState(() {
+        _isFullDownloaded = isFullDownloaded;
+        _downloadedCount = count;
+      });
+    }
+  }
+
+  Future<void> _downloadFullTafseer() async {
+    setState(() => _isDownloading = true);
+    final service = TafseerService();
+    final success = await service.downloadFullTafseer(
+      edition: widget.edition.slug,
+      onProgress: (completed, total) {
+        if (mounted) setState(() => _downloadedCount = completed);
+      },
+    );
+    if (mounted) {
+      setState(() {
+        _isDownloading = false;
+        _isFullDownloaded = success;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success
+              ? '${widget.edition.name} – Complete tafseer downloaded!'
+              : 'Some surahs failed. Tap to retry.'),
+          backgroundColor: success ? const Color(0xFFA67B5B) : Colors.red,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.colors;
+    return GestureDetector(
+      onTap: widget.onSelect,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: widget.isSelected ? c.green.withValues(alpha: 0.08) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: widget.isSelected ? c.green.withValues(alpha: 0.3) : c.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.edition.name,
+                    style: TextStyle(
+                      color: c.text.withValues(alpha: 0.8),
+                      fontSize: 14,
+                      fontWeight: widget.isSelected ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${widget.edition.authorName} • ${widget.edition.language}',
+                    style: TextStyle(
+                      color: c.textSecondary.withValues(alpha: 0.5),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Download button
+            if (_isDownloading)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$_downloadedCount/114',
+                    style: TextStyle(color: c.accent, fontSize: 10, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 1.5, color: c.accent),
+                  ),
+                ],
+              )
+            else if (_isFullDownloaded)
+              Icon(Icons.cloud_done_rounded, color: c.green.withValues(alpha: 0.7), size: 18)
+            else
+              GestureDetector(
+                onTap: _downloadFullTafseer,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: c.accent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.cloud_download_outlined, color: c.accent, size: 16),
+                      if (_downloadedCount > 0) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '$_downloadedCount/114',
+                          style: TextStyle(color: c.accent, fontSize: 10, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            if (widget.isSelected) ...[
+              const SizedBox(width: 8),
+              Icon(Icons.check_rounded, color: c.green, size: 20),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }

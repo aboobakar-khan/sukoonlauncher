@@ -117,81 +117,135 @@
 <body>
     <div class="container">
         <h1>Privacy Policy</h1>
-        <p class="last-updated">Last updated: January 25, 2026</p>
+        <p class="last-updated">Last updated: March 2, 2026</p>
 
         <div class="intro">
-            <p><strong>Sukoon Launcher</strong> ("we", "our", or "the app") is a Sukoon Launcher application. Your privacy is very important to us. This Privacy Policy explains how we handle information when you use our application.</p>
+            <p><strong>Sukoon Launcher</strong> ("we", "our", or "the app") is a peaceful Islamic launcher application designed for a focused, mindful digital life. Your privacy is very important to us. This Privacy Policy explains how we handle information when you use our application.</p>
             <p>By using this app, you agree to the practices described in this policy.</p>
         </div>
 
         <h2>1. Information We Collect</h2>
         <ul>
             <li>We do not collect, store, or sell any personal data.</li>
-            <li>All user preferences such as wallpaper selection, favorites, hidden apps, and settings are stored locally on your device only.</li>
+            <li>All user preferences — including wallpaper selection, favorites, hidden apps, prayer records, dhikr counts, Pomodoro history, app block rules, fasting logs, charity logs, and settings — are stored locally on your device only using Hive local storage.</li>
             <li>We do not require you to create an account.</li>
+            <li>No analytics, tracking, or telemetry data is collected or transmitted.</li>
         </ul>
 
         <h2>2. Microphone & Voice Recognition</h2>
         <ul>
-            <li>The app uses the device microphone only when you manually activate the voice unlock feature.</li>
+            <li>The app uses the device microphone only when you manually activate the voice search feature to find and launch apps by voice.</li>
             <li>The microphone is used temporarily to recognize spoken app names.</li>
             <li>Audio data is not recorded, stored, transmitted, or shared.</li>
-            <li>Voice processing is handled by the device or operating system's speech recognition service.</li>
+            <li>Voice processing is handled entirely by the device's built-in speech recognition service (on-device).</li>
             <li>The microphone is never accessed in the background.</li>
         </ul>
 
-        <h2>3. App Usage Access Permission</h2>
+        <h2>3. Location Access</h2>
         <ul>
-            <li>If you enable smart features such as automatic hiding of unused apps, the app may request Usage Access permission.</li>
-            <li>Usage data is processed only on your device.</li>
-            <li>We do not collect, store, or transmit app usage information.</li>
-            <li>This data is used only to improve launcher functionality (e.g., hiding unused apps).</li>
-            <li>Granting this permission is optional.</li>
+            <li>The app requests location permission (GPS and network) solely to calculate accurate prayer times (Salah times) and Qibla direction based on your geographic coordinates.</li>
+            <li>Location data is processed on-device only and is never transmitted, stored on any server, or shared with third parties.</li>
+            <li>Granting location permission is optional — you can manually set your location in settings if preferred.</li>
         </ul>
 
-        <h2>4. Installed Apps Information</h2>
+        <h2>4. App Usage Access Permission</h2>
         <ul>
-            <li>The app accesses the list of installed applications on your device in order to display and launch apps as part of the launcher functionality.</li>
+            <li>If you enable the Screen Time Tracker or App Blocker features, the app may request Usage Access permission.</li>
+            <li>Usage data is processed only on your device to show you how long you spend in each app and to enforce time limits you set.</li>
+            <li>We do not collect, store, or transmit app usage information to any server.</li>
+            <li>Granting this permission is entirely optional.</li>
+        </ul>
+
+        <h2>5. Notification Access</h2>
+        <ul>
+            <li>If you enable the Notification Filter feature, the app requests Notification Listener permission to capture and display your notifications inside the launcher.</li>
+            <li>Notification data is cached locally on your device and never transmitted externally.</li>
+            <li>This feature allows you to manage, filter, and dismiss notifications without leaving the launcher.</li>
+            <li>Granting this permission is entirely optional.</li>
+        </ul>
+
+        <h2>6. Installed Apps Information</h2>
+        <ul>
+            <li>The app accesses the list of installed applications on your device (QUERY_ALL_PACKAGES) in order to display, search, and launch apps as part of the launcher functionality.</li>
             <li>This information remains on your device and is not transmitted or shared.</li>
         </ul>
 
-        <h2>5. Qur'an Content</h2>
+        <h2>7. Alarms, Notifications & Background Services</h2>
         <ul>
-            <li>The app displays Qur'an verses for inspiration and reading purposes.</li>
-            <li>Qur'an text is stored locally for offline use.</li>
+            <li>The app uses exact alarm scheduling (SCHEDULE_EXACT_ALARM) to deliver Prayer Alarms (Salah Wake) at precise prayer times.</li>
+            <li>The app uses a foreground service for the App Blocker feature to monitor and enforce app time limits you configure.</li>
+            <li>The app may show notifications for prayer reminders, Pomodoro timer completion, and app time-limit alerts.</li>
+            <li>Wake Lock permission is used to ensure alarm sounds play reliably even when the screen is off.</li>
+            <li>Boot Completed permission is used to restart the App Blocker service after device reboot.</li>
+            <li>All alarm and notification data is stored and processed locally.</li>
+        </ul>
+
+        <h2>8. Overlay & Do Not Disturb</h2>
+        <ul>
+            <li>The app uses System Alert Window (overlay) permission for the Zen Mode feature, which displays a full-screen focus overlay and blocks notification bar pull-down during focus sessions.</li>
+            <li>Do Not Disturb (DND) access is requested to silence notifications during Zen Mode sessions.</li>
+            <li>These permissions are only used when you actively start a Zen Mode session.</li>
+            <li>Granting these permissions is entirely optional.</li>
+        </ul>
+
+        <h2>9. Device Admin</h2>
+        <ul>
+            <li>The app optionally requests Device Admin privilege solely for the double-tap-to-lock-screen feature.</li>
+            <li>This permission is never used to control, wipe, or modify your device in any other way.</li>
+            <li>You can revoke Device Admin at any time in Android Settings.</li>
+        </ul>
+
+        <h2>10. Qur'an & Islamic Content</h2>
+        <ul>
+            <li>The app displays Qur'an verses, Hadith, Duas, and Adhkar for inspiration and reading purposes.</li>
+            <li>All Islamic content is stored locally for offline use.</li>
             <li>Translation sources are credited in the app's Credits section.</li>
             <li>We do not track or collect reading activity.</li>
         </ul>
 
-        <h2>6. In-App Purchases</h2>
+        <h2>11. Donations</h2>
         <ul>
-            <li>The app may offer optional in-app purchases to unlock premium features.</li>
-            <li>Payments are processed securely by Google Play.</li>
-            <li>We do not store or process payment information.</li>
+            <li>The app offers optional voluntary donations as sadaqah jariyah via Razorpay.</li>
+            <li>All features in the app are completely free.</li>
+            <li>Payments are processed securely by Razorpay.</li>
+            <li>We do not store or process any payment or billing information.</li>
         </ul>
 
-        <h2>7. Third-Party Services</h2>
+        <h2>12. Internet Access</h2>
+        <ul>
+            <li>Internet permission is used for fetching prayer times from the Aladhan API based on your location and for processing donations via Razorpay.</li>
+            <li>No personal data is ever transmitted over the network.</li>
+        </ul>
+
+        <h2>13. Storage & Media Access</h2>
+        <ul>
+            <li>The app may request storage/media access to let you select custom alarm sounds from your device.</li>
+            <li>Files are read locally and never uploaded or transmitted.</li>
+        </ul>
+
+        <h2>14. Third-Party Services</h2>
         <p>The app may use trusted third-party services such as:</p>
         <ul>
-            <li>Google Play Services (for purchases and system integration)</li>
-            <li>Android speech recognition services</li>
+            <li>Razorpay (for voluntary donation processing)</li>
+            <li>Aladhan API (for prayer time calculation)</li>
+            <li>Android on-device speech recognition</li>
         </ul>
-        <p>These services operate under their own privacy policies.</p>
+        <p>These services operate under their own privacy policies. No personal data is shared with any third-party service.</p>
 
-        <h2>8. Children's Privacy</h2>
+        <h2>15. Children's Privacy</h2>
         <p>This app does not knowingly collect any personal information from children under the age of 13.</p>
 
-        <h2>9. Data Security</h2>
-        <p>All user data and settings are stored locally on the device. We take reasonable steps to protect the app from unauthorized access.</p>
+        <h2>16. Data Security</h2>
+        <p>All user data and settings are stored locally on the device using encrypted local storage. No data is transmitted to external servers. We take reasonable steps to protect the app from unauthorized access.</p>
 
-        <h2>10. Changes to This Policy</h2>
-        <p>We may update this Privacy Policy from time to time. Any changes will be reflected on this page.</p>
+        <h2>17. Changes to This Policy</h2>
+        <p>We may update this Privacy Policy from time to time. Any changes will be reflected on this page with an updated date.</p>
 
-        <h2>11. Contact Us</h2>
+        <h2>18. Contact Us</h2>
         <div class="contact">
             <p>If you have any questions about this Privacy Policy, you may contact us at:</p>
-            <p>📧 Email: <a href="mailto:your-email@example.com">your-email@example.com</a></p>
-            <p><em>Note: Please update the email address above with your actual contact email before publishing.</em></p>
+            <p>📧 Email: <a href="mailto:mewatxpro2@gmail.com">mewatxpro2@gmail.com</a></p>
+            <p>💬 WhatsApp: <a href="https://wa.me/918171114186">+91 8171114186</a></p>
         </div>
     </div>
 </body>

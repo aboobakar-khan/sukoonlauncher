@@ -7,15 +7,30 @@ import 'models/favorite_app.dart';
 import 'models/installed_app.dart';
 import 'models/prayer_record.dart';
 import 'models/productivity_models.dart';
+import 'features/prayer_alarm/models/prayer_alarm_config.dart';
+import 'features/prayer_alarm/services/prayer_alarm_service.dart';
+import 'features/prayer_alarm/screens/prayer_alarm_screen.dart';
 import 'screens/launcher_shell.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/notification_feed_screen.dart';
 import 'providers/font_provider.dart';
 import 'providers/font_size_provider.dart';
 import 'providers/amoled_provider.dart';
 import 'utils/hive_box_manager.dart';
+import 'utils/smooth_page_route.dart';
+
+/// Global navigator key so notification taps can push routes from anywhere
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ── Global error handler — catch framework errors ──
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('🔴 FlutterError: ${details.exceptionAsString()}');
+    // TODO: Send to Sentry / Firebase Crashlytics when integrated
+  };
 
   // Initialize Hive
   await Hive.initFlutter();
@@ -24,6 +39,11 @@ void main() async {
   Hive.registerAdapter(FavoriteAppAdapter());
   Hive.registerAdapter(InstalledAppAdapter());
   Hive.registerAdapter(PrayerRecordAdapter()); // Prayer tracking
+
+  // Prayer Alarm adapters
+  Hive.registerAdapter(PrayerAlarmConfigAdapter());
+  Hive.registerAdapter(DailyPrayerTimesAdapter());
+  Hive.registerAdapter(PrayerReminderSettingsAdapter());
 
   // Productivity Hub adapters
   Hive.registerAdapter(TodoItemAdapter());
@@ -48,16 +68,97 @@ void main() async {
     SystemUiMode.edgeToEdge,
     overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
   );
-  await Hive.openBox('wallpaperBox');
-
-  // Pre-open frequently used Hive boxes (avoids repeated I/O)
+  // Pre-open ALL frequently used Hive boxes in parallel (avoids repeated I/O)
+  // This eliminates ~40+ redundant Hive.openBox() calls during first render
   await Future.wait([
+    HiveBoxManager.get('wallpaperBox'),
     HiveBoxManager.get('settingsBox'),
     HiveBoxManager.get('zen_mode_box'),
     HiveBoxManager.get('tasbih_data'),
+    HiveBoxManager.get('settings'),
+    HiveBoxManager.get<TodoItem>('productivity_todos'),
+    HiveBoxManager.get<PomodoroSettings>('pomodoro_settings'),
+    HiveBoxManager.get('pomodoro_daily_stats'),
+    HiveBoxManager.get<InstalledApp>('installed_apps'),
+    HiveBoxManager.get<AppBlockRule>('app_block_rules'),
+    HiveBoxManager.get<AcademicDoubt>('academic_doubts'),
+    HiveBoxManager.get<ProductivityEvent>('productivity_events'),
+    HiveBoxManager.get('focus_streak'),
+    HiveBoxManager.get<String>('recently_installed_apps'),
+    HiveBoxManager.get('prayer_records'),
+    HiveBoxManager.get('prayer_alarm_config'),
+    HiveBoxManager.get<DailyPrayerTimes>('prayer_alarm_times'),
+    HiveBoxManager.get('prayer_reminder_settings'),
   ]);
 
+  // Initialize prayer alarm service (exact alarms + notifications)
+  await PrayerAlarmService.initialize();
+
+  // Wire notification tap → open prayer alarm screen
+  PrayerAlarmService.onAlarmScreenRequested = (prayerName) {
+    // Guard: if an alarm screen is already showing, don't push another
+    if (PrayerAlarmService.isAlarmScreenShowing) return;
+
+    // Lock: mark alarm screen as showing BEFORE the push
+    PrayerAlarmService.markAlarmScreenShowing(prayerName);
+
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (_) => PrayerAlarmScreen(prayerName: prayerName),
+      ),
+    ).then((_) {
+      // Safety-net: ensure the guard is cleared even if the screen was
+      // dismissed by an unusual path (e.g. navigatorKey.pop from outside).
+      // The alarm screen itself calls markAlarmScreenClosed() before popping
+      // in all normal paths, so this is only a fallback.
+      PrayerAlarmService.markAlarmScreenClosed();
+    });
+  };
+
+  // Check if app was launched by tapping a prayer notification (cold-start)
+  await PrayerAlarmService.checkPendingNotificationLaunch();
+
+  // Listen for native "open notification feed" intent (from hint notification tap)
+  const notifChannel = MethodChannel('com.sukoon.launcher/notification_filter');
+  notifChannel.setMethodCallHandler((call) async {
+    if (call.method == 'openNotificationFeed') {
+      // Delay briefly to let the navigator finish attaching
+      await Future.delayed(const Duration(milliseconds: 500));
+      navigatorKey.currentState?.push(
+        SmoothForwardRoute(child: const NotificationFeedScreen()),
+      );
+    }
+  });
+
+  // NOTE: checkNativeAlarmPending() is NOT called here because navigatorKey
+  // is not yet attached to the widget tree at this point. It runs instead in
+  // _LauncherEntryPointState.initState() via addPostFrameCallback so the
+  // navigator is guaranteed to be ready.
+
   runApp(const ProviderScope(child: SukoonLauncherApp()));
+}
+
+/// Global scroll behavior: removes ALL overscroll stretch and glow indicators.
+///
+/// On Android with Material 3, the default [MaterialScrollBehavior] wraps every
+/// [Scrollable] in a [StretchingOverscrollIndicator]. This causes:
+///   - Visible elastic "stretching" at the first and last pages of [PageView].
+///   - Subtle content shift/resize between pages during fast swipes.
+///   - A spring-back visual on inner scrollables (lists, grids).
+///
+/// By overriding [buildOverscrollIndicator] to return [child] directly, we
+/// strip the stretch from every scrollable in the app — making page transitions
+/// feel rigid and mechanical, like Pixel Launcher / AOSP Launcher3.
+class _NoStretchScrollBehavior extends ScrollBehavior {
+  const _NoStretchScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) =>
+      child; // No stretch, no glow — just the raw scrollable content.
 }
 
 class SukoonLauncherApp extends ConsumerWidget {
@@ -71,8 +172,21 @@ class SukoonLauncherApp extends ConsumerWidget {
     final bgColor = isAmoled ? Colors.black : Colors.black.withValues(alpha: 0.5);
 
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Sukoon Launcher',
       debugShowCheckedModeBanner: false,
+      // ── Global scroll behavior: kill ALL overscroll stretch/glow ──
+      //
+      // On Android with Material 3 the default MaterialScrollBehavior wraps
+      // every Scrollable in a StretchingOverscrollIndicator.  This applies
+      // to the PageView itself, producing the elastic "page stretching"
+      // effect at the first/last page, and a subtle stretch between any
+      // two pages when the user drags past the settling point.
+      //
+      // By returning `child` unmodified from buildOverscrollIndicator we
+      // strip the stretch from every scrollable in the widget tree — the
+      // PageView, inner ScrollViews, ListViews, GridViews, etc. — globally.
+      scrollBehavior: const _NoStretchScrollBehavior(),
       builder: (context, child) {
         return MediaQuery(
           data: MediaQuery.of(
@@ -87,6 +201,19 @@ class SukoonLauncherApp extends ConsumerWidget {
         primarySwatch: Colors.grey,
         useMaterial3: true,
         fontFamily: appFont.fontFamily,
+        // ── Global iOS-style page transitions for ALL MaterialPageRoutes ──
+        // This gives every push/pop the smooth Apple slide animation with
+        // interactive swipe-back on both Android and iOS — no more janky
+        // Android zoom transitions.
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
+          },
+        ),
         // 2-font hierarchy: headings use heading font, body uses body font
         textTheme: TextTheme(
           // Display styles — large headings
@@ -134,10 +261,21 @@ class _LauncherEntryPoint extends StatefulWidget {
 
 class _LauncherEntryPointState extends State<_LauncherEntryPoint>
     with WidgetsBindingObserver {
+  DateTime? _lastCompactTime;
+  
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Check SharedPrefs for a pending prayer alarm written by AlarmActivity.
+    // We use addPostFrameCallback so navigatorKey is attached to the widget
+    // tree and ready to push the PrayerAlarmScreen.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Extra delay for Samsung cold-boot: give the FlutterEngine time to
+      // fully set up its platform channels and route table.
+      await Future.delayed(const Duration(milliseconds: 800));
+      PrayerAlarmService.checkNativeAlarmPending();
+    });
   }
 
   @override
@@ -151,12 +289,25 @@ class _LauncherEntryPointState extends State<_LauncherEntryPoint>
     super.didChangeAppLifecycleState(state);
     switch (state) {
       case AppLifecycleState.paused:
-      case AppLifecycleState.inactive:
-        // Compact Hive boxes when app goes to background
-        HiveBoxManager.compactAll();
+        // Compact Hive only on full pause (not inactive — inactive fires
+        // for permission dialogs, notification shade, etc. and running
+        // disk I/O there can compete with the UI thread on resume).
+        final now = DateTime.now();
+        if (_lastCompactTime == null || 
+            now.difference(_lastCompactTime!).inMinutes >= 5) {
+          _lastCompactTime = now;
+          HiveBoxManager.compactAll();
+        }
         break;
       case AppLifecycleState.resumed:
-        // Nothing special needed on resume
+        // Only check for a pending native alarm if no alarm screen is
+        // currently showing. If one is already visible (e.g. user pressed
+        // power button and came back), we must NOT re-push — that would
+        // create a duplicate and the subsequent popUntil in LauncherShell
+        // would kill the visible alarm screen.
+        if (!PrayerAlarmService.isAlarmScreenShowing) {
+          PrayerAlarmService.checkNativeAlarmPending();
+        }
         break;
       default:
         break;
@@ -165,32 +316,11 @@ class _LauncherEntryPointState extends State<_LauncherEntryPoint>
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: _checkOnboardingStatus(),
-      builder: (context, snapshot) {
-        // Show loading while checking
-        if (!snapshot.hasData) {
-          return const Scaffold(
-            backgroundColor: Colors.black,
-            body: Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFFC2A366), // SukoonColors.sandGold
-              ),
-            ),
-          );
-        }
-
-        // Show onboarding if not completed, otherwise show launcher
-        final onboardingCompleted = snapshot.data ?? false;
-        return onboardingCompleted 
-            ? const LauncherShell() 
-            : const OnboardingScreen();
-      },
-    );
-  }
-
-  Future<bool> _checkOnboardingStatus() async {
-    final box = await HiveBoxManager.get('settingsBox');
-    return box.get('onboarding_completed', defaultValue: false);
+    // Synchronous read — settingsBox is already pre-opened in main()
+    final box = Hive.box('settingsBox');
+    final onboardingCompleted = box.get('onboarding_completed', defaultValue: false) as bool;
+    return onboardingCompleted 
+        ? const LauncherShell() 
+        : const OnboardingScreen();
   }
 }

@@ -6,8 +6,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.app.usage.UsageStatsManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.graphics.PixelFormat
 import android.os.Build
@@ -34,31 +36,32 @@ import androidx.core.app.NotificationCompat
  * 2. Re-launches our app if user leaves to ANY app (not just blocked ones)
  * 3. Adds a status-bar overlay to block notification panel pull-down
  * 4. Blocks share sheets, choosers, and system UI interactions
- * 5. Only allows: our app, camera, phone/dialer
+ * 5. Only allows: our app, camera
  */
 class AppBlockerService : Service() {
 
     companion object {
         const val TAG = "AppBlockerService"
-        const val CHANNEL_ID = "app_blocker_channel"
+        const val CHANNEL_ID = "sukoon_focus_v3"   // v3 — IMPORTANCE_LOW, no status bar icon
         const val NOTIFICATION_ID = 1001
         const val PREFS_NAME = "app_blocker_prefs"
         const val KEY_BLOCKED_PACKAGES = "blocked_packages"
         const val KEY_SERVICE_ENABLED = "service_enabled"
         const val KEY_ZEN_MODE = "zen_mode_active"
+        const val KEY_TIMED_SESSION_PKG = "timed_session_package"
+        const val KEY_TIMED_SESSION_END = "timed_session_end_time"
+        const val KEY_TIMED_SESSION_START = "timed_session_start_time"
+        const val KEY_TIMED_SESSION_EXTENSIONS = "timed_session_extensions"
         const val POLL_INTERVAL_MS = 500L
-        const val ZEN_POLL_INTERVAL_MS = 200L  // Faster polling in Zen Mode
-        const val IDLE_POLL_INTERVAL_MS = 2000L // Slow poll when on home screen
+        const val ZEN_POLL_INTERVAL_MS = 200L
+        const val IDLE_POLL_INTERVAL_MS = 10000L  // 10s when nothing to monitor — saves battery
 
-        // Allowed packages during Zen Mode (emergency calls + camera only)
+        /** Weak reference to the live service instance — lets MainActivity call refreshNotification() directly. */
+        private var _instance: AppBlockerService? = null
+        fun getRunningInstance(): AppBlockerService? = _instance
+
+        // Allowed packages during Zen Mode (camera only)
         private val ZEN_ALLOWED_PACKAGES = setOf(
-            "com.android.dialer",           // Stock dialer
-            "com.google.android.dialer",    // Google dialer
-            "com.samsung.android.dialer",   // Samsung dialer
-            "com.samsung.android.incallui", // Samsung in-call
-            "com.android.incallui",         // Stock in-call
-            "com.android.phone",            // Phone app
-            "com.android.server.telecom",   // Telecom service
             "com.android.camera",           // Stock camera
             "com.android.camera2",          // Stock camera 2
             "com.google.android.GoogleCamera", // Google camera
@@ -137,6 +140,100 @@ class AppBlockerService : Service() {
         fun isEnabled(context: Context): Boolean {
             return getPrefs(context).getBoolean(KEY_SERVICE_ENABLED, false)
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // 🕐 TIMED SESSION: Per-app time limits
+        // The service polls foreground app. If the timed app is in front
+        // and past the deadline, we launch a "time's up" overlay.
+        // ═══════════════════════════════════════════════════════════════
+
+        /** Start a timed session for a specific app */
+        fun startTimedSession(context: Context, packageName: String, minutes: Int) {
+            val now = System.currentTimeMillis()
+            val endTime = now + (minutes * 60 * 1000L)
+            getPrefs(context).edit()
+                .putString(KEY_TIMED_SESSION_PKG, packageName)
+                .putLong(KEY_TIMED_SESSION_START, now)
+                .putLong(KEY_TIMED_SESSION_END, endTime)
+                .putInt(KEY_TIMED_SESSION_EXTENSIONS, 0)
+                .remove(KEY_ENDED_SESSION_PKG)
+                .remove(KEY_ENDED_SESSION_TIME)
+                .apply()
+            Log.d(TAG, "Timed session started: $packageName for ${minutes}m (until $endTime)")
+            // Ensure service is running to enforce the timer
+            if (!isEnabled(context)) {
+                start(context)   // onStartCommand will buildNotification() with fresh state
+            }
+            // Refresh the notification immediately so it shows "Timer · AppName"
+            _instance?.refreshNotification()
+        }
+
+        /** Extend the active timed session by additional minutes */
+        fun extendTimedSession(context: Context, packageName: String, additionalMinutes: Int) {
+            val prefs = getPrefs(context)
+            val currentPkg = prefs.getString(KEY_TIMED_SESSION_PKG, null)
+            if (currentPkg != packageName) return
+            val currentEnd = prefs.getLong(KEY_TIMED_SESSION_END, 0L)
+            val now = System.currentTimeMillis()
+            // Extend from now (if overtime) or from current deadline
+            val base = if (now > currentEnd) now else currentEnd
+            val newEnd = base + (additionalMinutes * 60 * 1000L)
+            val extensions = prefs.getInt(KEY_TIMED_SESSION_EXTENSIONS, 0) + 1
+            prefs.edit()
+                .putLong(KEY_TIMED_SESSION_END, newEnd)
+                .putInt(KEY_TIMED_SESSION_EXTENSIONS, extensions)
+                .apply()
+            Log.d(TAG, "Timed session extended: $packageName +${additionalMinutes}m (ext #$extensions)")
+            _instance?.refreshNotification()
+        }
+
+        /** End the active timed session.
+         *  Fully clears the session from SharedPreferences immediately.
+         *  We also record the ended package + timestamp so the polling loop
+         *  won't re-fire "times up" if the user quickly re-opens the app
+         *  before a new startTimedSession call arrives. */
+        private const val KEY_ENDED_SESSION_PKG = "ended_session_package"
+        private const val KEY_ENDED_SESSION_TIME = "ended_session_time"
+        private const val ENDED_GRACE_MS = 10_000L // 10s grace after ending
+
+        fun endTimedSession(context: Context, packageName: String) {
+            val prefs = getPrefs(context)
+            val currentPkg = prefs.getString(KEY_TIMED_SESSION_PKG, null)
+            if (currentPkg == null || currentPkg == packageName) {
+                // Fully clear the timed session so polling loop won't see it
+                prefs.edit()
+                    .remove(KEY_TIMED_SESSION_PKG)
+                    .remove(KEY_TIMED_SESSION_START)
+                    .remove(KEY_TIMED_SESSION_END)
+                    .remove(KEY_TIMED_SESSION_EXTENSIONS)
+                    // Record that we just ended this package (grace period)
+                    .putString(KEY_ENDED_SESSION_PKG, packageName)
+                    .putLong(KEY_ENDED_SESSION_TIME, System.currentTimeMillis())
+                    .apply()
+                Log.d(TAG, "Timed session fully ended: $packageName")
+                // Refresh notification so it reverts to "Focus Mode" or "Sukoon"
+                _instance?.refreshNotification()
+            }
+        }
+
+        /** Check if a session was recently ended (within grace period).
+         *  Used by polling loop to avoid re-firing times-up during transitions. */
+        fun wasRecentlyEnded(context: Context, packageName: String): Boolean {
+            val prefs = getPrefs(context)
+            val endedPkg = prefs.getString(KEY_ENDED_SESSION_PKG, null) ?: return false
+            if (endedPkg != packageName) return false
+            val endedTime = prefs.getLong(KEY_ENDED_SESSION_TIME, 0L)
+            return (System.currentTimeMillis() - endedTime) < ENDED_GRACE_MS
+        }
+
+        /** Get active timed session info (or null if none) */
+        fun getTimedSession(context: Context): Triple<String, Long, Int>? {
+            val prefs = getPrefs(context)
+            val pkg = prefs.getString(KEY_TIMED_SESSION_PKG, null) ?: return null
+            val endTime = prefs.getLong(KEY_TIMED_SESSION_END, 0L)
+            val extensions = prefs.getInt(KEY_TIMED_SESSION_EXTENSIONS, 0)
+            return Triple(pkg, endTime, extensions)
+        }
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -150,8 +247,51 @@ class AppBlockerService : Service() {
     private var cachedIsZen = false
     private var cachedBlockedPackages: Set<String> = emptySet()
     private var cacheLastRefresh: Long = 0
-    private val CACHE_TTL_MS = 3000L // Refresh cache every 3 seconds
-    private var consecutiveIdlePolls = 0 // Track how long user is on home screen
+    private val CACHE_TTL_MS = 5000L
+    private var consecutiveIdlePolls = 0
+    private var isScreenOn = true
+
+    // Notification refresh — update every 60s when timer active (shows countdown)
+    private var lastNotifRefresh: Long = 0
+    private val NOTIF_REFRESH_MS = 60_000L
+
+    /**
+     * BroadcastReceiver for screen ON/OFF events.
+     * - During Zen Mode: shows ZenLockScreenActivity on screen-on.
+     * - Always: pauses/resumes foreground polling when screen turns off/on
+     *   to save significant battery (no point polling when display is dark).
+     */
+    private val screenStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                Intent.ACTION_SCREEN_ON -> {
+                    isScreenOn = true
+                    // Resume polling
+                    handler.removeCallbacks(pollRunnable)
+                    handler.post(pollRunnable)
+                    Log.d(TAG, "Screen ON — polling resumed")
+
+                    if (isZenMode(context)) {
+                        handler.postDelayed({
+                            try {
+                                ZenLockScreenActivity.show(context)
+                                Log.d(TAG, "ZenLockScreenActivity shown over keyguard (screen ON)")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to show ZenLockScreenActivity: ${e.message}")
+                            }
+                        }, 200)
+                    }
+                }
+                Intent.ACTION_SCREEN_OFF -> {
+                    isScreenOn = false
+                    // Stop polling entirely — nothing to monitor when screen is off
+                    handler.removeCallbacks(pollRunnable)
+                    Log.d(TAG, "Screen OFF — polling paused (battery saver)")
+                }
+            }
+        }
+    }
+    private var screenStateReceiverRegistered = false
 
     private val pollRunnable = object : Runnable {
         override fun run() {
@@ -160,35 +300,96 @@ class AppBlockerService : Service() {
             // Refresh cached state periodically (not every poll)
             val now = System.currentTimeMillis()
             if (now - cacheLastRefresh > CACHE_TTL_MS) {
+                val prevIsZen = cachedIsZen
+                val prevBlocked = cachedBlockedPackages.size
                 cachedIsZen = isZenMode(this@AppBlockerService)
                 cachedBlockedPackages = getBlockedPackages(this@AppBlockerService)
                 cacheLastRefresh = now
+
+                // React to Zen Mode transitions (overlay management)
+                if (cachedIsZen && !prevIsZen) {
+                    addStatusBarOverlay()
+                    Log.d(TAG, "Zen Mode ON — overlays added")
+                } else if (!cachedIsZen && prevIsZen) {
+                    removeStatusBarOverlay()
+                    refreshNotification()  // Revert to "Focus Mode" or "Sukoon" when Zen ends
+                    try {
+                        ZenLockScreenActivity.dismiss(this@AppBlockerService)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error dismissing ZenLockScreen: ${e.message}")
+                    }
+                    Log.d(TAG, "Zen Mode OFF — overlays removed")
+                } else if (cachedBlockedPackages.size != prevBlocked) {
+                    refreshNotification()  // "X apps blocked" count changed
+                }
+            }
+
+            // Refresh notification countdown while a timer session is active
+            val hasActiveTimer = getTimedSession(this@AppBlockerService) != null
+            if (hasActiveTimer && (now - lastNotifRefresh) >= NOTIF_REFRESH_MS) {
+                lastNotifRefresh = now
+                refreshNotification()  // Updates "Xm left · tap to return"
             }
             
             checkForegroundApp()
             
-            // Adaptive interval: fast during Zen, slow when idle
+            // Adaptive interval: fast during Zen, normal during active timer,
+            // slow when idle on home screen with nothing to monitor
             val interval = when {
                 cachedIsZen -> ZEN_POLL_INTERVAL_MS
-                consecutiveIdlePolls > 5 -> IDLE_POLL_INTERVAL_MS // User is just on home screen
+                hasActiveTimer -> POLL_INTERVAL_MS // Keep 500ms when timer running
+                consecutiveIdlePolls > 3 -> IDLE_POLL_INTERVAL_MS  // Ramp to slow poll when idle
                 else -> POLL_INTERVAL_MS
             }
+
+            // Service stays alive permanently so the status-bar notification
+            // is always present while there are blocked apps or a timer running.
+            // When idle (no blocked apps, no timer, no zen), the service auto-stops
+            // in checkForegroundApp() to save battery.
+
             handler.postDelayed(this, interval)
         }
     }
 
     override fun onCreate() {
         super.onCreate()
+        _instance = this
         createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "Service started")
+
+        // ── Immediate bail-out: if there's nothing to do, don't even show
+        //    the foreground notification. Stop immediately to avoid the
+        //    "Running in background" OS notification that alarms users.
+        val hasBlockedApps = getBlockedPackages(this).isNotEmpty()
+        val hasTimedSession = getTimedSession(this) != null
+        val isZen = isZenMode(this)
+        if (!hasBlockedApps && !hasTimedSession && !isZen) {
+            Log.d(TAG, "Service started with nothing to do — stopping immediately")
+            getPrefs(this).edit().putBoolean(KEY_SERVICE_ENABLED, false).apply()
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         startForeground(NOTIFICATION_ID, buildNotification())
         isRunning = true
-        handler.post(pollRunnable)
 
-        // If Zen Mode is active, enforce DND and add overlay
+        // Always register screen state receiver — pauses polling when screen
+        // is off to save battery (biggest single optimization)
+        registerScreenStateReceiver()
+
+        // Check actual screen state at start — don't poll while screen is off
+        val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        isScreenOn = pm.isInteractive
+        if (isScreenOn) {
+            handler.post(pollRunnable)
+        } else {
+            Log.d(TAG, "Screen is OFF at service start — polling deferred until screen-on")
+        }
+
+        // If Zen Mode is active, enforce DND, add overlay
         if (isZenMode(this)) {
             addStatusBarOverlay()
             // Re-enforce DND on service restart (e.g. after reboot)
@@ -208,9 +409,11 @@ class AppBlockerService : Service() {
 
     override fun onDestroy() {
         Log.d(TAG, "Service stopped")
+        _instance = null
         isRunning = false
         handler.removeCallbacks(pollRunnable)
         removeStatusBarOverlay()
+        unregisterScreenStateReceiver()
         
         // Restore DND when service stops
         try {
@@ -230,10 +433,13 @@ class AppBlockerService : Service() {
     private fun checkForegroundApp() {
         val isZen = cachedIsZen
         val blockedPackages = cachedBlockedPackages
+        val hasTimedSession = getTimedSession(this) != null
 
-        // If not in Zen Mode and no blocked packages, nothing to do
-        if (!isZen && blockedPackages.isEmpty()) {
-            consecutiveIdlePolls++
+        // If not in Zen Mode and no blocked packages AND no timed session, nothing to do.
+        // Auto-stop IMMEDIATELY — no reason to linger and show "Running in background".
+        if (!isZen && blockedPackages.isEmpty() && !hasTimedSession) {
+            Log.d(TAG, "Nothing to monitor — auto-stopping service immediately")
+            stop(this)
             return
         }
 
@@ -248,6 +454,43 @@ class AppBlockerService : Service() {
         
         // Active app detected — reset idle counter
         consecutiveIdlePolls = 0
+
+        // ── TIMED SESSION CHECK — always checked first, regardless of mode ──
+        val session = getTimedSession(this)
+        if (session != null) {
+            val (sessionPkg, endTime, extensions) = session
+            val now = System.currentTimeMillis()
+            if (now >= endTime && foregroundPackage == sessionPkg) {
+                // Skip if this session was recently ended by user (grace period)
+                if (wasRecentlyEnded(this, sessionPkg)) {
+                    return
+                }
+                // Time's up and user is still in the app!
+                // Throttle: don't fire more than once per 5s to avoid intent storm
+                val shouldFire = lastBlockedPackage != foregroundPackage ||
+                                 (now - lastBlockTime) > 5000
+                if (shouldFire) {
+                    Log.d(TAG, "TIMED SESSION EXPIRED: $sessionPkg — launching times-up overlay")
+                    lastBlockedPackage = foregroundPackage
+                    lastBlockTime = now
+
+                    val sessionStart = getPrefs(this).getLong(KEY_TIMED_SESSION_START, endTime - 60000L)
+                    val minutesSpent = ((now - sessionStart) / 60000L).toInt().coerceAtLeast(1)
+
+                    val launchIntent = Intent(this, MainActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        putExtra("times_up", true)
+                        putExtra("timed_package", sessionPkg)
+                        putExtra("extensions_used", extensions)
+                        putExtra("minutes_spent", minutesSpent)
+                    }
+                    startActivity(launchIntent)
+                }
+                return
+            }
+        }
 
         if (isZen) {
             // ═══════════════════════════════════════════
@@ -290,6 +533,7 @@ class AppBlockerService : Service() {
             // ═══════════════════════════════════════════
             // NORMAL MODE: Only block specific packages
             // ═══════════════════════════════════════════
+
             if (blockedPackages.contains(foregroundPackage)) {
                 val now = System.currentTimeMillis()
                 if (foregroundPackage == lastBlockedPackage && (now - lastBlockTime) < 1000) {
@@ -312,6 +556,37 @@ class AppBlockerService : Service() {
                     lastBlockedPackage = null
                 }
             }
+        }
+    }
+
+    /**
+     * Register screen ON/OFF receiver — ALWAYS registered when service runs.
+     * Handles: (1) pausing/resuming poll loop on screen off/on (battery saver)
+     *          (2) showing ZenLockScreen on screen-on during Zen Mode
+     */
+    private fun registerScreenStateReceiver() {
+        if (screenStateReceiverRegistered) return
+        try {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_SCREEN_OFF)
+            }
+            registerReceiver(screenStateReceiver, filter)
+            screenStateReceiverRegistered = true
+            Log.d(TAG, "Screen state receiver registered (battery optimized polling)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to register screen state receiver: ${e.message}")
+        }
+    }
+
+    private fun unregisterScreenStateReceiver() {
+        if (!screenStateReceiverRegistered) return
+        try {
+            unregisterReceiver(screenStateReceiver)
+            screenStateReceiverRegistered = false
+            Log.d(TAG, "Screen state receiver unregistered")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to unregister screen state receiver: ${e.message}")
         }
     }
 
@@ -421,15 +696,22 @@ class AppBlockerService : Service() {
 
     /**
      * Get the foreground package using UsageStatsManager.
-     * This is the most reliable method on Android 5.0+ and doesn't
-     * require AccessibilityService.
+     *
+     * Strategy (precision mode):
+     *  1. Query usage EVENTS for the last 10 seconds — look for the most
+     *     recent ACTIVITY_RESUMED / MOVE_TO_FOREGROUND event.
+     *  2. If no event found (user has been in the same app longer than 10s),
+     *     fall back to queryUsageStats() and pick the app with the most
+     *     recent lastTimeUsed — this always returns data even if the user
+     *     hasn't switched apps.
      */
     private fun getForegroundPackage(): String? {
         try {
             val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val now = System.currentTimeMillis()
-            val usageEvents = usageStatsManager.queryEvents(now - 5000, now)
-            
+
+            // ── Attempt 1: Recent events (most accurate, sub-second) ──
+            val usageEvents = usageStatsManager.queryEvents(now - 10_000, now)
             var lastForegroundPackage: String? = null
             var lastTimestamp: Long = 0
 
@@ -444,7 +726,25 @@ class AppBlockerService : Service() {
                     }
                 }
             }
-            return lastForegroundPackage
+            if (lastForegroundPackage != null) return lastForegroundPackage
+
+            // ── Attempt 2: UsageStats fallback (works when user stays in app) ──
+            val stats = usageStatsManager.queryUsageStats(
+                UsageStatsManager.INTERVAL_DAILY, now - 60_000, now
+            )
+            if (stats.isNullOrEmpty()) return null
+
+            var bestPkg: String? = null
+            var bestTime: Long = 0
+            for (s in stats) {
+                if (s.lastTimeUsed > bestTime && s.packageName != packageName) {
+                    bestTime = s.lastTimeUsed
+                    bestPkg = s.packageName
+                }
+            }
+            // Only trust the fallback if lastTimeUsed is within the last 30s
+            // (otherwise it's a stale entry from hours ago)
+            return if (bestTime > now - 30_000) bestPkg else null
         } catch (e: Exception) {
             Log.e(TAG, "Error getting foreground package: ${e.message}")
             return null
@@ -453,23 +753,45 @@ class AppBlockerService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "App Blocker",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Keeps app blocker active in the background"
-                setShowBadge(false)
-            }
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+
+            // Delete old channels only if the new channel doesn't exist yet.
+            // Prevents redundant Binder IPC on every service start.
+            if (manager.getNotificationChannel(CHANNEL_ID) == null) {
+                manager.deleteNotificationChannel("app_blocker_channel")
+                manager.deleteNotificationChannel("sukoon_focus_v2")
+                val channel = NotificationChannel(
+                    CHANNEL_ID,
+                    "Sukoon Focus",
+                    NotificationManager.IMPORTANCE_LOW   // LOW = in shade but no status bar icon (less intrusive)
+                ).apply {
+                    description = "Shows active focus state — app timer, blocked apps"
+                    setShowBadge(false)
+                    enableLights(false)
+                    enableVibration(false)
+                    setSound(null, null)
+                }
+                manager.createNotificationChannel(channel)
+            }
+        }
+    }
+
+    /** Rebuild and re-post the foreground notification to reflect current state.
+     *  Called on service start and whenever state changes (session start/end, Zen toggle). */
+    fun refreshNotification() {
+        try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.notify(NOTIFICATION_ID, buildNotification())
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to refresh notification: ${e.message}")
         }
     }
 
     private fun buildNotification(): Notification {
+        val blockedPackages = getBlockedPackages(this)
+        val session = getTimedSession(this)
         val isZen = isZenMode(this)
-        val blockedCount = getBlockedPackages(this).size
-        
+
         val launchIntent = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -479,17 +801,44 @@ class AppBlockerService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = if (isZen) "🧘 Zen Mode Active" else "☪️ Focus Mode Active"
-        val text = if (isZen) "Phone locked · Put it down & enjoy life" else "$blockedCount apps blocked · Stay focused"
+        // ── Determine title + text based on priority: Timer > Zen > Blocker ──
+        val hasActiveWork = session != null || isZen || blockedPackages.isNotEmpty()
+
+        val (title, text) = when {
+            session != null -> {
+                val (pkg, endTime, _) = session
+                val appName = try {
+                    packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+                } catch (_: Exception) { pkg.split(".").last() }
+                val minsLeft = ((endTime - System.currentTimeMillis()) / 60_000L).coerceAtLeast(0)
+                val timeLabel = if (minsLeft > 0) "${minsLeft}m left" else "Time's up"
+                "Timer · $appName" to "$timeLabel · tap to return"
+            }
+            isZen -> {
+                "Muraqaba" to "Stay focused — all apps blocked"
+            }
+            blockedPackages.isNotEmpty() -> {
+                "Focus Mode" to "${blockedPackages.size} app${if (blockedPackages.size > 1) "s" else ""} blocked · Stay on track"
+            }
+            else -> {
+                // Should not reach here (service auto-stops when idle),
+                // but if it does, use minimal invisible notification.
+                "Sukoon" to null
+            }
+        }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
-            .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_lock_lock)
+            .apply { if (text != null) setContentText(text) }
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setShowWhen(false)
             .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(if (hasActiveWork) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_MIN)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(if (hasActiveWork) NotificationCompat.VISIBILITY_PUBLIC else NotificationCompat.VISIBILITY_SECRET)
             .build()
     }
 }

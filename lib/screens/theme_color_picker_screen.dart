@@ -2,120 +2,179 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/theme_provider.dart';
-import '../providers/premium_provider.dart';
+import '../widgets/swipe_back_wrapper.dart';
 
-import '../screens/premium_paywall_screen.dart';
-
-/// Theme Color Picker Screen with Premium Gating
-/// Free: 3 colors | Premium: All 12 colors
+/// Theme Color Picker Screen — all colors unlocked
 class ThemeColorPickerScreen extends ConsumerWidget {
   const ThemeColorPickerScreen({super.key});
 
-  // First 3 themes are free
-  static const int freeThemeCount = 3;
+  // ── Grouped color sections ────────────────────────────────────────────────
+  static final _brandSection = [ThemeColors.sukoon];
+
+  static final _neutralSection = [ThemeColors.white, ThemeColors.slate];
+
+  static final _warmSection = [
+    ThemeColors.gold,
+    ThemeColors.amber,
+    ThemeColors.orange,
+    ThemeColors.peach,
+    ThemeColors.rose,
+    ThemeColors.warmRed,
+    ThemeColors.coral,
+    ThemeColors.crimson,
+  ];
+
+  static final _coolSection = [
+    ThemeColors.blue,
+    ThemeColors.skyBlue,
+    ThemeColors.cyan,
+    ThemeColors.aqua,
+    ThemeColors.teal,
+    ThemeColors.indigo,
+  ];
+
+  static final _natureSection = [
+    ThemeColors.green,
+    ThemeColors.emerald,
+    ThemeColors.mint,
+    ThemeColors.sage,
+    ThemeColors.lavender,
+    ThemeColors.lilac,
+    ThemeColors.purple,
+    ThemeColors.pink,
+  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentTheme = ref.watch(themeColorProvider);
-    final isPremium = ref.watch(premiumProvider).isPremium;
+    final isLight = currentTheme.isLight;
+    final bgColor = isLight ? const Color(0xFFF5F5F5) : Colors.black;
+    final primaryText = isLight ? const Color(0xFF0D0D0D) : Colors.white;
 
-    return Scaffold(
-      backgroundColor: Colors.black,
+    return SwipeBackWrapper(
+      child: Scaffold(
+      backgroundColor: bgColor,
       body: SafeArea(
-        child: Column(
-          children: [
+        child: CustomScrollView(
+          slivers: [
             // Header
-            _buildHeader(context, isPremium),
+            SliverToBoxAdapter(child: _buildHeader(context, isLight: isLight, primaryText: primaryText)),
 
-            // Color grid
-            Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.all(20),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 1.5,
-                ),
-                itemCount: ThemeColors.all.length,
-                itemBuilder: (context, index) {
-                  final theme = ThemeColors.all[index];
-                  final isSelected = theme.name == currentTheme.name;
-                  final isLocked = !isPremium && index >= freeThemeCount;
+            // Brand
+            _buildSectionHeader('BRAND', primaryText: primaryText),
+            _buildColorGrid(context, ref, _brandSection, currentTheme, primaryText: primaryText),
 
-                  return _buildColorOption(
-                    context, 
-                    ref, 
-                    theme, 
-                    isSelected, 
-                    isLocked,
-                    index,
-                  );
-                },
-              ),
-            ),
+            // Neutral
+            _buildSectionHeader('NEUTRAL', primaryText: primaryText),
+            _buildColorGrid(context, ref, _neutralSection, currentTheme, primaryText: primaryText),
+
+            // Warm
+            _buildSectionHeader('WARM', primaryText: primaryText),
+            _buildColorGrid(context, ref, _warmSection, currentTheme, primaryText: primaryText),
+
+            // Cool
+            _buildSectionHeader('COOL', primaryText: primaryText),
+            _buildColorGrid(context, ref, _coolSection, currentTheme, primaryText: primaryText),
+
+            // Nature
+            _buildSectionHeader('NATURE', primaryText: primaryText),
+            _buildColorGrid(context, ref, _natureSection, currentTheme, primaryText: primaryText),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
+        ),
+      ),
+    ),
+    );
+  }
+
+  SliverToBoxAdapter _buildSectionHeader(String label, {required Color primaryText}) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 2.5,
+            color: primaryText.withValues(alpha: 0.35),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool isPremium) {
+  SliverPadding _buildColorGrid(
+    BuildContext context,
+    WidgetRef ref,
+    List<AppThemeColor> colors,
+    AppThemeColor currentTheme, {
+    required Color primaryText,
+  }) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      sliver: SliverGrid(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final theme = colors[index];
+            final isSelected = theme.name == currentTheme.name;
+            return _buildColorOption(context, ref, theme, isSelected, primaryText: primaryText);
+          },
+          childCount: colors.length,
+        ),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.0,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, {required bool isLight, required Color primaryText}) {
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 16, 20, 8),
       child: Row(
         children: [
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
-            child: Icon(
-              Icons.arrow_back,
-              color: Colors.white.withValues(alpha: 0.7),
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              'THEME COLOR',
-              style: TextStyle(
-                fontSize: 20,
-                letterSpacing: 4,
-                fontWeight: FontWeight.w300,
-                color: Colors.white.withValues(alpha: 0.9),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: primaryText.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.arrow_back_ios_new,
+                color: primaryText.withValues(alpha: 0.7),
+                size: 18,
               ),
             ),
           ),
-          // Premium indicator
-          if (!isPremium)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFC2A366).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFC2A366).withValues(alpha: 0.4),
+          const SizedBox(width: 14),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Theme Color',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: primaryText,
                 ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.lock_open,
-                    color: const Color(0xFFC2A366),
-                    size: 14,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${ThemeColors.all.length - freeThemeCount} PRO',
-                    style: const TextStyle(
-                      color: Color(0xFFC2A366),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 2),
+              Text(
+                '${ThemeColors.all.length} beautiful colors',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: primaryText.withValues(alpha: 0.4),
+                ),
               ),
-            ),
+            ],
+          ),
         ],
       ),
     );
@@ -125,142 +184,92 @@ class ThemeColorPickerScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     AppThemeColor theme,
-    bool isSelected,
-    bool isLocked,
-    int index,
-  ) {
+    bool isSelected, {
+    required Color primaryText,
+  }) {
+    final isLight = ref.read(themeColorProvider).isLight;
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        
-        if (isLocked) {
-          // Show premium paywall
-          showPremiumPaywall(
-            context, 
-            triggerFeature: 'Theme: ${theme.name}',
-          );
-          return;
-        }
-        
         ref.read(themeColorProvider.notifier).setThemeColor(theme);
         Navigator.of(context).pop();
       },
-      child: Stack(
-        children: [
-          // Main card
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isSelected 
-                    ? theme.color 
-                    : isLocked 
-                        ? Colors.white.withValues(alpha: 0.05)
-                        : Colors.white.withValues(alpha: 0.1),
-                width: isSelected ? 2 : 1,
-              ),
-            ),
-            child: Stack(
-              children: [
-                // Color preview
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
-                    gradient: LinearGradient(
-                      colors: [
-                        theme.color.withValues(alpha: isLocked ? 0.15 : 0.3),
-                        theme.accentColor.withValues(alpha: isLocked ? 0.05 : 0.1),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                ),
-
-                // Color name and circle
-                Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: theme.color.withValues(alpha: isLocked ? 0.5 : 1.0),
-                          shape: BoxShape.circle,
-                          boxShadow: isLocked ? null : [
-                            BoxShadow(
-                              color: theme.color.withValues(alpha: 0.3),
-                              blurRadius: 8,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: isLocked 
-                            ? Icon(
-                                Icons.lock,
-                                color: Colors.white.withValues(alpha: 0.7),
-                                size: 18,
-                              )
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        theme.name,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: isLocked ? 0.4 : 0.8),
-                          fontSize: 14,
-                          letterSpacing: 1,
-                          fontWeight: isSelected
-                              ? FontWeight.w500
-                              : FontWeight.w300,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Selected indicator
-                if (isSelected)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: theme.color,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.check, color: Colors.black, size: 16),
-                    ),
-                  ),
-              ],
-            ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? theme.color
+                : (isLight ? Colors.black : Colors.white).withValues(alpha: 0.08),
+            width: isSelected ? 2.5 : 1,
           ),
-          
-          // Premium badge for locked themes
-          if (isLocked)
-            Positioned(
-              top: 8,
-              left: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFC2A366).withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'PRO',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
+          gradient: LinearGradient(
+            colors: [
+              theme.color.withValues(alpha: 0.25),
+              theme.accentColor.withValues(alpha: 0.08),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Color name and circle
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: theme.color,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.color.withValues(alpha: 0.4),
+                          blurRadius: isSelected ? 12 : 6,
+                          spreadRadius: isSelected ? 2 : 0,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Text(
+                    theme.name,
+                    style: TextStyle(
+                      color: primaryText.withValues(alpha: isSelected ? 0.9 : 0.65),
+                      fontSize: 11,
+                      letterSpacing: 0.5,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
-        ],
+
+            // Selected indicator
+            if (isSelected)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: theme.color,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check, color: Colors.black, size: 12),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

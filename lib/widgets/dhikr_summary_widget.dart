@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/tasbih_provider.dart';
 import '../providers/theme_provider.dart';
@@ -10,15 +9,6 @@ import '../screens/dhikr_counter_screen.dart';
 /// Shows today's stats at a glance. Tap to open full counter.
 class DhikrSummaryWidget extends ConsumerWidget {
   const DhikrSummaryWidget({super.key});
-
-  // ☪️ Design tokens
-  static const Color _gold = Color(0xFFC2A366);
-  static const Color _goldLight = Color(0xFFE8D5B7);
-  static const Color _green = Color(0xFF7BAE6E);
-  static const Color _textPrimary = Color(0xFFE6EDF3);
-  static const Color _textSecondary = Color(0xFF8B949E);
-  static const Color _textMuted = Color(0xFF484F58);
-  static const Color _borderColor = Color(0xFF1E1E1E);
 
   static const List<String> _dhikrNames = [
     'SubhanAllah', 'Alhamdulillah', 'Allahu Akbar',
@@ -38,11 +28,10 @@ class DhikrSummaryWidget extends ConsumerWidget {
 
     return GestureDetector(
       onTap: () {
-        HapticFeedback.lightImpact();
         Navigator.of(context).push(
           PageRouteBuilder(
-            pageBuilder: (_, __, ___) => const DhikrCounterScreen(),
-            transitionsBuilder: (_, anim, __, child) {
+            pageBuilder: (_, _, _) => const DhikrCounterScreen(),
+            transitionsBuilder: (_, anim, _, child) {
               return FadeTransition(
                 opacity: anim,
                 child: SlideTransition(
@@ -80,17 +69,31 @@ class DhikrSummaryWidget extends ConsumerWidget {
                     fontSize: 11,
                     letterSpacing: 1.8,
                     fontWeight: FontWeight.w600,
-                    color: themeColor.color.withOpacity(0.7),
+                    color: themeColor.color.withValues(alpha: 0.7),
                   ),
                 ),
                 if (tasbih.streakDays > 0) ...[
                   const SizedBox(width: 8),
-                  Text(
-                    '🔥 ${tasbih.streakDays}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: _gold.withOpacity(0.7),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: themeColor.color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.local_fire_department_rounded, size: 10, color: themeColor.color.withValues(alpha: 0.7)),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${tasbih.streakDays}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: themeColor.color.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -99,13 +102,13 @@ class DhikrSummaryWidget extends ConsumerWidget {
                   'Tap to count',
                   style: TextStyle(
                     fontSize: 10,
-                    color: _textMuted.withOpacity(0.6),
+                    color: themeColor.color.withValues(alpha: 0.4),
                   ),
                 ),
                 const SizedBox(width: 4),
                 Icon(
                   Icons.chevron_right_rounded,
-                  color: _textMuted.withOpacity(0.5),
+                  color: themeColor.color.withValues(alpha: 0.35),
                   size: 16,
                 ),
               ],
@@ -121,7 +124,7 @@ class DhikrSummaryWidget extends ConsumerWidget {
                   child: _buildStatColumn(
                     label: 'Today',
                     value: _formatNumber(tasbih.todayCount),
-                    color: _gold,
+                    color: themeColor.color,
                   ),
                 ),
 
@@ -136,8 +139,8 @@ class DhikrSummaryWidget extends ConsumerWidget {
                         size: const Size(56, 56),
                         painter: _MiniArcPainter(
                           progress: math.min(progress, 1.0),
-                          bgColor: _borderColor,
-                          fgColor: done ? _green : _gold,
+                          bgColor: themeColor.color.withValues(alpha: 0.1),
+                          fgColor: done ? const Color(0xFF4CAF50) : themeColor.color,
                           stroke: 3,
                         ),
                       ),
@@ -149,13 +152,13 @@ class DhikrSummaryWidget extends ConsumerWidget {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w300,
-                              color: done ? _green : _textPrimary,
+                              color: done ? const Color(0xFF4CAF50) : Colors.white.withValues(alpha: 0.9),
                               fontFeatures: const [FontFeature.tabularFigures()],
                             ),
                           ),
                           Text(
                             '/ ${tasbih.targetCount}',
-                            style: const TextStyle(fontSize: 8, color: _textMuted),
+                            style: TextStyle(fontSize: 8, color: themeColor.color.withValues(alpha: 0.4)),
                           ),
                         ],
                       ),
@@ -168,7 +171,7 @@ class DhikrSummaryWidget extends ConsumerWidget {
                   child: _buildStatColumn(
                     label: 'Total',
                     value: _formatNumber(tasbih.totalAllTime),
-                    color: _goldLight,
+                    color: themeColor.color,
                     align: CrossAxisAlignment.end,
                   ),
                 ),
@@ -182,9 +185,9 @@ class DhikrSummaryWidget extends ConsumerWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: _gold.withOpacity(0.06),
+                color: themeColor.color.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _gold.withOpacity(0.12)),
+                border: Border.all(color: themeColor.color.withValues(alpha: 0.12)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -192,7 +195,7 @@ class DhikrSummaryWidget extends ConsumerWidget {
                   Icon(
                     Icons.auto_awesome_rounded,
                     size: 12,
-                    color: _gold.withOpacity(0.5),
+                    color: themeColor.color.withValues(alpha: 0.5),
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -200,7 +203,7 @@ class DhikrSummaryWidget extends ConsumerWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: _goldLight.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.75),
                     ),
                   ),
                   if (done) ...[
@@ -210,7 +213,7 @@ class DhikrSummaryWidget extends ConsumerWidget {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
-                        color: _green.withOpacity(0.8),
+                        color: const Color(0xFF4CAF50).withValues(alpha: 0.8),
                       ),
                     ),
                   ],
@@ -238,7 +241,7 @@ class DhikrSummaryWidget extends ConsumerWidget {
             fontSize: 10,
             letterSpacing: 0.5,
             fontWeight: FontWeight.w500,
-            color: _textMuted,
+            color: color.withValues(alpha: 0.45),
           ),
         ),
         const SizedBox(height: 4),

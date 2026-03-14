@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,18 +7,23 @@ import 'package:installed_apps/installed_apps.dart';
 import '../models/installed_app.dart';
 import '../providers/installed_apps_provider.dart';
 import '../providers/theme_provider.dart';
-import '../providers/favorite_apps_provider.dart';
 import '../providers/recent_apps_provider.dart';
 import '../providers/productivity_provider.dart';
+import '../providers/launcher_page_provider.dart';
+import '../providers/screen_time_provider.dart';
+import '../screens/settings_screen.dart';
+import '../utils/usage_permission_helper.dart';
 import 'blocked_app_screen.dart';
+import 'app_session_timer_sheet.dart';
 
-/// Quick Search Overlay - Samsung-style pull-down search
+/// Quick Search Overlay — One UI–style pull-down panel
 /// 
-/// Features:
-/// - Appears on swipe down from home
-/// - INSTANT search using apps already in memory
-/// - Auto-opens single match
-/// - Text-only minimalist design (no icons)
+/// Layout (top → bottom):
+///   1. "Quick Access" header + Settings gear
+///   2. "SUGGESTED" label
+///   3. 4-column × 2-row grid of recent apps (text + letter avatar, full names)
+///   4. Search bar (auto-focuses keyboard)
+///   5. Dismiss hint
 class QuickSearchOverlay extends ConsumerStatefulWidget {
   final VoidCallback onDismiss;
 
@@ -38,12 +44,13 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
   
   String _searchQuery = '';
   bool _hasAutoLaunched = false;
+  Timer? _autoLaunchDebounce;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 200), // Faster animation
+      duration: const Duration(milliseconds: 220),
       vsync: this,
     );
     _slideAnimation = Tween<Offset>(
@@ -54,15 +61,16 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
     _controller.forward();
-    
-    // Auto-focus search instantly
+
+    // Auto-open keyboard when panel slides in
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _searchFocus.requestFocus();
+      if (mounted) _searchFocus.requestFocus();
     });
   }
 
   @override
   void dispose() {
+    _autoLaunchDebounce?.cancel();
     _controller.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
@@ -75,31 +83,34 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
         _searchQuery = query;
         _hasAutoLaunched = false;
       });
-      
-      // Check for auto-launch
-      _checkAutoLaunch();
+      // Cancel pending debounce — user is still typing
+      _autoLaunchDebounce?.cancel();
+      if (query.length >= 2) {
+        _autoLaunchDebounce = Timer(const Duration(milliseconds: 300), () {
+          _checkAutoLaunch();
+        });
+      }
     }
   }
 
   void _checkAutoLaunch() {
-    if (_hasAutoLaunched || _searchQuery.isEmpty) return;
-    
-    final installedAppsNotifier = ref.read(installedAppsProvider.notifier);
-    final filteredApps = installedAppsNotifier.filterApps(_searchQuery);
-    
-    // Auto-launch when exactly 1 result
+    if (_hasAutoLaunched || _searchQuery.length < 2) return;
+
+    final filteredApps = ref.read(installedAppsProvider.notifier).filterApps(_searchQuery);
+
+    // Fire when the search narrows to exactly ONE result.
+    // No full-name match required — if only one app matches, that's the one.
     if (filteredApps.length == 1) {
-      // 🛡️ Don't auto-launch blocked apps
+      final app = filteredApps.first;
+
       final blocker = ref.read(appBlockRuleProvider.notifier);
-      if (blocker.isAppBlocked(filteredApps.first.packageName)) return;
+      if (blocker.isAppBlocked(app.packageName)) return;
 
       _hasAutoLaunched = true;
       HapticFeedback.lightImpact();
-      
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (mounted) {
-          _launchApp(filteredApps.first);
-        }
+
+      Future.delayed(const Duration(milliseconds: 120), () {
+        if (mounted) _launchApp(app);
       });
     }
   }
@@ -107,27 +118,70 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
   Future<void> _launchApp(InstalledApp app) async {
     _searchFocus.unfocus();
 
-    // 🛡️ Check app blocker — block ALL channels
     final blocker = ref.read(appBlockRuleProvider.notifier);
     if (blocker.isAppBlocked(app.packageName)) {
       HapticFeedback.heavyImpact();
       widget.onDismiss();
-      if (mounted) {
-        _showBlockedMessage(app.appName);
-      }
+      if (mounted) _showBlockedMessage(app.appName);
       return;
     }
 
-    // Track as recent app
-    ref.read(recentAppsProvider.notifier).addRecent(app.packageName);
+    // ── App Time Intent: ask "how long?" before launch ──
+    final screenTime = ref.read(screenTimeProvider);
+    int? timerMinutes;
+    if (screenTime.featureEnabled && screenTime.hasTimerFor(app.packageName)) {
+      // Ensure Usage Access is granted — required for precision timing
+      if (!mounted) return;
+      final hasPermission = await UsagePermissionHelper.ensureGranted(context);
+      if (!hasPermission) {
+        widget.onDismiss();
+        return;
+      }
 
-    // Dismiss and launch
+      final config = screenTime.appConfigs[app.packageName];
+      final defaultMins = config?.defaultMinutes ?? 15;
+
+      if (!mounted) return;
+      // Show prompt — user picks a time or dismisses to go back
+      final chosenMinutes = await AppSessionPrompt.show(
+        context,
+        packageName: app.packageName,
+        appName: app.appName,
+        defaultMinutes: defaultMins,
+      );
+      // User dismissed (back/swipe) → go back, DON'T launch the app
+      if (chosenMinutes == null || chosenMinutes <= 0) {
+        widget.onDismiss();
+        return;
+      }
+
+      timerMinutes = chosenMinutes;
+    }
+
+    ref.read(recentAppsProvider.notifier).addRecent(app.packageName);
     widget.onDismiss();
+
+    // Launch the app FIRST — user sees it open directly.
     try {
       await InstalledApps.startApp(app.packageName);
-    } catch (e) {
-      // Silent fail
+    } catch (_) {}
+
+    // Now that the app is visible, start the timed session on native side
+    if (timerMinutes != null) {
+      ref.read(screenTimeProvider.notifier).startSession(
+        app.packageName, app.appName, timerMinutes,
+      );
     }
+
+    // Jump to home AFTER app is covering the screen — invisible to user.
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return; // widget may have been disposed by the time timer fires
+      final pageCtrl = ref.read(launcherPageControllerProvider);
+      if (pageCtrl != null && pageCtrl.hasClients) {
+        final current = pageCtrl.page?.round() ?? 2;
+        if (current != 2) pageCtrl.jumpToPage(2);
+      }
+    });
   }
 
   void _showBlockedMessage(String appName) {
@@ -148,46 +202,45 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
     _controller.reverse().then((_) => widget.onDismiss());
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // BUILD
+  // ═══════════════════════════════════════════════════════════════════════════
+
   @override
   Widget build(BuildContext context) {
     final themeColor = ref.watch(themeColorProvider);
-    
-    // Get apps directly from memory - INSTANT!
     final installedAppsNotifier = ref.watch(installedAppsProvider.notifier);
     final allApps = ref.watch(installedAppsProvider);
     final recentPackages = ref.watch(recentAppsProvider);
     
-    // Filter apps instantly from memory
     final filteredApps = _searchQuery.isEmpty 
         ? <InstalledApp>[]
         : installedAppsNotifier.filterApps(_searchQuery).take(8).toList();
     
-    // Get recent apps (most recently launched)
+    // Recent apps — up to 8 for 4×2 grid
     final recentApps = <InstalledApp>[];
     for (final packageName in recentPackages) {
       final app = allApps.where((a) => a.packageName == packageName).firstOrNull;
-      if (app != null && recentApps.length < 6) {
+      if (app != null && recentApps.length < 8) {
         recentApps.add(app);
       }
     }
+
+    // Choose what to show in the grid
+    final bool isSearching = _searchQuery.isNotEmpty;
+    final gridApps = isSearching ? filteredApps : recentApps;
+    final sectionTitle = isSearching ? 'Results' : 'Suggested apps';
     
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
         return Stack(
           children: [
-            // Tap to dismiss background
+            // ── Dismiss tap area ──
             GestureDetector(
               onTap: _dismiss,
               onVerticalDragEnd: (details) {
-                if (details.primaryVelocity != null && details.primaryVelocity! < -500) {
-                  _dismiss();
-                }
-              },
-              onHorizontalDragEnd: (details) {
-                // Swipe left or right to dismiss
-                final velocity = details.primaryVelocity ?? 0;
-                if (velocity.abs() > 300) {
+                if (details.primaryVelocity != null && details.primaryVelocity! < -400) {
                   _dismiss();
                 }
               },
@@ -196,36 +249,99 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
               ),
             ),
             
-            // Search panel
+            // ── Panel ──
             SlideTransition(
               position: _slideAnimation,
               child: SafeArea(
+                bottom: false,
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    // ── Card ──
                     Container(
-                      margin: const EdgeInsets.all(20),
+                      margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A1A1A),
-                        borderRadius: BorderRadius.circular(20),
+                        color: const Color(0xFF1C1C1E),
+                        borderRadius: BorderRadius.circular(22),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.08),
+                          color: Colors.white.withValues(alpha: 0.07),
                         ),
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(22),
                         child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                           child: Padding(
-                            padding: const EdgeInsets.all(20),
+                            padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Search bar
+                                // ── Header: Quick Access + Settings gear ──
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Quick Access',
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.6),
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500,
+                                        letterSpacing: 0.2,
+                                        decoration: TextDecoration.none,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    GestureDetector(
+                                      onTap: () {
+                                        widget.onDismiss();
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                                        );
+                                      },
+                                      child: Container(
+                                        width: 38, height: 38,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.08),
+                                          borderRadius: BorderRadius.circular(11),
+                                        ),
+                                        child: Icon(
+                                          Icons.settings_rounded,
+                                          color: Colors.white.withValues(alpha: 0.45),
+                                          size: 20,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                
+                                const SizedBox(height: 16),
+                                
+                                // ── Section label ──
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 2),
+                                  child: Text(
+                                    sectionTitle,
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.85),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: -0.2,
+                                      decoration: TextDecoration.none,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 18),
+
+                                // ── 4×2 App Grid ──
+                                _buildAppGrid(gridApps),
+
+                                const SizedBox(height: 16),
+
+                                // ── Search bar at bottom ──
                                 Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(12),
+                                    color: Colors.white.withValues(alpha: 0.07),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
                                   child: TextField(
                                     controller: _searchController,
@@ -238,17 +354,24 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
                                     decoration: InputDecoration(
                                       hintText: 'Search apps...',
                                       hintStyle: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.4),
+                                        color: Colors.white.withValues(alpha: 0.3),
+                                        fontSize: 16,
                                       ),
-                                      prefixIcon: Icon(
-                                        Icons.search,
-                                        color: themeColor.color.withValues(alpha: 0.7),
+                                      prefixIcon: Padding(
+                                        padding: const EdgeInsets.only(left: 12, right: 6),
+                                        child: Icon(
+                                          Icons.search_rounded,
+                                          color: themeColor.color.withValues(alpha: 0.55),
+                                          size: 22,
+                                        ),
                                       ),
+                                      prefixIconConstraints: const BoxConstraints(minWidth: 40),
                                       suffixIcon: _searchController.text.isNotEmpty
                                           ? IconButton(
                                               icon: Icon(
-                                                Icons.clear,
-                                                color: Colors.white.withValues(alpha: 0.5),
+                                                Icons.close_rounded,
+                                                color: Colors.white.withValues(alpha: 0.4),
+                                                size: 18,
                                               ),
                                               onPressed: () {
                                                 _searchController.clear();
@@ -258,21 +381,13 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
                                           : null,
                                       border: InputBorder.none,
                                       contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
+                                        horizontal: 14,
                                         vertical: 14,
                                       ),
                                     ),
                                     onChanged: _onSearchChanged,
                                   ),
                                 ),
-                                
-                                const SizedBox(height: 20),
-                                
-                                // Results or recent apps (INSTANT!)
-                                if (_searchQuery.isNotEmpty)
-                                  _buildSearchResults(filteredApps, themeColor)
-                                else
-                                  _buildRecentApps(recentApps, themeColor),
                               ],
                             ),
                           ),
@@ -280,16 +395,19 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
                       ),
                     ),
                     
-                    // Hint
-                    Opacity(
-                      opacity: _fadeAnimation.value,
-                      child: Text(
-                        'swipe up or tap outside to close',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          fontSize: 11,
-                          letterSpacing: 1,
-                          decoration: TextDecoration.none,
+                    // ── Dismiss hint ──
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Opacity(
+                        opacity: _fadeAnimation.value,
+                        child: Text(
+                          'swipe up or tap outside to close',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            fontSize: 11,
+                            letterSpacing: 1,
+                            decoration: TextDecoration.none,
+                          ),
                         ),
                       ),
                     ),
@@ -303,135 +421,81 @@ class _QuickSearchOverlayState extends ConsumerState<QuickSearchOverlay>
     );
   }
 
-  Widget _buildSearchResults(List<InstalledApp> apps, AppThemeColor themeColor) {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 4×2 Grid — One UI style, text-only centered names, no icons
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildAppGrid(List<InstalledApp> apps) {
     if (apps.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20),
+        padding: const EdgeInsets.symmetric(vertical: 30),
         child: Center(
           child: Text(
-            'No apps found',
+            _searchQuery.isNotEmpty ? 'No apps found' : 'No recent apps yet',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.4),
-              fontSize: 14,
+              color: Colors.white.withValues(alpha: 0.25),
+              fontSize: 13,
               decoration: TextDecoration.none,
             ),
           ),
         ),
       );
     }
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'RESULTS',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.3),
-            fontSize: 10,
-            letterSpacing: 2,
-            decoration: TextDecoration.none,
-          ),
-        ),
-        const SizedBox(height: 12),
-        ...apps.map((app) => _buildAppTile(app, themeColor)),
-      ],
-    );
-  }
 
-  Widget _buildRecentApps(List<InstalledApp> apps, AppThemeColor themeColor) {
-    if (apps.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Text(
-          'Type to search apps...',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.3),
-            fontSize: 13,
-            decoration: TextDecoration.none,
-          ),
+    // Build rows of 4 — max 2 rows (8 apps)
+    final List<Widget> rows = [];
+    final int total = apps.length.clamp(0, 8);
+    for (int i = 0; i < total; i += 4) {
+      final rowApps = apps.sublist(i, (i + 4).clamp(0, total));
+      rows.add(
+        Row(
+          children: [
+            for (int j = 0; j < 4; j++) ...[
+              Expanded(
+                child: j < rowApps.length
+                    ? _buildTextTile(rowApps[j])
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ],
         ),
       );
     }
-    
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'RECENT',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.3),
-            fontSize: 10,
-            letterSpacing: 2,
-            decoration: TextDecoration.none,
-          ),
-        ),
-        const SizedBox(height: 12),
-        // Text-only list (no icons)
-        ...apps.map((app) => _buildAppTile(app, themeColor)),
+        for (int i = 0; i < rows.length; i++) ...[
+          if (i > 0) const SizedBox(height: 6),
+          rows[i],
+        ],
       ],
     );
   }
 
-  Widget _buildAppTile(InstalledApp app, AppThemeColor themeColor) {
+  Widget _buildTextTile(InstalledApp app) {
     final isBlocked = ref.read(appBlockRuleProvider.notifier).isAppBlocked(app.packageName);
-    
+
     return GestureDetector(
       onTap: () => _launchApp(app),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: Colors.white.withValues(alpha: 0.05),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Center(
+          child: Text(
+            app.appName,
+            style: TextStyle(
+              color: isBlocked
+                  ? Colors.white.withValues(alpha: 0.18)
+                  : Colors.white.withValues(alpha: 0.85),
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
+              height: 1.3,
+              decoration: TextDecoration.none,
             ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        child: Row(
-          children: [
-            // Text only - NO icon!
-            Expanded(
-              child: Text(
-                app.appName,
-                style: TextStyle(
-                  color: isBlocked 
-                      ? Colors.white.withValues(alpha: 0.25) 
-                      : Colors.white.withValues(alpha: 0.8),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w300,
-                  decoration: TextDecoration.none,
-                ),
-              ),
-            ),
-            if (isBlocked)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8915A).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.shield_rounded, 
-                        color: const Color(0xFFE8915A).withValues(alpha: 0.6), size: 10),
-                    const SizedBox(width: 3),
-                    Text('BLOCKED', style: TextStyle(
-                      color: const Color(0xFFE8915A).withValues(alpha: 0.7),
-                      fontSize: 8,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                      decoration: TextDecoration.none,
-                    )),
-                  ],
-                ),
-              )
-            else
-              Icon(
-                Icons.chevron_right,
-                color: Colors.white.withValues(alpha: 0.2),
-                size: 18,
-              ),
-          ],
         ),
       ),
     );
@@ -446,8 +510,5 @@ void showQuickSearchOverlay(BuildContext context) {
       onDismiss: () => entry.remove(),
     ),
   );
-  
   Overlay.of(context).insert(entry);
 }
-
-// Blocked app overlay now uses shared BlockedAppScreen widget

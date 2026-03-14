@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
+import '../utils/hive_box_manager.dart';
 
 /// Tafseer Edition model
 class TafseerEdition {
@@ -88,7 +89,7 @@ class SelectedTafseerNotifier extends StateNotifier<TafseerEdition> {
   }
 
   Future<void> _init() async {
-    _box = await Hive.openBox<String>(_boxName);
+    _box = await HiveBoxManager.get<String>(_boxName);
     final saved = _box?.get(_key);
     if (saved != null) {
       try {
@@ -108,7 +109,7 @@ class SelectedTafseerNotifier extends StateNotifier<TafseerEdition> {
 
   Future<void> setEdition(TafseerEdition edition) async {
     state = edition;
-    _box ??= await Hive.openBox<String>(_boxName);
+    _box ??= await HiveBoxManager.get<String>(_boxName);
     await _box?.put(_key, jsonEncode({
       'id': edition.id,
       'name': edition.name,

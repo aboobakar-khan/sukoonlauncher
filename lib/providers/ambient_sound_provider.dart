@@ -18,9 +18,9 @@ class AmbientSound {
 
 const ambientSounds = [
   AmbientSound(id: 'rain', name: 'Rain', emoji: '🌧️', assetPath: 'sounds/rain.mp3'),
-  AmbientSound(id: 'waterfall', name: 'Waterfall', emoji: '💦', assetPath: 'sounds/waterfall(chosic.com).mp3'),
-  AmbientSound(id: 'stream', name: 'Streamfall', emoji: '💧', assetPath: 'sounds/stremafall.mp3'),
-  AmbientSound(id: 'gentle', name: 'Gentle Water', emoji: '�', assetPath: 'sounds/gentlewater warm.mp3'),
+  AmbientSound(id: 'waterfall', name: 'Waterfall', emoji: '💦', assetPath: 'sounds/waterfall.mp3'),
+  AmbientSound(id: 'stream', name: 'Stream', emoji: '💧', assetPath: 'sounds/streamfall.mp3'),
+  AmbientSound(id: 'gentle', name: 'Gentle Water', emoji: '🫧', assetPath: 'sounds/gentle_water.mp3'),
 ];
 
 class AmbientSoundState {

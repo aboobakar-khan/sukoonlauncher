@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 import '../models/favorite_app.dart';
+import '../utils/hive_box_manager.dart';
 
 /// Provider for favorite apps stored permanently with app name
 /// No cache, no expiration - instant minimalist performance
@@ -12,13 +13,13 @@ class FavoriteAppsNotifier extends StateNotifier<List<FavoriteApp>> {
   Box<FavoriteApp>? _box;
 
   Future<void> _loadFavorites() async {
-    _box ??= await Hive.openBox<FavoriteApp>('favorite_apps_v2');
+    _box ??= await HiveBoxManager.get<FavoriteApp>('favorite_apps_v2');
     state = _box!.values.toList()
       ..sort((a, b) => a.addedAt.compareTo(b.addedAt));
   }
 
   Future<bool> toggleFavorite(String packageName, String appName) async {
-    _box ??= await Hive.openBox<FavoriteApp>('favorite_apps_v2');
+    _box ??= await HiveBoxManager.get<FavoriteApp>('favorite_apps_v2');
 
     final existingIndex = state.indexWhere(
       (app) => app.packageName == packageName,

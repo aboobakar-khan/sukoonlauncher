@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../utils/hive_box_manager.dart';
 
 /// Font category for grouping in the picker
 enum FontCategory { sansSerif, serif, display }
@@ -203,30 +204,30 @@ class FontNotifier extends StateNotifier<AppFont> {
   static const String _fontKey = 'appFont';
   Box? _box;
 
-  FontNotifier() : super(AppFonts.system) {
+  FontNotifier() : super(AppFonts.montserrat) {
     _init();
   }
 
   Future<void> _init() async {
     try {
-      _box = await Hive.openBox(_boxName);
+      _box = await HiveBoxManager.get(_boxName);
       final savedFontName = _box?.get(_fontKey) as String?;
 
       if (savedFontName != null) {
         final font = AppFonts.all.firstWhere(
           (f) => f.name == savedFontName,
-          orElse: () => AppFonts.system,
+          orElse: () => AppFonts.montserrat,
         );
         state = font;
       }
     } catch (e) {
       // Handle error, use default font
-      state = AppFonts.system;
+      state = AppFonts.montserrat;
     }
   }
 
   Future<void> setFont(AppFont font) async {
-    _box ??= await Hive.openBox(_boxName);
+    _box ??= await HiveBoxManager.get(_boxName);
     await _box?.put(_fontKey, font.name);
     state = font;
   }

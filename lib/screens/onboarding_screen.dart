@@ -1,46 +1,33 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import '../providers/theme_provider.dart';
-import '../providers/premium_provider.dart';
-import 'launcher_shell.dart';
+import 'warmup_screen.dart';
+import '../utils/hive_box_manager.dart';
 
-/// ═══════════════════════════════════════════════════════════════════
-/// ☪️ SUKOON LAUNCHER — PREMIUM ONBOARDING EXPERIENCE
-/// ═══════════════════════════════════════════════════════════════════
-///
-/// A modern, addictive 5-screen onboarding flow.
-///
-/// Design principles:
-///  • Staggered micro-animations — elements appear with choreographed timing
-///  • Parallax depth — background layers move at different speeds
-///  • Psychology-based UX — hook → pain → solution → value → commitment
-///  • Consistent sukoon brand tokens throughout
-///  • Responsive layout — adapts to any screen size
-///  • Haptic feedback on every interaction
-///
-/// Screens:
-///  1. HOOK — Emotional identity ("Your Phone. Your Rules.")
-///  2. IMPACT — Loss aversion with animated stat
-///  3. SOLUTION — Product features as the answer
-///  4. PRO — Soft upsell with free trial
-///  5. ACTIVATE — Set as default launcher
-/// ═══════════════════════════════════════════════════════════════════
+// ─── Sukoon Premium Onboarding ──────────────────────────────────
+//
+// 7-page storytelling flow. No swipe navigation — Next/Back buttons only.
+// Skip button top-right only.
+// No location permission ask.
+// Set Default Launcher is the final page (with Finish).
+//
+// Pages:
+//  1. Welcome       — emotional hook, brand identity
+//  2. The Problem   — what's broken with normal phones
+//  3. Features      — faith + focus + calm overview
+//  4. Prayer Times  — salah alarms, adhan, Ramadan
+//  5. Productivity  — focus tools, screen wellness
+//  6. Personalise   — clock styles, themes, widgets
+//  7. Activate      — set as default launcher + Finish
 
-// ─── Design Tokens ──────────────────────────────────────────────
-const Color _bg = Color(0xFF050508);
-const Color _cardBg = Color(0xFF0D0D12);
-const Color _surfaceBg = Color(0xFF0A0A0F);
-const Color _borderDim = Color(0xFF1A1A22);
-const Color _gold = Color(0xFFC2A366);
-const Color _goldLight = Color(0xFFE8D5B7);
-const Color _green = Color(0xFF7BAE6E);
-const Color _sunset = Color(0xFFE8915A);
-const Color _textPrimary = Color(0xFFF2F0ED);
-const Color _textSecondary = Color(0xFF9A9590);
-const Color _textMuted = Color(0xFF585450);
+// ─── Palette ────────────────────────────────────────────────────
+const _kLeafGreen = Color(0xFF6B8F71);
+const _kLeafDark = Color(0xFF4A6B4F);
+const _kBeige = Color(0xFFF5F0E8);
+const _kBeigeDark = Color(0xFFE8E0D0);
+const _kInk = Color(0xFF1A2A1C);
+const _kInkSoft = Color(0xFF3D5240);
+const _kInkMuted = Color(0xFF6B7D6E);
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -51,49 +38,56 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     with TickerProviderStateMixin {
-  final PageController _pageController = PageController();
-  int _currentPage = 0;
-  static const int _totalPages = 4;
+  int _page = 0;
+  static const int _totalPages = 7;
 
-  // Master entrance animation per page
-  late AnimationController _entranceController;
-  // Pulse for CTA buttons
-  late AnimationController _pulseController;
+  late AnimationController _entranceCtrl;
+  late Animation<double> _entranceFade;
+  late Animation<Offset> _entranceSlide;
+
+  late AnimationController _pulseCtrl;
   late Animation<double> _pulseAnim;
-  // Floating particles
-  late AnimationController _particleController;
 
   @override
   void initState() {
     super.initState();
 
-    _entranceController = AnimationController(
-      duration: const Duration(milliseconds: 900),
+    _entranceCtrl = AnimationController(
       vsync: this,
-    )..forward();
+      duration: const Duration(milliseconds: 700),
+    );
+    _entranceFade = CurvedAnimation(
+      parent: _entranceCtrl,
+      curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
+    );
+    _entranceSlide = Tween<Offset>(
+      begin: const Offset(0, 0.05),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _entranceCtrl,
+      curve: const Interval(0.1, 0.8, curve: Curves.easeOutCubic),
+    ));
+    _entranceCtrl.forward();
 
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 2200),
+    _pulseCtrl = AnimationController(
       vsync: this,
+      duration: const Duration(milliseconds: 2400),
     )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 1.0, end: 1.04).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    _pulseAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
     );
 
-    _particleController = AnimationController(
-      duration: const Duration(seconds: 12),
-      vsync: this,
-    )..repeat();
-
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ));
   }
 
   @override
   void dispose() {
-    _pageController.dispose();
-    _entranceController.dispose();
-    _pulseController.dispose();
-    _particleController.dispose();
+    _entranceCtrl.dispose();
+    _pulseCtrl.dispose();
     SystemChrome.setEnabledSystemUIMode(
       SystemUiMode.edgeToEdge,
       overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
@@ -101,26 +95,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     super.dispose();
   }
 
-  // ─── Navigation ───────────────────────────────────────────────
+  // ─── Navigation ─────────────────────────────────────────────
 
   Future<void> _completeOnboarding() async {
-    final box = await Hive.openBox('settingsBox');
+    final box = await HiveBoxManager.get('settingsBox');
     await box.put('onboarding_completed', true);
   }
 
-  void _goToNext() {
-    HapticFeedback.lightImpact();
-    if (_currentPage < _totalPages - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeOutCubic,
-      );
-    }
+  void _goTo(int index) {
+    if (index < 0 || index >= _totalPages) return;
+    _entranceCtrl.reset();
+    setState(() => _page = index);
+    _entranceCtrl.forward();
   }
 
+  void _next() => _goTo(_page + 1);
+  void _back() => _goTo(_page - 1);
 
-
-  void _setDefaultAndFinish() async {
+  void _setDefaultAndNext() async {
     HapticFeedback.heavyImpact();
     try {
       const platform = MethodChannel('com.sukoon.launcher/launcher');
@@ -128,12 +120,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     } catch (e) {
       debugPrint('Home settings error: $e');
     }
+    // After the user returns from the system launcher picker, finish onboarding.
+    _finish();
+  }
+
+  void _finish() async {
     await _completeOnboarding();
     if (mounted) _navigateToLauncher();
   }
 
   void _skipToLauncher() async {
-    HapticFeedback.lightImpact();
     await _completeOnboarding();
     if (mounted) _navigateToLauncher();
   }
@@ -141,83 +137,187 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   void _navigateToLauncher() {
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const LauncherShell(),
+        pageBuilder: (_, __, ___) => const WarmupScreen(),
         transitionsBuilder: (_, anim, __, child) {
           return FadeTransition(
             opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 0.02),
-                end: Offset.zero,
-              ).animate(
-                  CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
-              child: child,
-            ),
+            child: child,
           );
         },
-        transitionDuration: const Duration(milliseconds: 700),
+        transitionDuration: const Duration(milliseconds: 600),
       ),
     );
   }
 
-  // ─── Build ────────────────────────────────────────────────────
+  // ─── Build ──────────────────────────────────────────────────
+
+  Widget _buildCurrentPage() {
+    switch (_page) {
+      case 0:
+        return _PageWelcome(fade: _entranceFade, slide: _entranceSlide);
+      case 1:
+        return _PageProblem(fade: _entranceFade, slide: _entranceSlide);
+      case 2:
+        return _PageFeatures(fade: _entranceFade, slide: _entranceSlide);
+      case 3:
+        return _PagePrayer(fade: _entranceFade, slide: _entranceSlide);
+      case 4:
+        return _PageProductivity(fade: _entranceFade, slide: _entranceSlide);
+      case 5:
+        return _PagePersonalise(fade: _entranceFade, slide: _entranceSlide);
+      case 6:
+        return _PageActivate(
+          fade: _entranceFade,
+          slide: _entranceSlide,
+          onSetDefault: _setDefaultAndNext,
+          onFinish: _finish,
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final mq = MediaQuery.of(context);
-    final bottomPad = mq.padding.bottom;
-    final topPad = mq.padding.top;
+    final isFirst = _page == 0;
+    final isLast = _page == _totalPages - 1;
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: _kBeige,
       body: Stack(
         children: [
-          // Layer 1: Animated gradient background
-          Positioned.fill(child: _GradientBg(page: _currentPage)),
+          // Organic background
+          Positioned.fill(child: _OrganicBackground(pulse: _pulseAnim)),
 
-          // Layer 2: Floating particles
-          Positioned.fill(
-            child: _FloatingParticles(controller: _particleController),
-          ),
-
-          // Layer 3: Content
           SafeArea(
-            bottom: false,
             child: Column(
               children: [
-                SizedBox(height: topPad > 40 ? 4 : 12),
-
-                // Progress bar + Skip
-                _buildTopBar(),
-
-                const SizedBox(height: 8),
-
-                // Pages
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(),
-                    onPageChanged: (i) {
-                      setState(() => _currentPage = i);
-                      _entranceController.reset();
-                      _entranceController.forward();
-                    },
+                // ── Top bar: progress + skip ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 20, 0),
+                  child: Row(
                     children: [
-                      _PageHook(entrance: _entranceController),
-                      _PageImpact(entrance: _entranceController),
-                      _PageSolution(entrance: _entranceController),
-                      _PageActivate(
-                        entrance: _entranceController,
-                        pulse: _pulseAnim,
+                      // Progress dots
+                      Expanded(
+                        child: _ProgressBar(current: _page, total: _totalPages),
+                      ),
+                      const SizedBox(width: 16),
+                      // Skip — only on non-last pages
+                      if (!isLast)
+                        GestureDetector(
+                          onTap: _skipToLauncher,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 6, horizontal: 4),
+                            child: Text(
+                              'Skip',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: _kInkMuted.withValues(alpha: 0.45),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // ── Page content ──
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 320),
+                    switchInCurve: Curves.easeOut,
+                    switchOutCurve: Curves.easeIn,
+                    transitionBuilder: (child, anim) => FadeTransition(
+                      opacity: anim,
+                      child: child,
+                    ),
+                    child: KeyedSubtree(
+                      key: ValueKey(_page),
+                      child: _buildCurrentPage(),
+                    ),
+                  ),
+                ),
+
+                // ── Bottom navigation: Back / Next or Finish ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+                  child: Row(
+                    children: [
+                      // Back button — invisible on first page
+                      if (!isFirst)
+                        GestureDetector(
+                          onTap: _back,
+                          child: Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              color: _kInk.withValues(alpha: 0.05),
+                              border: Border.all(
+                                color: _kInk.withValues(alpha: 0.07),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.arrow_back_rounded,
+                              size: 20,
+                              color: _kInkSoft.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        )
+                      else
+                        const SizedBox(width: 52),
+
+                      const SizedBox(width: 12),
+
+                      // Next / Finish button
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: isLast ? _finish : _next,
+                          child: Container(
+                            height: 52,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              color: _kLeafGreen,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _kLeafGreen.withValues(alpha: 0.28),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    isLast ? 'Get Started' : 'Next',
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.2,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    isLast
+                                        ? Icons.check_rounded
+                                        : Icons.arrow_forward_rounded,
+                                    size: 17,
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-
-                // Bottom CTA
-                _buildBottomCTA(),
-
-                SizedBox(height: bottomPad + 16),
               ],
             ),
           ),
@@ -225,839 +325,102 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
       ),
     );
   }
-
-  // ═══════════ TOP BAR ═══════════
-
-  Widget _buildTopBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 4),
-      child: Row(
-        children: [
-          // Segmented progress with glow on active
-          Expanded(
-            child: Row(
-              children: List.generate(_totalPages, (i) {
-                final isActive = i <= _currentPage;
-                final isCurrent = i == _currentPage;
-                return Expanded(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 400),
-                    curve: Curves.easeOut,
-                    height: isCurrent ? 4 : 3,
-                    margin: const EdgeInsets.symmetric(horizontal: 2.5),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(2),
-                      color: isActive
-                          ? _gold
-                          : Colors.white.withValues(alpha: 0.06),
-                      boxShadow: isCurrent
-                          ? [
-                              BoxShadow(
-                                  color: _gold.withValues(alpha: 0.4),
-                                  blurRadius: 8)
-                            ]
-                          : null,
-                    ),
-                  ),
-                );
-              }),
-            ),
-          ),
-          const SizedBox(width: 20),
-          // Skip
-          if (_currentPage < _totalPages - 1)
-            GestureDetector(
-              onTap: _skipToLauncher,
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                child: Text(
-                  'Skip',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // ═══════════ BOTTOM CTA ═══════════
-
-  Widget _buildBottomCTA() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 0, 28, 4),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 350),
-        switchInCurve: Curves.easeOut,
-        switchOutCurve: Curves.easeIn,
-        child: _currentPage == 3
-            ? _buildActivationButtons()
-            : _buildNextButton(),
-      ),
-    );
-  }
-
-  Widget _buildNextButton() {
-    final labels = [
-      'Begin Your Journey',
-      'Show Me the Way',
-      'Discover Features',
-      'Continue',
-    ];
-    return _PrimaryCTA(
-      key: ValueKey('next_$_currentPage'),
-      label: labels[_currentPage],
-      onTap: _goToNext,
-    );
-  }
-
-
-
-  Widget _buildActivationButtons() {
-    return Column(
-      key: const ValueKey('activation_buttons'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ScaleTransition(
-          scale: _pulseAnim,
-          child: _PrimaryCTA(
-            label: 'Set as My Launcher',
-            onTap: _setDefaultAndFinish,
-            icon: Icons.home_rounded,
-          ),
-        ),
-        const SizedBox(height: 10),
-        _SecondaryCTA(
-            label: "I'll do this later", onTap: _skipToLauncher),
-      ],
-    );
-  }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-//  PAGE 1 — HOOK (Identity + Curiosity)
-// ═══════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════
+// ORGANIC BACKGROUND — subtle living texture
+// ═════════════════════════════════════════════════════════════════
 
-class _PageHook extends StatelessWidget {
-  final AnimationController entrance;
-  const _PageHook({required this.entrance});
-
-  @override
-  Widget build(BuildContext context) {
-    final h = MediaQuery.of(context).size.height;
-    final isSmall = h < 700;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 36),
-      child: Column(
-        children: [
-          SizedBox(height: isSmall ? h * 0.06 : h * 0.10),
-
-          // Brand icon with radial glow
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.0,
-            child: _BrandIcon(size: isSmall ? 80 : 100),
-          ),
-
-          SizedBox(height: isSmall ? 28 : 44),
-
-          // Headline
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.15,
-            child: const Text(
-              'Assalamu Alaikum',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 36,
-                fontWeight: FontWeight.w800,
-                color: _textPrimary,
-                height: 1.12,
-                letterSpacing: -0.8,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Subtext
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.30,
-            child: Text(
-              'A mindful launcher designed for\nMuslims who value their time.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 15.5,
-                color: Colors.white.withValues(alpha: 0.48),
-                height: 1.65,
-                letterSpacing: 0.1,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 36),
-
-          // Three mini trust chips
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.45,
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _TrustChip(icon: Icons.people_outline, label: '10K+ Users'),
-                SizedBox(width: 12),
-                _TrustChip(icon: Icons.star_outline, label: '4.8 Rating'),
-                SizedBox(width: 12),
-                _TrustChip(icon: Icons.verified_outlined, label: 'Ad-Free'),
-              ],
-            ),
-          ),
-
-          const Spacer(),
-        ],
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  PAGE 2 — IMPACT (Loss Aversion)
-// ═══════════════════════════════════════════════════════════════════
-
-class _PageImpact extends StatelessWidget {
-  final AnimationController entrance;
-  const _PageImpact({required this.entrance});
-
-  @override
-  Widget build(BuildContext context) {
-    final h = MediaQuery.of(context).size.height;
-    final isSmall = h < 700;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 36),
-      child: Column(
-        children: [
-          SizedBox(height: isSmall ? h * 0.04 : h * 0.08),
-
-          // Big animated stat
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.0,
-            child: _AnimatedStat(
-              value: 4,
-              suffix: ' hrs',
-              label: 'Average daily screen time',
-              color: _sunset,
-            ),
-          ),
-
-          SizedBox(height: isSmall ? 24 : 36),
-
-          // Headline
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.20,
-            child: const Text(
-              "That's 60 days\nyou lose every year.",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-                color: _textPrimary,
-                height: 1.18,
-                letterSpacing: -0.4,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 18),
-
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.35,
-            child: Text(
-              '60 days that could be spent in worship,\nwith family, or building your dreams.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14.5,
-                color: Colors.white.withValues(alpha: 0.45),
-                height: 1.65,
-              ),
-            ),
-          ),
-
-          SizedBox(height: isSmall ? 28 : 44),
-
-          // Time blocks visual
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.50,
-            child: const _TimeBlockBar(),
-          ),
-
-          const SizedBox(height: 14),
-
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.55,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(2),
-                    color: _sunset.withValues(alpha: 0.5),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text('Wasted',
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: 0.3))),
-                const SizedBox(width: 16),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(2),
-                    color: _green.withValues(alpha: 0.5),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text('Reclaimed',
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: 0.3))),
-              ],
-            ),
-          ),
-
-          const Spacer(),
-        ],
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  PAGE 3 — SOLUTION (Features)
-// ═══════════════════════════════════════════════════════════════════
-
-class _PageSolution extends StatelessWidget {
-  final AnimationController entrance;
-  const _PageSolution({required this.entrance});
-
-  @override
-  Widget build(BuildContext context) {
-    final h = MediaQuery.of(context).size.height;
-    final isSmall = h < 700;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: Column(
-        children: [
-          SizedBox(height: isSmall ? h * 0.03 : h * 0.06),
-
-          // Headline
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.0,
-            child: RichText(
-              textAlign: TextAlign.center,
-              text: const TextSpan(
-                children: [
-                  TextSpan(
-                    text: 'Everything you need.\n',
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w800,
-                      color: _textPrimary,
-                      height: 1.2,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  TextSpan(
-                    text: "Nothing you don't.",
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w800,
-                      color: _gold,
-                      height: 1.2,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          SizedBox(height: isSmall ? 24 : 36),
-
-          // Feature cards
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.12,
-            child: const _FeatureCard(
-              icon: Icons.menu_book_rounded,
-              title: 'Quran & Hadith',
-              desc: 'Read, reflect, and grow daily',
-              accentColor: _green,
-            ),
-          ),
-          const SizedBox(height: 10),
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.22,
-            child: const _FeatureCard(
-              icon: Icons.timer_outlined,
-              title: 'Focus & Productivity',
-              desc: 'Pomodoro, app blocking, and task lists',
-              accentColor: _sunset,
-            ),
-          ),
-          const SizedBox(height: 10),
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.32,
-            child: const _FeatureCard(
-              icon: Icons.favorite_outline_rounded,
-              title: 'Prayer & Dhikr',
-              desc: 'Track salah, count dhikr, build streaks',
-              accentColor: Color(0xFF6BA3D6),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.42,
-            child: const _FeatureCard(
-              icon: Icons.palette_outlined,
-              title: 'Minimal by Design',
-              desc: 'No clutter, no noise — just peace',
-              accentColor: Color(0xFFB088C9),
-            ),
-          ),
-
-          const Spacer(),
-        ],
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  PAGE 4 — ACTIVATION
-// ═══════════════════════════════════════════════════════════════════
-
-class _PageActivate extends StatelessWidget {
-  final AnimationController entrance;
+class _OrganicBackground extends StatelessWidget {
   final Animation<double> pulse;
-  const _PageActivate({required this.entrance, required this.pulse});
-
-  @override
-  Widget build(BuildContext context) {
-    final h = MediaQuery.of(context).size.height;
-    final isSmall = h < 700;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        children: [
-          SizedBox(height: isSmall ? h * 0.06 : h * 0.10),
-
-          // Animated home icon
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.0,
-            child: ScaleTransition(
-              scale: pulse,
-              child: Container(
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      _gold.withValues(alpha: 0.18),
-                      _gold.withValues(alpha: 0.02),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _gold.withValues(alpha: 0.12),
-                      blurRadius: 40,
-                      spreadRadius: 8,
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.home_rounded,
-                    size: 44, color: _gold),
-              ),
-            ),
-          ),
-
-          SizedBox(height: isSmall ? 28 : 40),
-
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.12,
-            child: const Text(
-              'One Last Step',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w800,
-                color: _textPrimary,
-                height: 1.12,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.22,
-            child: Text(
-              'Set Sukoon Launcher as your\ndefault home screen',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 15.5,
-                color: Colors.white.withValues(alpha: 0.48),
-                height: 1.6,
-              ),
-            ),
-          ),
-
-          SizedBox(height: isSmall ? 28 : 44),
-
-          // Steps card
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.35,
-            child: Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.03),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _borderDim),
-              ),
-              child: Column(
-                children: [
-                  const _SetupStepRow(
-                      num: '1',
-                      text: 'Tap "Set as My Launcher" below'),
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 14),
-                    child: Divider(
-                        color:
-                            Colors.white.withValues(alpha: 0.04),
-                        height: 1),
-                  ),
-                  const _SetupStepRow(
-                      num: '2', text: 'Select "Sukoon Launcher"'),
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 14),
-                    child: Divider(
-                        color:
-                            Colors.white.withValues(alpha: 0.04),
-                        height: 1),
-                  ),
-                  const _SetupStepRow(
-                      num: '3',
-                      text: "Press Home — you're done!"),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          _StaggeredFade(
-            entrance: entrance,
-            delay: 0.50,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.info_outline_rounded,
-                    size: 13,
-                    color: Colors.white.withValues(alpha: 0.25)),
-                const SizedBox(width: 6),
-                Text(
-                  'You can change this anytime in Settings',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.25),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const Spacer(),
-        ],
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  REUSABLE DESIGN COMPONENTS
-// ═══════════════════════════════════════════════════════════════════
-
-/// Staggered fade + slide-up entrance animation
-class _StaggeredFade extends StatelessWidget {
-  final AnimationController entrance;
-  final double delay; // 0.0 - 1.0
-  final Widget child;
-
-  const _StaggeredFade({
-    required this.entrance,
-    required this.delay,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final start = delay.clamp(0.0, 0.85);
-    final end = (delay + 0.35).clamp(0.0, 1.0);
-
-    final opacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-          parent: entrance,
-          curve: Interval(start, end, curve: Curves.easeOut)),
-    );
-    final slide =
-        Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
-            .animate(
-      CurvedAnimation(
-          parent: entrance,
-          curve: Interval(start, end, curve: Curves.easeOutCubic)),
-    );
-
-    return FadeTransition(
-      opacity: opacity,
-      child: SlideTransition(position: slide, child: child),
-    );
-  }
-}
-
-/// Brand icon with Islamic crescent motif and ambient glow
-class _BrandIcon extends StatelessWidget {
-  final double size;
-  const _BrandIcon({required this.size});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size + 40,
-      height: size + 40,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: _gold.withValues(alpha: 0.12),
-            blurRadius: 60,
-            spreadRadius: 20,
-          ),
-        ],
-      ),
-      child: Center(
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                _gold.withValues(alpha: 0.15),
-                _gold.withValues(alpha: 0.05),
-              ],
-            ),
-            border: Border.all(
-              color: _gold.withValues(alpha: 0.2),
-              width: 1.5,
-            ),
-          ),
-          child: Icon(
-            Icons.nightlight_round,
-            size: size * 0.5,
-            color: _gold,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Trust chip (page 1)
-class _TrustChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _TrustChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: _gold.withValues(alpha: 0.7)),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.white.withValues(alpha: 0.45),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Animated stat counter (page 2)
-class _AnimatedStat extends StatefulWidget {
-  final int value;
-  final String suffix;
-  final String label;
-  final Color color;
-  const _AnimatedStat({
-    required this.value,
-    required this.suffix,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  State<_AnimatedStat> createState() => _AnimatedStatState();
-}
-
-class _AnimatedStatState extends State<_AnimatedStat>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      duration: const Duration(milliseconds: 1400),
-      vsync: this,
-    );
-    _anim =
-        Tween<double>(begin: 0, end: widget.value.toDouble()).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic),
-    );
-    Future.delayed(const Duration(milliseconds: 400), () {
-      if (mounted) _ctrl.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
+  const _OrganicBackground({required this.pulse});
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _anim,
+      animation: pulse,
       builder: (context, _) {
-        return Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  _anim.value.toStringAsFixed(0),
-                  style: TextStyle(
-                    fontSize: 76,
-                    fontWeight: FontWeight.w900,
-                    color: widget.color,
-                    height: 1,
-                    letterSpacing: -2,
-                  ),
-                ),
-                Padding(
-                  padding:
-                      const EdgeInsets.only(bottom: 10, left: 4),
-                  child: Text(
-                    widget.suffix,
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w600,
-                      color: widget.color.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              widget.label,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.white.withValues(alpha: 0.35),
-                letterSpacing: 0.3,
-              ),
-            ),
-          ],
+        final v = pulse.value;
+        return CustomPaint(
+          painter: _OrganicPainter(breathe: v),
+          size: Size.infinite,
         );
       },
     );
   }
 }
 
-/// Time blocks bar (page 2 — wasted vs reclaimed)
-class _TimeBlockBar extends StatelessWidget {
-  const _TimeBlockBar();
+class _OrganicPainter extends CustomPainter {
+  final double breathe;
+  _OrganicPainter({required this.breathe});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    final p1 = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0.8, -0.6),
+        radius: 0.9,
+        colors: [
+          _kLeafGreen.withValues(alpha: 0.06 + breathe * 0.02),
+          _kLeafGreen.withValues(alpha: 0.0),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), p1);
+
+    final p2 = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.7, 0.7),
+        radius: 0.8,
+        colors: [
+          _kLeafDark.withValues(alpha: 0.04 + breathe * 0.015),
+          _kLeafDark.withValues(alpha: 0.0),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), p2);
+
+    final p3 = Paint()
+      ..shader = RadialGradient(
+        center: Alignment.center,
+        radius: 0.5,
+        colors: [
+          _kBeigeDark.withValues(alpha: 0.3 + breathe * 0.05),
+          _kBeigeDark.withValues(alpha: 0.0),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), p3);
+  }
+
+  @override
+  bool shouldRepaint(_OrganicPainter old) => old.breathe != breathe;
+}
+
+// ═════════════════════════════════════════════════════════════════
+// PROGRESS BAR
+// ═════════════════════════════════════════════════════════════════
+
+class _ProgressBar extends StatelessWidget {
+  final int current;
+  final int total;
+  const _ProgressBar({required this.current, required this.total});
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(12, (i) {
-        final isWasted = i < 8;
-        return AnimatedContainer(
-          duration: Duration(milliseconds: 300 + i * 50),
-          width: 22,
-          height: 22,
-          margin: const EdgeInsets.symmetric(horizontal: 2.5),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(5),
-            color: isWasted
-                ? _sunset.withValues(alpha: 0.12 + (i * 0.04))
-                : _green.withValues(alpha: 0.10 + ((i - 8) * 0.06)),
-            border: Border.all(
-              color: isWasted
-                  ? _sunset.withValues(alpha: 0.25)
-                  : _green.withValues(alpha: 0.2),
-              width: 1,
+      children: List.generate(total, (i) {
+        return Expanded(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic,
+            height: 3,
+            margin: EdgeInsets.only(right: i < total - 1 ? 5 : 0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(2),
+              color: i <= current
+                  ? _kLeafGreen.withValues(alpha: 0.7)
+                  : _kInk.withValues(alpha: 0.08),
             ),
           ),
         );
@@ -1066,386 +429,971 @@ class _TimeBlockBar extends StatelessWidget {
   }
 }
 
-/// Feature card (page 3)
-class _FeatureCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String desc;
-  final Color accentColor;
+// ═════════════════════════════════════════════════════════════════
+// PAGE 1: WELCOME
+// ═════════════════════════════════════════════════════════════════
 
-  const _FeatureCard({
-    required this.icon,
-    required this.title,
-    required this.desc,
-    required this.accentColor,
+class _PageWelcome extends StatelessWidget {
+  final Animation<double> fade;
+  final Animation<Offset> slide;
+  const _PageWelcome({required this.fade, required this.slide});
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: fade,
+      child: SlideTransition(
+        position: slide,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            children: [
+              const Spacer(flex: 2),
+
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(26),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _kLeafGreen.withValues(alpha: 0.18),
+                      blurRadius: 40,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Image.asset(
+                    'assets/app_icon.png',
+                    width: 96,
+                    height: 96,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              const Text(
+                'Assalamu Alaikum',
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  color: _kInk,
+                  letterSpacing: -0.8,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              Text(
+                'Welcome to Sukoon',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: _kLeafGreen.withValues(alpha: 0.7),
+                  letterSpacing: 0.2,
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              Text(
+                'Your phone should serve\nyour soul, not steal it.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w500,
+                  color: _kInkSoft.withValues(alpha: 0.7),
+                  height: 1.5,
+                  letterSpacing: -0.2,
+                ),
+              ),
+
+              const SizedBox(height: 36),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _TrustBadge(icon: Icons.shield_outlined, label: 'Private'),
+                  const SizedBox(width: 24),
+                  _TrustBadge(icon: Icons.eco_outlined, label: 'Ad-free'),
+                  const SizedBox(width: 24),
+                  _TrustBadge(icon: Icons.favorite_border_rounded, label: 'Free'),
+                ],
+              ),
+
+              const Spacer(flex: 3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════
+// PAGE 2: THE PROBLEM
+// ═════════════════════════════════════════════════════════════════
+
+class _PageProblem extends StatelessWidget {
+  final Animation<double> fade;
+  final Animation<Offset> slide;
+  const _PageProblem({required this.fade, required this.slide});
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: fade,
+      child: SlideTransition(
+        position: slide,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            children: [
+              const Spacer(flex: 2),
+
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  color: _kLeafGreen.withValues(alpha: 0.08),
+                  border:
+                      Border.all(color: _kLeafGreen.withValues(alpha: 0.12)),
+                ),
+                child: Text(
+                  'Average: 96 phone unlocks a day',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                    color: _kLeafDark.withValues(alpha: 0.75),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              const Text(
+                'What if your home screen\nbrought you closer to Allah\ninstead of further away?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 23,
+                  fontWeight: FontWeight.w800,
+                  color: _kInk,
+                  letterSpacing: -0.5,
+                  height: 1.35,
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              Text(
+                'Sukoon replaces the chaos with calm.\nBuilt around prayer, purpose and presence.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: _kInkSoft.withValues(alpha: 0.6),
+                  height: 1.65,
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              _ContrastRow(
+                beforeIcon: Icons.notifications_active_outlined,
+                beforeText: 'Endless notifications',
+                afterIcon: Icons.notifications_paused_outlined,
+                afterText: 'Filtered calm',
+              ),
+              const SizedBox(height: 10),
+              _ContrastRow(
+                beforeIcon: Icons.grid_view_rounded,
+                beforeText: 'App clutter',
+                afterIcon: Icons.search_rounded,
+                afterText: 'Quick search',
+              ),
+              const SizedBox(height: 10),
+              _ContrastRow(
+                beforeIcon: Icons.phone_android_outlined,
+                beforeText: 'Mindless scrolling',
+                afterIcon: Icons.self_improvement_rounded,
+                afterText: 'Intentional use',
+              ),
+
+              const Spacer(flex: 3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════
+// PAGE 3: FEATURES OVERVIEW
+// ═════════════════════════════════════════════════════════════════
+
+class _PageFeatures extends StatelessWidget {
+  final Animation<double> fade;
+  final Animation<Offset> slide;
+  const _PageFeatures({required this.fade, required this.slide});
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: fade,
+      child: SlideTransition(
+        position: slide,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            children: [
+              const Spacer(flex: 1),
+
+              Text(
+                'BUILT FOR YOUR DEEN',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 2.2,
+                  color: _kLeafGreen.withValues(alpha: 0.55),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Everything you need.\nNothing you don\'t.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: _kInk,
+                  letterSpacing: -0.5,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              _FeatureCard(
+                icon: Icons.mosque_rounded,
+                title: 'Prayer & Ramadan',
+                desc: 'GPS adhan alarms for all 5 prayers. Suhoor & Iftar countdowns, Islamic calendar.',
+              ),
+              const SizedBox(height: 10),
+              _FeatureCard(
+                icon: Icons.auto_stories_rounded,
+                title: 'Quran, Hadith & Dhikr',
+                desc: 'Full Quran with tafseer, 9 hadith collections, dhikr counter with streak tracking.',
+              ),
+              const SizedBox(height: 10),
+              _FeatureCard(
+                icon: Icons.spa_rounded,
+                title: 'Digital Wellness',
+                desc: 'Muraqaba, Pomodoro timer, app time limits, screen time tracking.',
+              ),
+              const SizedBox(height: 10),
+              _FeatureCard(
+                icon: Icons.dashboard_customize_rounded,
+                title: 'Fully Customisable',
+                desc: '6 clock styles, wallpapers, themes, charity log, and more.',
+              ),
+
+              const Spacer(flex: 2),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════
+// PAGE 4: PRAYER & SALAH
+// ═════════════════════════════════════════════════════════════════
+
+class _PagePrayer extends StatelessWidget {
+  final Animation<double> fade;
+  final Animation<Offset> slide;
+  const _PagePrayer({required this.fade, required this.slide});
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: fade,
+      child: SlideTransition(
+        position: slide,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            children: [
+              const Spacer(flex: 2),
+
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _kLeafGreen.withValues(alpha: 0.09),
+                  border: Border.all(
+                      color: _kLeafGreen.withValues(alpha: 0.18), width: 1.5),
+                ),
+                child: Icon(Icons.mosque_rounded,
+                    size: 30, color: _kLeafGreen.withValues(alpha: 0.8)),
+              ),
+
+              const SizedBox(height: 22),
+
+              const Text(
+                'Never Miss a Prayer',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: _kInk,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Sukoon calculates accurate salah times\nfor your exact city — automatically.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.6,
+                  color: _kInkSoft.withValues(alpha: 0.6),
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              _DetailRow(
+                icon: Icons.alarm_rounded,
+                title: 'Adhan Alarms',
+                subtitle: 'Individual on/off for each of the 5 prayers',
+              ),
+              const SizedBox(height: 12),
+              _DetailRow(
+                icon: Icons.nightlight_round,
+                title: 'Ramadan Mode',
+                subtitle: 'Suhoor & Iftar countdowns on your home screen',
+              ),
+              const SizedBox(height: 12),
+              _DetailRow(
+                icon: Icons.calendar_today_rounded,
+                title: 'Islamic Calendar',
+                subtitle: 'Hijri date always visible. Key dates highlighted.',
+              ),
+              const SizedBox(height: 12),
+              _DetailRow(
+                icon: Icons.history_toggle_off_rounded,
+                title: 'Prayer History',
+                subtitle: 'Track your consistency with weekly reports',
+              ),
+
+              const Spacer(flex: 3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════
+// PAGE 5: PRODUCTIVITY & FOCUS
+// ═════════════════════════════════════════════════════════════════
+
+class _PageProductivity extends StatelessWidget {
+  final Animation<double> fade;
+  final Animation<Offset> slide;
+  const _PageProductivity({required this.fade, required this.slide});
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: fade,
+      child: SlideTransition(
+        position: slide,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            children: [
+              const Spacer(flex: 2),
+
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _kLeafGreen.withValues(alpha: 0.09),
+                  border: Border.all(
+                      color: _kLeafGreen.withValues(alpha: 0.18), width: 1.5),
+                ),
+                child: Icon(Icons.self_improvement_rounded,
+                    size: 30, color: _kLeafGreen.withValues(alpha: 0.8)),
+              ),
+
+              const SizedBox(height: 22),
+
+              const Text(
+                'Focus on What Matters',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: _kInk,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Sukoon gives you the tools to cut\ndistractions and protect your time.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.6,
+                  color: _kInkSoft.withValues(alpha: 0.6),
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              _DetailRow(
+                icon: Icons.timer_rounded,
+                title: 'Pomodoro Timer',
+                subtitle: 'Work sessions with built-in breaks. Stay deep.',
+              ),
+              const SizedBox(height: 12),
+              _DetailRow(
+                icon: Icons.shield_rounded,
+                title: 'App Blocker',
+                subtitle: 'Block social media during salah or study time',
+              ),
+              const SizedBox(height: 12),
+              _DetailRow(
+                icon: Icons.bar_chart_rounded,
+                title: 'Screen Time Tracking',
+                subtitle: 'See exactly where your hours go each day',
+              ),
+              const SizedBox(height: 12),
+              _DetailRow(
+                icon: Icons.do_not_disturb_on_rounded,
+                title: 'Muraqaba',
+                subtitle: 'One tap to silence everything — total presence',
+              ),
+
+              const Spacer(flex: 3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════
+// PAGE 6: PERSONALISE
+// ═════════════════════════════════════════════════════════════════
+
+class _PagePersonalise extends StatelessWidget {
+  final Animation<double> fade;
+  final Animation<Offset> slide;
+  const _PagePersonalise({required this.fade, required this.slide});
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: fade,
+      child: SlideTransition(
+        position: slide,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            children: [
+              const Spacer(flex: 2),
+
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _kLeafGreen.withValues(alpha: 0.09),
+                  border: Border.all(
+                      color: _kLeafGreen.withValues(alpha: 0.18), width: 1.5),
+                ),
+                child: Icon(Icons.palette_rounded,
+                    size: 30, color: _kLeafGreen.withValues(alpha: 0.8)),
+              ),
+
+              const SizedBox(height: 22),
+
+              const Text(
+                'Make It Yours',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: _kInk,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'A launcher that adapts to your taste,\nnot the other way around.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.6,
+                  color: _kInkSoft.withValues(alpha: 0.6),
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              _DetailRow(
+                icon: Icons.access_time_rounded,
+                title: '6 Clock Styles',
+                subtitle: 'From minimalist digits to elegant Arabic numerals',
+              ),
+              const SizedBox(height: 12),
+              _DetailRow(
+                icon: Icons.wallpaper_rounded,
+                title: 'Wallpapers & Themes',
+                subtitle: 'Curated Islamic wallpapers, AMOLED black mode',
+              ),
+              const SizedBox(height: 12),
+              _DetailRow(
+                icon: Icons.volunteer_activism_rounded,
+                title: 'Charity Log',
+                subtitle: 'Track your Sadaqah. Set daily giving goals.',
+              ),
+              const SizedBox(height: 12),
+              _DetailRow(
+                icon: Icons.apps_rounded,
+                title: 'Favourite Apps',
+                subtitle: 'Pin up to 7 apps on your home screen — instant access',
+              ),
+
+              const Spacer(flex: 3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════
+// PAGE 7: ACTIVATE — Set as default launcher (FINAL PAGE)
+// ═════════════════════════════════════════════════════════════════
+
+class _PageActivate extends StatelessWidget {
+  final Animation<double> fade;
+  final Animation<Offset> slide;
+  final VoidCallback onSetDefault;
+  final VoidCallback onFinish;
+
+  const _PageActivate({
+    required this.fade,
+    required this.slide,
+    required this.onSetDefault,
+    required this.onFinish,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: fade,
+      child: SlideTransition(
+        position: slide,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            children: [
+              const Spacer(flex: 2),
+
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _kLeafGreen.withValues(alpha: 0.1),
+                  border: Border.all(
+                    color: _kLeafGreen.withValues(alpha: 0.2),
+                    width: 1.5,
+                  ),
+                ),
+                child: Icon(
+                  Icons.home_rounded,
+                  size: 30,
+                  color: _kLeafGreen.withValues(alpha: 0.85),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              const Text(
+                'One Last Step',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: _kInk,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Set Sukoon as your default launcher\nso it becomes your home screen.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.6,
+                  color: _kInkSoft.withValues(alpha: 0.6),
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              _SetupStep(number: '1', text: 'Tap "Set as Default Launcher"'),
+              const SizedBox(height: 12),
+              _SetupStep(number: '2', text: 'Select Sukoon from the list'),
+              const SizedBox(height: 12),
+              _SetupStep(number: '3', text: 'Choose "Always"'),
+
+              const SizedBox(height: 28),
+
+              // Set Default CTA
+              GestureDetector(
+                onTap: onSetDefault,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    color: _kLeafGreen,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _kLeafGreen.withValues(alpha: 0.28),
+                        blurRadius: 20,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Set as Default Launcher',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              Text(
+                'You can change this anytime in Android Settings.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: _kInkMuted.withValues(alpha: 0.4),
+                ),
+              ),
+
+              const Spacer(flex: 2),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════
+// SHARED COMPONENTS
+// ═════════════════════════════════════════════════════════════════
+
+/// Trust badge
+class _TrustBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _TrustBadge({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _kLeafGreen.withValues(alpha: 0.07),
+            border:
+                Border.all(color: _kLeafGreen.withValues(alpha: 0.12)),
+          ),
+          child:
+              Icon(icon, size: 20, color: _kLeafGreen.withValues(alpha: 0.6)),
+        ),
+        const SizedBox(height: 7),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: _kInkMuted.withValues(alpha: 0.55),
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Before → After contrast pill row
+class _ContrastRow extends StatelessWidget {
+  final IconData beforeIcon;
+  final String beforeText;
+  final IconData afterIcon;
+  final String afterText;
+
+  const _ContrastRow({
+    required this.beforeIcon,
+    required this.beforeText,
+    required this.afterIcon,
+    required this.afterText,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _borderDim),
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withValues(alpha: 0.5),
+        border: Border.all(color: _kInk.withValues(alpha: 0.04)),
       ),
       child: Row(
         children: [
-          // Icon container
+          Icon(beforeIcon,
+              size: 15, color: _kInkMuted.withValues(alpha: 0.3)),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              beforeText,
+              style: TextStyle(
+                fontSize: 12,
+                color: _kInkMuted.withValues(alpha: 0.35),
+                decoration: TextDecoration.lineThrough,
+                decorationColor: _kInkMuted.withValues(alpha: 0.2),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Icon(
+              Icons.arrow_forward_rounded,
+              size: 13,
+              color: _kLeafGreen.withValues(alpha: 0.5),
+            ),
+          ),
+          Icon(afterIcon,
+              size: 15, color: _kLeafGreen.withValues(alpha: 0.7)),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              afterText,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _kLeafDark.withValues(alpha: 0.75),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Feature card
+class _FeatureCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String desc;
+
+  const _FeatureCard({
+    required this.icon,
+    required this.title,
+    required this.desc,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: Colors.white.withValues(alpha: 0.6),
+        border: Border.all(color: _kLeafGreen.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: _kInk.withValues(alpha: 0.025),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
           Container(
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: accentColor.withValues(alpha: 0.12)),
+              color: _kLeafGreen.withValues(alpha: 0.09),
+              border:
+                  Border.all(color: _kLeafGreen.withValues(alpha: 0.14)),
             ),
-            child: Icon(icon, color: accentColor, size: 21),
+            child: Icon(icon,
+                size: 20, color: _kLeafGreen.withValues(alpha: 0.8)),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 15,
+                  style: TextStyle(
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: _textPrimary,
-                    letterSpacing: 0.1,
+                    color: _kInk.withValues(alpha: 0.85),
+                    letterSpacing: -0.1,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   desc,
                   style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white.withValues(alpha: 0.40),
-                    height: 1.3,
+                    fontSize: 12,
+                    height: 1.4,
+                    color: _kInkSoft.withValues(alpha: 0.5),
                   ),
                 ),
               ],
             ),
           ),
-          Icon(Icons.chevron_right_rounded,
-              color: Colors.white.withValues(alpha: 0.12), size: 20),
         ],
       ),
     );
   }
 }
 
-/// Pro feature row (page 4)
-class _ProRow extends StatelessWidget {
+/// Detail row — icon + title + subtitle (used in deep-dive pages)
+class _DetailRow extends StatelessWidget {
   final IconData icon;
-  final String text;
-  const _ProRow({required this.icon, required this.text});
+  final String title;
+  final String subtitle;
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: _gold.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: _gold.withValues(alpha: 0.10)),
-          ),
-          child: Icon(icon,
-              color: _gold.withValues(alpha: 0.85), size: 18),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 14.5,
-              color: Colors.white.withValues(alpha: 0.75),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        Icon(Icons.check_circle_rounded,
-            color: _green.withValues(alpha: 0.55), size: 20),
-      ],
-    );
-  }
-}
-
-/// Trust pill (page 4 bottom)
-class _TrustPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _TrustPill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon,
-              size: 13,
-              color: Colors.white.withValues(alpha: 0.35)),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10.5,
-              color: Colors.white.withValues(alpha: 0.35),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Setup step row (page 5)
-class _SetupStepRow extends StatelessWidget {
-  final String num;
-  final String text;
-  const _SetupStepRow({required this.num, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: _gold.withValues(alpha: 0.10),
-            border: Border.all(color: _gold.withValues(alpha: 0.18)),
-          ),
-          child: Center(
-            child: Text(
-              num,
-              style: const TextStyle(
-                color: _gold,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 14.5,
-              color: Colors.white.withValues(alpha: 0.65),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Primary CTA button
-class _PrimaryCTA extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  final IconData? icon;
-
-  const _PrimaryCTA({
-    super.key,
-    required this.label,
-    required this.onTap,
-    this.icon,
+  const _DetailRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: Material(
-        color: _gold,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          splashColor: Colors.white.withValues(alpha: 0.1),
-          child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (icon != null) ...[
-                  Icon(icon,
-                      size: 20, color: const Color(0xFF1A1000)),
-                  const SizedBox(width: 8),
-                ],
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1000),
-                    letterSpacing: 0.2,
-                  ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(11),
+            color: _kLeafGreen.withValues(alpha: 0.08),
+            border: Border.all(color: _kLeafGreen.withValues(alpha: 0.13)),
+          ),
+          child:
+              Icon(icon, size: 19, color: _kLeafGreen.withValues(alpha: 0.75)),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _kInk.withValues(alpha: 0.85),
+                  letterSpacing: -0.1,
                 ),
-              ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.45,
+                  color: _kInkSoft.withValues(alpha: 0.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Numbered setup step
+class _SetupStep extends StatelessWidget {
+  final String number;
+  final String text;
+  const _SetupStep({required this.number, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _kLeafGreen.withValues(alpha: 0.08),
+            border:
+                Border.all(color: _kLeafGreen.withValues(alpha: 0.15)),
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _kLeafGreen.withValues(alpha: 0.75),
+              ),
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Secondary CTA (text link)
-class _SecondaryCTA extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _SecondaryCTA({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Text(
-          label,
+        const SizedBox(width: 14),
+        Text(
+          text,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.35),
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            color: _kInkSoft.withValues(alpha: 0.6),
           ),
         ),
-      ),
+      ],
     );
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-//  ANIMATED BACKGROUND LAYERS
-// ═══════════════════════════════════════════════════════════════════
 
-/// Gradient background that morphs per page
-class _GradientBg extends StatelessWidget {
-  final int page;
-  const _GradientBg({required this.page});
-
-  @override
-  Widget build(BuildContext context) {
-    const gradients = [
-      [
-        Color(0xFF0A0A1A),
-        Color(0xFF0F0A00),
-        Color(0xFF050508)
-      ], // Hook
-      [
-        Color(0xFF1A0808),
-        Color(0xFF100505),
-        Color(0xFF050508)
-      ], // Impact
-      [
-        Color(0xFF061A0A),
-        Color(0xFF050F05),
-        Color(0xFF050508)
-      ], // Solution
-      [
-        Color(0xFF1A1200),
-        Color(0xFF0F0A00),
-        Color(0xFF050508)
-      ], // Pro
-      [
-        Color(0xFF0A0F1A),
-        Color(0xFF050A10),
-        Color(0xFF050508)
-      ], // Activate
-    ];
-
-    final g = gradients[page.clamp(0, 4)];
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 700),
-      curve: Curves.easeInOut,
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: const Alignment(0, -0.4),
-          radius: 1.6,
-          colors: g,
-          stops: const [0.0, 0.5, 1.0],
-        ),
-      ),
-    );
-  }
-}
-
-/// Floating particles — subtle ambient effect
-class _FloatingParticles extends StatelessWidget {
-  final AnimationController controller;
-  const _FloatingParticles({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        return CustomPaint(
-          painter:
-              _ParticlePainter(progress: controller.value),
-          size: Size.infinite,
-        );
-      },
-    );
-  }
-}
-
-class _ParticlePainter extends CustomPainter {
-  final double progress;
-  _ParticlePainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
-    final rng = math.Random(42); // Fixed seed for consistent particles
-
-    for (int i = 0; i < 20; i++) {
-      final baseX = rng.nextDouble() * size.width;
-      final baseY = rng.nextDouble() * size.height;
-      final speed = 0.3 + rng.nextDouble() * 0.7;
-      final phase = rng.nextDouble() * math.pi * 2;
-      final radius = 1.0 + rng.nextDouble() * 1.5;
-
-      final x =
-          baseX +
-          math.sin(progress * math.pi * 2 * speed + phase) * 20;
-      final y =
-          baseY +
-          math.cos(progress * math.pi * 2 * speed * 0.7 + phase) *
-              15;
-      final alpha =
-          (0.04 +
-              math
-                      .sin(progress * math.pi * 2 + phase)
-                      .abs() *
-                  0.06);
-
-      paint.color = _gold.withValues(alpha: alpha);
-      canvas.drawCircle(Offset(x, y), radius, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ParticlePainter old) =>
-      old.progress != progress;
-}

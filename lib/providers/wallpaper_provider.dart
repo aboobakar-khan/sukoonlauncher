@@ -11,6 +11,46 @@ enum WallpaperType {
   redGradient,
   greenGradient,
   customImage,
+  // Premium Islamic wallpapers
+  islamicNamazMat,
+  islamicInshallah,
+  islamicFlag,
+  islamicQuranDark,
+  // Static wallpapers
+  yearDots,
+  // Aesthetic light-toned gradients
+  leafGreenGradient,
+  beigeGradient,
+  roseGoldGradient,
+  lavenderGradient,
+  oceanTealGradient,
+  sunsetPeachGradient,
+  mintGradient,
+  dustyRoseGradient,
+}
+
+/// Which wallpapers are premium (require unlock)
+const premiumWallpapers = {
+  WallpaperType.islamicNamazMat,
+  WallpaperType.islamicInshallah,
+  WallpaperType.islamicFlag,
+  WallpaperType.islamicQuranDark,
+};
+
+/// Asset path for premium wallpapers
+String? wallpaperAssetPath(WallpaperType type) {
+  switch (type) {
+    case WallpaperType.islamicNamazMat:
+      return 'assets/wallpapers/namazmat.jpg';
+    case WallpaperType.islamicInshallah:
+      return 'assets/wallpapers/inshallah.jpg';
+    case WallpaperType.islamicFlag:
+      return 'assets/wallpapers/islamic_flag.jpg';
+    case WallpaperType.islamicQuranDark:
+      return 'assets/wallpapers/quran_dark.jpg';
+    default:
+      return null;
+  }
 }
 
 final wallpaperProvider =
@@ -19,7 +59,7 @@ final wallpaperProvider =
     );
 
 class WallpaperNotifier extends StateNotifier<WallpaperType> {
-  WallpaperNotifier() : super(WallpaperType.desertGradient) {
+  WallpaperNotifier() : super(WallpaperType.black) {
     _loadFromHive();
   }
 
@@ -59,8 +99,8 @@ class WallpaperNotifier extends StateNotifier<WallpaperType> {
   Future<void> reset() async {
     customImagePath = null;
     await _box.delete(_imagePathKey);
-    await _box.put(_wallpaperKey, WallpaperType.desertGradient.index);
-    state = WallpaperType.desertGradient;
+    await _box.put(_wallpaperKey, WallpaperType.black.index);
+    state = WallpaperType.black;
   }
 }
 
@@ -83,6 +123,32 @@ extension WallpaperTypeUI on WallpaperType {
         return 'Green animated gradient';
       case WallpaperType.customImage:
         return 'Pick image from gallery';
+      case WallpaperType.islamicNamazMat:
+        return '🕌 Premium · Namaz Mat';
+      case WallpaperType.islamicInshallah:
+        return '🤲 Premium · Inshallah';
+      case WallpaperType.islamicFlag:
+        return '☪ Premium · Islamic Flag';
+      case WallpaperType.islamicQuranDark:
+        return '📖 Premium · Quran Dark';
+      case WallpaperType.yearDots:
+        return '365-dot year progress grid';
+      case WallpaperType.leafGreenGradient:
+        return '🌿 Fresh leaf green';
+      case WallpaperType.beigeGradient:
+        return '🏜️ Warm beige sand';
+      case WallpaperType.roseGoldGradient:
+        return '✨ Rose gold shimmer';
+      case WallpaperType.lavenderGradient:
+        return '💜 Soft lavender mist';
+      case WallpaperType.oceanTealGradient:
+        return '🌊 Ocean teal breeze';
+      case WallpaperType.sunsetPeachGradient:
+        return '🌅 Sunset peach glow';
+      case WallpaperType.mintGradient:
+        return '🍃 Cool mint fresh';
+      case WallpaperType.dustyRoseGradient:
+        return '🌸 Dusty rose bloom';
     }
   }
 }

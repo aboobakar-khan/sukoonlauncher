@@ -79,12 +79,35 @@ class AppFilterUtils {
     'com.android.camera',
     'com.android.camera2',
     'com.google.android.GoogleCamera',
+    'com.google.android.GoogleCameraGo',
     'com.sec.android.app.camera',
+    'com.samsung.android.camera',
     'com.miui.camera',
     'com.oppo.camera',
+    'com.coloros.camera',
+    'com.coloros.camera2',
     'com.vivo.camera',
     'com.oneplus.camera',
     'com.realme.camera',
+    'com.motorola.camera3',
+    'com.motorola.camera2',
+    'com.huawei.camera',
+    'com.asus.camera',
+    'com.sonyericsson.android.camera',
+    'org.codeaurora.snapcam',
+    'com.hmd.camera',
+    'com.lava.camera',
+    'com.lava.camera2',
+    'com.transsion.camera',
+    'com.mediatek.camera',
+    'com.lenovo.camera',
+    'com.nothing.camera',
+    'com.tcl.camera',
+    'com.zte.camera',
+    'com.oneplus.camera.service', // OnePlus Camera Service
+    'com.oneplus.camera.provider', // OnePlus Camera Provider
+    'com.oplus.camera', // OPPO/OnePlus unified camera
+    'com.agc.toolkit', // AGC Toolkit (shows as "Camera" on some OnePlus devices)
 
     // ═══════════════════════════════════════════════════════════
     // 🖼️ GALLERY / PHOTOS
@@ -214,6 +237,8 @@ class AppFilterUtils {
     // 🤖 ASSISTANT
     // ═══════════════════════════════════════════════════════════
     'com.google.android.apps.googleassistant',
+    'com.google.android.apps.bard', // Google Bard (older name)
+    'com.google.android.apps.gemini', // Google Gemini AI Assistant
 
     // ═══════════════════════════════════════════════════════════
     // 📧 GOOGLE CORE APPS

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/favorite_apps_provider.dart';
 import '../providers/installed_apps_provider.dart';
 import '../providers/theme_provider.dart';
+import '../widgets/swipe_back_wrapper.dart';
 
 /// Favorite Picker Screen — Select up to 7 favorite apps
 class FavoritePickerScreen extends ConsumerStatefulWidget {
@@ -30,6 +31,9 @@ class _FavoritePickerScreenState extends ConsumerState<FavoritePickerScreen> {
   @override
   Widget build(BuildContext context) {
     final themeColor = ref.watch(themeColorProvider);
+    final isLight = themeColor.isLight;
+    final bgColor = isLight ? const Color(0xFFF5F5F5) : Colors.black;
+    final primaryText = isLight ? const Color(0xFF0D0D0D) : Colors.white;
     final allApps = ref.watch(installedAppsProvider);
     final favorites = ref.watch(favoriteAppsProvider);
     final favPackages = favorites.map((f) => f.packageName).toSet();
@@ -43,10 +47,11 @@ class _FavoritePickerScreenState extends ConsumerState<FavoritePickerScreen> {
                 app.appName.toLowerCase().contains(_searchQuery.toLowerCase()))
             .toList();
 
-    return Scaffold(
-      backgroundColor: Colors.black,
+    return SwipeBackWrapper(
+      child: Scaffold(
+      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: bgColor,
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios, color: themeColor.color, size: 20),
@@ -58,7 +63,7 @@ class _FavoritePickerScreenState extends ConsumerState<FavoritePickerScreen> {
             Text(
               'Select Favorites',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: primaryText.withValues(alpha: 0.9),
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
               ),
@@ -102,7 +107,7 @@ class _FavoritePickerScreenState extends ConsumerState<FavoritePickerScreen> {
             margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             height: 3,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
+              color: primaryText.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(2),
             ),
             child: FractionallySizedBox(
@@ -131,18 +136,18 @@ class _FavoritePickerScreenState extends ConsumerState<FavoritePickerScreen> {
               ),
               decoration: InputDecoration(
                 hintText: 'Search apps...',
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25)),
+                hintStyle: TextStyle(color: primaryText.withValues(alpha: 0.25)),
                 filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.06),
+                fillColor: primaryText.withValues(alpha: 0.06),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                prefixIcon: Icon(Icons.search_rounded, color: Colors.white.withValues(alpha: 0.3), size: 20),
+                prefixIcon: Icon(Icons.search_rounded, color: primaryText.withValues(alpha: 0.3), size: 20),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.4), size: 18),
+                        icon: Icon(Icons.close_rounded, color: primaryText.withValues(alpha: 0.4), size: 18),
                         onPressed: () {
                           _searchCtrl.clear();
                           setState(() => _searchQuery = '');
@@ -197,10 +202,10 @@ class _FavoritePickerScreenState extends ConsumerState<FavoritePickerScreen> {
                             app.appName,
                             style: TextStyle(
                               color: isFav
-                                  ? Colors.white.withValues(alpha: 0.95)
+                                  ? primaryText.withValues(alpha: 0.95)
                                   : isMaxReached
-                                      ? Colors.white.withValues(alpha: 0.25)
-                                      : Colors.white.withValues(alpha: 0.7),
+                                      ? primaryText.withValues(alpha: 0.25)
+                                      : primaryText.withValues(alpha: 0.7),
                               fontSize: 15,
                               fontWeight: isFav ? FontWeight.w500 : FontWeight.w300,
                               letterSpacing: 0.5,
@@ -216,11 +221,11 @@ class _FavoritePickerScreenState extends ConsumerState<FavoritePickerScreen> {
                             borderRadius: BorderRadius.circular(7),
                             color: isFav
                                 ? _sandGold.withValues(alpha: 0.2)
-                                : Colors.white.withValues(alpha: 0.06),
+                                : primaryText.withValues(alpha: 0.06),
                             border: Border.all(
                               color: isFav
                                   ? _sandGold.withValues(alpha: 0.5)
-                                  : Colors.white.withValues(alpha: 0.12),
+                                  : primaryText.withValues(alpha: 0.12),
                               width: 1.5,
                             ),
                           ),
@@ -237,6 +242,7 @@ class _FavoritePickerScreenState extends ConsumerState<FavoritePickerScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 }

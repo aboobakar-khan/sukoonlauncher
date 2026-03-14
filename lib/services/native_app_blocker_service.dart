@@ -94,4 +94,207 @@ class NativeAppBlockerService {
       return false;
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🕐 Timed Session Bridge (App Time Intent feature)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  static const _usageChannel = MethodChannel('com.sukoon.launcher/usage_stats');
+
+  /// Start a timed session — native service will show overlay when limit expires
+  static Future<bool> startTimedSession(String packageName, int minutes) async {
+    try {
+      final result = await _channel.invokeMethod('startTimedSession', {
+        'packageName': packageName,
+        'minutes': minutes,
+      });
+      return result == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Extend an active timed session by additional minutes
+  static Future<bool> extendTimedSession(String packageName, int additionalMinutes) async {
+    try {
+      final result = await _channel.invokeMethod('extendTimedSession', {
+        'packageName': packageName,
+        'additionalMinutes': additionalMinutes,
+      });
+      return result == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// End a timed session (user returned to launcher)
+  static Future<bool> endTimedSession(String packageName) async {
+    try {
+      final result = await _channel.invokeMethod('endTimedSession', {
+        'packageName': packageName,
+      });
+      return result == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Check if there's a pending "time's up" event from the native side
+  static Future<Map<String, dynamic>?> getPendingTimesUp() async {
+    try {
+      final result = await _channel.invokeMethod('getPendingTimesUp');
+      if (result is Map) {
+        return Map<String, dynamic>.from(result);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Get usage stats from native UsageStatsManager
+  static Future<List<Map<String, dynamic>>> getUsageStats(int startTime, int endTime) async {
+    try {
+      final result = await _usageChannel.invokeMethod('getUsageStats', {
+        'startTime': startTime,
+        'endTime': endTime,
+      });
+      if (result is List) {
+        return result.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Get per-day usage stats for the last [days] days.
+  /// Returns list of DailyUsageStat — index 0 = today, index 1 = yesterday, etc.
+  static Future<List<Map<String, dynamic>>> getDailyUsageStats({int days = 7}) async {
+    try {
+      final result = await _usageChannel.invokeMethod('getDailyUsageStats', {
+        'days': days,
+      });
+      if (result is List) {
+        return result.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 📬 Notification Filter Bridge
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  static const _notifChannel = MethodChannel('com.sukoon.launcher/notification_filter');
+
+  /// Check if Notification Listener permission is granted
+  static Future<bool> hasNotificationListenerPermission() async {
+    try {
+      final result = await _notifChannel.invokeMethod('hasPermission');
+      return result == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Open system settings to grant Notification Listener permission
+  static Future<bool> requestNotificationListenerPermission() async {
+    try {
+      final result = await _notifChannel.invokeMethod('requestPermission');
+      return result == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Get currently cached notifications from the native listener
+  static Future<List<Map<String, dynamic>>> getCachedNotifications() async {
+    try {
+      final result = await _notifChannel.invokeMethod('getCachedNotifications');
+      if (result is List) {
+        return result.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Clear a specific notification by key
+  static Future<bool> clearNotification(String key) async {
+    try {
+      final result = await _notifChannel.invokeMethod('clearNotification', {'key': key});
+      return result == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Clear all cached notifications
+  static Future<bool> clearAllNotifications() async {
+    try {
+      final result = await _notifChannel.invokeMethod('clearAll');
+      return result == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Launch an app by its package name
+  static Future<bool> launchApp(String packageName) async {
+    try {
+      final result = await _notifChannel.invokeMethod('launchApp', {'packageName': packageName});
+      return result == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Open a notification's original contentIntent (deep-link).
+  /// Falls back to launching the app if the PendingIntent expired.
+  static Future<bool> openNotificationIntent(String key) async {
+    try {
+      final result = await _notifChannel.invokeMethod('openNotificationIntent', {'key': key});
+      return result == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Push the allowed packages list to the native service so it can suppress
+  /// notifications from non-allowed apps in the Android system notification bar.
+  static Future<bool> updateAllowedPackages(List<String> packages, {bool enabled = true}) async {
+    try {
+      final result = await _notifChannel.invokeMethod('updateAllowedPackages', {
+        'packages': packages,
+        'enabled': enabled,
+      });
+      return result == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Get the total number of notifications suppressed since filter was enabled
+  static Future<int> getTotalSuppressed() async {
+    try {
+      final result = await _notifChannel.invokeMethod('getTotalSuppressed');
+      return (result as int?) ?? 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /// Show or update the persistent hint notification in the system notification bar
+  static Future<bool> showHintNotification() async {
+    try {
+      final result = await _notifChannel.invokeMethod('showHintNotification');
+      return result == true;
+    } catch (e) {
+      return false;
+    }
+  }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../utils/hive_box_manager.dart';
 
 /// Available time formats
 enum TimeFormat { hour24, hour12 }
@@ -41,7 +42,7 @@ class TimeFormatNotifier extends StateNotifier<TimeFormat> {
 
   Future<void> _init() async {
     try {
-      _box = await Hive.openBox(_boxName);
+      _box = await HiveBoxManager.get(_boxName);
       final savedFormat = _box?.get(_formatKey) as String?;
 
       if (savedFormat != null) {
@@ -58,7 +59,7 @@ class TimeFormatNotifier extends StateNotifier<TimeFormat> {
   }
 
   Future<void> setTimeFormat(TimeFormat format) async {
-    _box ??= await Hive.openBox(_boxName);
+    _box ??= await HiveBoxManager.get(_boxName);
     await _box?.put(_formatKey, format.name);
     state = format;
   }

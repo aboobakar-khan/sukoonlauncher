@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import '../utils/hive_box_manager.dart';
 
 /// Bismillah Overlay - Shows بِسْمِ ٱللَّٰهِ before every app launch
 /// 
@@ -41,7 +40,6 @@ class _BismillahOverlayState extends State<BismillahOverlay>
   static const Color _primaryGreen = Color(0xFFC2A366);
   static const Color _spiritualGold = Color(0xFFFFD93D);
   static const Color _deepBlack = Color(0xFF0D1117);
-  static const Color _softGlow = Color(0xFF26A69A);
 
   @override
   void initState() {
@@ -113,7 +111,7 @@ class _BismillahOverlayState extends State<BismillahOverlay>
                     radius: 1.2,
                     colors: [
                       _deepBlack,
-                      _deepBlack.withOpacity(0.95),
+                      _deepBlack.withValues(alpha: 0.95),
                     ],
                   ),
                 ),
@@ -153,7 +151,7 @@ class _BismillahOverlayState extends State<BismillahOverlay>
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w300,
-                            color: Colors.white.withOpacity(0.5),
+                            color: Colors.white.withValues(alpha: 0.5),
                             letterSpacing: 6,
                           ),
                         ),
@@ -166,7 +164,7 @@ class _BismillahOverlayState extends State<BismillahOverlay>
                             gradient: LinearGradient(
                               colors: [
                                 Colors.transparent,
-                                _primaryGreen.withOpacity(0.6),
+                                _primaryGreen.withValues(alpha: 0.6),
                                 Colors.transparent,
                               ],
                             ),
@@ -193,22 +191,22 @@ class BismillahService {
   static const String _durationKey = 'duration_ms';
 
   static Future<bool> isEnabled() async {
-    final box = await Hive.openBox(_boxName);
+    final box = await HiveBoxManager.get(_boxName);
     return box.get(_enabledKey, defaultValue: true);
   }
 
   static Future<void> setEnabled(bool enabled) async {
-    final box = await Hive.openBox(_boxName);
+    final box = await HiveBoxManager.get(_boxName);
     await box.put(_enabledKey, enabled);
   }
 
   static Future<int> getDurationMs() async {
-    final box = await Hive.openBox(_boxName);
+    final box = await HiveBoxManager.get(_boxName);
     return box.get(_durationKey, defaultValue: 800);
   }
 
   static Future<void> setDurationMs(int ms) async {
-    final box = await Hive.openBox(_boxName);
+    final box = await HiveBoxManager.get(_boxName);
     await box.put(_durationKey, ms);
   }
 }
@@ -263,9 +261,6 @@ class _QuickBismillahWidgetState extends State<_QuickBismillahWidget>
     );
 
     _controller.forward();
-    
-    // Light haptic feedback
-    HapticFeedback.lightImpact();
 
     // Auto-dismiss
     Future.delayed(const Duration(milliseconds: 600), () {
@@ -291,7 +286,7 @@ class _QuickBismillahWidgetState extends State<_QuickBismillahWidget>
         return Positioned.fill(
           child: IgnorePointer(
             child: Container(
-              color: Colors.black.withOpacity(0.7 * _animation.value),
+              color: Colors.black.withValues(alpha: 0.7 * _animation.value),
               child: Center(
                 child: Transform.scale(
                   scale: 0.8 + (0.2 * _animation.value),
@@ -306,11 +301,11 @@ class _QuickBismillahWidgetState extends State<_QuickBismillahWidget>
                         color: const Color(0xFF161B22),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: const Color(0xFFC2A366).withOpacity(0.3),
+                          color: const Color(0xFFC2A366).withValues(alpha: 0.3),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFC2A366).withOpacity(0.2),
+                            color: const Color(0xFFC2A366).withValues(alpha: 0.2),
                             blurRadius: 30,
                             spreadRadius: 5,
                           ),
@@ -341,7 +336,7 @@ class _QuickBismillahWidgetState extends State<_QuickBismillahWidget>
                             'In the name of Allah',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white.withOpacity(0.5),
+                              color: Colors.white.withValues(alpha: 0.5),
                               letterSpacing: 2,
                             ),
                           ),

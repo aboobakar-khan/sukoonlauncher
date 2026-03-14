@@ -3,51 +3,70 @@ import 'package:flutter/services.dart';
 
 /// Reusable bottom swipe-up wrapper for pushed screens.
 ///
-/// Adds a bottom-center pill indicator and swipe-up gesture
-/// that pops the screen (Navigator.pop), mimicking Android's
-/// system navigation gesture — but for our own pushed pages
-/// (Settings, Prayer Analytics, Dhikr Analytics, Challenge Analytics).
+/// Swipe-up from the bottom zone pops back to the launcher root with a
+/// smooth reverse slide animation (iOS-style). The CupertinoPageRoute
+/// transition keeps the home page fully interactive during the animation.
 ///
 /// Does NOT conflict with vertical scroll inside children because
 /// it only captures gestures in a thin bottom zone.
-class SwipeBackWrapper extends StatelessWidget {
+/// Requires a strong deliberate swipe-up (high velocity).
+class SwipeBackWrapper extends StatefulWidget {
   final Widget child;
 
   const SwipeBackWrapper({super.key, required this.child});
+
+  @override
+  State<SwipeBackWrapper> createState() => _SwipeBackWrapperState();
+}
+
+class _SwipeBackWrapperState extends State<SwipeBackWrapper> {
+  bool _isDragging = false;
+
+  /// Pop back to home with the smooth reverse slide animation.
+  ///
+  /// With CupertinoPageRoute the reverse animation is a smooth right-slide
+  /// that keeps the underlying page interactive during the transition —
+  /// no more ~300ms input-blocked overlay that MaterialPageRoute had.
+  void _popToHome() {
+    if (!Navigator.of(context).canPop()) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
         // Main content
-        child,
+        widget.child,
 
-        // Bottom swipe-up zone → pop screen
+        // Bottom swipe-up zone → pop ALL screens back to launcher home
+        // Only triggers on strong deliberate upward swipe (not taps or small drags)
         Positioned(
           bottom: 0,
           left: 0,
           right: 0,
-          height: 40,
+          height: 36, // Reduced zone to avoid accidental captures
           child: GestureDetector(
+            onVerticalDragStart: (details) {
+              _isDragging = true;
+            },
             onVerticalDragEnd: (details) {
+              if (!_isDragging) return;
+              _isDragging = false;
+
               final velocity = details.primaryVelocity ?? 0;
-              if (velocity < -250) {
+              // Require strong upward velocity (more negative = faster upswipe)
+              if (velocity < -500) {
                 HapticFeedback.lightImpact();
-                Navigator.of(context).pop();
+                _popToHome();
               }
             },
-            behavior: HitTestBehavior.opaque,
-            child: Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
+            onVerticalDragCancel: () {
+              _isDragging = false;
+            },
+            // translucent so taps pass through to content below
+            behavior: HitTestBehavior.translucent,
+            child: const SizedBox.expand(),
           ),
         ),
       ],

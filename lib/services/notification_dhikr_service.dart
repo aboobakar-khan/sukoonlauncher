@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../utils/hive_box_manager.dart';
@@ -50,7 +51,7 @@ class NotificationDhikrService {
       _channel.setMethodCallHandler(_handleMethodCall);
     } catch (e) {
       // Service not available on this platform
-      print('Dhikr notification service not available: $e');
+      debugPrint('Dhikr notification service not available: $e');
     }
   }
 
@@ -62,7 +63,7 @@ class NotificationDhikrService {
       await _channel.invokeMethod('stopDhikrNotification');
       _isServiceRunning = false;
     } catch (e) {
-      print('Error stopping dhikr notification: $e');
+      debugPrint('Error stopping dhikr notification: $e');
     }
   }
 

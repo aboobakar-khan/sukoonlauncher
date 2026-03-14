@@ -30,17 +30,17 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
   // Track which day we're viewing: 0 = today, 1 = yesterday
   int _selectedDayOffset = 0;
 
-  // ☪️ Sukoon brand design tokens — aligned with app theme
-  static const Color _bgDark = Color(0xFF0A0A0A);
-  static const Color _cardBg = Color(0xFF111111);
-  static const Color _borderColor = Color(0xFF1E1E1E);
-  static const Color _greenPrimary = Color(0xFF7BAE6E);   // Oasis green
-  static const Color _greenLight = Color(0xFFA8D5A0);     // Soft oasis
-  static const Color _greenDark = Color(0xFF5A8F50);      // Deep oasis
+  /// Whether the pulse animation is currently running.
+  /// We track this to avoid redundant start/stop calls.
+  bool _pulseRunning = false;
+
+  // ☪️ Sukoon brand design tokens — semi-transparent to follow dashboard theme
+  static final Color _bgDark = Colors.white.withValues(alpha: 0.02);
+  static final Color _cardBg = Colors.white.withValues(alpha: 0.03);
+  static final Color _borderColor = Colors.white.withValues(alpha: 0.06);
   static const Color _textPrimary = Color(0xFFE6EDF3);
   static const Color _textSecondary = Color(0xFF8B949E);
   static const Color _textMuted = Color(0xFF484F58);
-  static const Color _amberAccent = Color(0xFFC2A366);    // Sand gold
 
   // Prayer data with Islamic context
   static const List<Map<String, dynamic>> _prayers = [
@@ -87,11 +87,45 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
-    )..repeat(reverse: true);
+    );
     
     _pulseAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    // DO NOT start .repeat() here.
+    // This widget lives on the WidgetDashboardScreen (page 1) which uses
+    // AutomaticKeepAliveClientMixin — it stays mounted even when the user
+    // is on the home page or app list.  A repeating animation on a kept-
+    // alive but off-screen widget burns CPU+GPU continuously because
+    // SingleTickerProviderStateMixin only pauses the ticker when the
+    // entire route/tree is off-screen (i.e., pushed route), NOT when a
+    // PageView sibling is off-viewport.
+    //
+    // Instead, we start/stop via the VisibilityDetector pattern: the
+    // parent build method calls _ensurePulseRunning() so the animation
+    // only runs while the widget is actually being painted.
+  }
+
+  @override
+  void deactivate() {
+    // Widget is being removed from the tree (page swiped away, route pushed).
+    // Stop the animation immediately to free the ticker.
+    if (_pulseRunning) {
+      _pulseController.stop();
+      _pulseRunning = false;
+    }
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    // Widget is re-inserted into the tree — restart the animation.
+    if (!_pulseRunning) {
+      _pulseController.repeat(reverse: true);
+      _pulseRunning = true;
+    }
   }
 
   @override
@@ -118,12 +152,6 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
     } catch (e) {
       return null;
     }
-  }
-
-  String _getDayLabel() {
-    if (_selectedDayOffset == 0) return 'Today';
-    if (_selectedDayOffset == 1) return 'Yesterday';
-    return '${_selectedDayOffset} days ago';
   }
 
   bool _isEditable() {
@@ -162,11 +190,19 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
 
   @override
   Widget build(BuildContext context) {
+    // Lazy-start the pulse animation on the first build frame.
+    // This ensures it only runs when the widget is actually visible.
+    if (!_pulseRunning) {
+      _pulseController.repeat(reverse: true);
+      _pulseRunning = true;
+    }
+
     final themeColor = ref.watch(themeColorProvider);
     final selectedRecord = _getRecordForSelectedDay();
     final completedCount = _getCompletedCount(selectedRecord);
     final progress = completedCount / 5;
     final isEditable = _isEditable();
+    final accent = themeColor.color;
 
     return GestureDetector(
       onTap: () {
@@ -201,14 +237,14 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: completedCount == 5 
-                ? _greenPrimary.withOpacity(0.4) 
+                ? accent.withValues(alpha: 0.4) 
                 : _borderColor,
             width: completedCount == 5 ? 1.5 : 1,
           ),
           boxShadow: completedCount == 5
               ? [
                   BoxShadow(
-                    color: _greenPrimary.withOpacity(0.15),
+                    color: accent.withValues(alpha: 0.15),
                     blurRadius: 20,
                     spreadRadius: -5,
                   ),
@@ -225,7 +261,7 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
                   Row(
                     children: [
                       // Progress ring
-                      _buildProgressRing(progress, completedCount),
+                      _buildProgressRing(progress, completedCount, accent),
                       const SizedBox(width: 16),
                       
                       // Title & stats
@@ -241,7 +277,7 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
                                     fontSize: 12,
                                     letterSpacing: 1.5,
                                     fontWeight: FontWeight.w600,
-                                    color: themeColor.color.withOpacity(0.9),
+                                    color: accent.withValues(alpha: 0.9),
                                   ),
                                 ),
                                 const Spacer(),
@@ -260,7 +296,7 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
                               style: TextStyle(
                                 fontSize: 14,
                                 color: completedCount == 5 
-                                    ? _greenLight 
+                                    ? accent.withValues(alpha: 0.8) 
                                     : _textSecondary,
                                 fontWeight: FontWeight.w400,
                               ),
@@ -273,7 +309,7 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
                   
                   // Day selector
                   const SizedBox(height: 12),
-                  _buildDaySelector(),
+                  _buildDaySelector(accent),
                 ],
               ),
             ),
@@ -288,14 +324,14 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
                   return _buildPrayerPill(
                     prayer: prayer,
                     isCompleted: isCompleted,
-                    themeColor: themeColor.color,
+                    themeColor: accent,
                     isEditable: isEditable,
                   );
                 }).toList(),
               ),
             ),
 
-            // Progress bar
+            // Progress bar — only animates the pulse when there's actual progress
             Container(
               height: 3,
               decoration: BoxDecoration(
@@ -305,30 +341,32 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
                   bottomRight: Radius.circular(16),
                 ),
               ),
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: progress,
-                child: AnimatedBuilder(
-                  animation: _pulseAnimation,
-                  builder: (context, child) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            _greenDark,
-                            _greenPrimary,
-                            _greenLight.withOpacity(0.5 + _pulseAnimation.value * 0.5),
-                          ],
-                        ),
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(16),
-                          bottomRight: Radius.circular(3),
-                        ),
+              child: progress > 0
+                  ? FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: progress,
+                      child: AnimatedBuilder(
+                        animation: _pulseAnimation,
+                        builder: (context, child) {
+                          return Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  accent.withValues(alpha: 0.6),
+                                  accent,
+                                  accent.withValues(alpha: 0.5 + _pulseAnimation.value * 0.5),
+                                ],
+                              ),
+                              borderRadius: const BorderRadius.only(
+                                bottomLeft: Radius.circular(16),
+                                bottomRight: Radius.circular(3),
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
-              ),
+                    )
+                  : null, // No animation when 0 prayers completed
             ),
           ],
         ),
@@ -336,7 +374,7 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
     );
   }
 
-  Widget _buildDaySelector() {
+  Widget _buildDaySelector(Color accent) {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -347,18 +385,18 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
       child: Row(
         children: [
           Expanded(
-            child: _buildDayTab('Today', 0),
+            child: _buildDayTab('Today', 0, accent),
           ),
           const SizedBox(width: 4),
           Expanded(
-            child: _buildDayTab('Yesterday', 1),
+            child: _buildDayTab('Yesterday', 1, accent),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDayTab(String label, int dayOffset) {
+  Widget _buildDayTab(String label, int dayOffset, Color accent) {
     final isSelected = _selectedDayOffset == dayOffset;
     
     return GestureDetector(
@@ -372,10 +410,10 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? _greenPrimary.withOpacity(0.15) : Colors.transparent,
+          color: isSelected ? accent.withValues(alpha: 0.15) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? _greenPrimary.withOpacity(0.5) : Colors.transparent,
+            color: isSelected ? accent.withValues(alpha: 0.5) : Colors.transparent,
             width: 1,
           ),
         ),
@@ -385,13 +423,13 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
             if (isSelected && dayOffset == 0)
               Icon(
                 Icons.today_rounded,
-                color: _greenPrimary,
+                color: accent,
                 size: 14,
               ),
             if (isSelected && dayOffset == 1)
               Icon(
                 Icons.history_rounded,
-                color: _amberAccent,
+                color: accent,
                 size: 14,
               ),
             if (isSelected) const SizedBox(width: 4),
@@ -400,9 +438,7 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected 
-                    ? (dayOffset == 0 ? _greenPrimary : _amberAccent)
-                    : _textSecondary,
+                color: isSelected ? accent : _textSecondary,
                 letterSpacing: 0.5,
               ),
             ),
@@ -412,7 +448,7 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
     );
   }
 
-  Widget _buildProgressRing(double progress, int completed) {
+  Widget _buildProgressRing(double progress, int completed, Color accent) {
     return SizedBox(
       width: 52,
       height: 52,
@@ -438,7 +474,7 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
                 size: const Size(52, 52),
                 painter: _RingPainter(
                   progress: value,
-                  color: _greenPrimary,
+                  color: accent,
                   strokeWidth: 4,
                 ),
               );
@@ -451,7 +487,7 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
                 ? Icon(
                     Icons.check_rounded,
                     key: const ValueKey('check'),
-                    color: _greenPrimary,
+                    color: accent,
                     size: 24,
                   )
                 : Text(
@@ -481,15 +517,15 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
     final double opacity;
     
     if (isCompleted) {
-      pillColor = _greenPrimary;
-      iconColor = _greenPrimary;
-      textColor = _greenLight;
+      pillColor = themeColor;
+      iconColor = themeColor;
+      textColor = themeColor.withValues(alpha: 0.8);
       opacity = 1.0;
     } else if (!isEditable) {
       // Non-editable past prayers
       pillColor = _borderColor;
-      iconColor = _textMuted.withOpacity(0.4);
-      textColor = _textMuted.withOpacity(0.5);
+      iconColor = _textMuted.withValues(alpha: 0.4);
+      textColor = _textMuted.withValues(alpha: 0.5);
       opacity = 0.5;
     } else {
       pillColor = _borderColor;
@@ -527,12 +563,12 @@ class _PrayerTrackerWidgetState extends ConsumerState<PrayerTrackerWidget>
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
             color: isCompleted 
-                ? pillColor.withOpacity(0.15)
+                ? pillColor.withValues(alpha: 0.15)
                 : _bgDark,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isCompleted 
-                  ? pillColor.withOpacity(0.5)
+                  ? pillColor.withValues(alpha: 0.5)
                   : pillColor,
               width: 1,
             ),

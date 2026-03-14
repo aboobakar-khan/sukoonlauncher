@@ -2,12 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../models/note.dart';
+import '../utils/hive_box_manager.dart';
 
 const _uuid = Uuid();
 
 /// Provider for the Hive box containing notes
 final noteBoxProvider = FutureProvider<Box<Note>>((ref) async {
-  return await Hive.openBox<Note>('notes');
+  return await HiveBoxManager.get<Note>('notes');
 });
 
 /// Provider for the list of notes
@@ -27,7 +28,7 @@ class NoteListNotifier extends StateNotifier<List<Note>> {
 
   Future<void> _init() async {
     try {
-      _box = await Hive.openBox<Note>('notes');
+      _box = await HiveBoxManager.get<Note>('notes');
       state = _box!.values.toList()
         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     } catch (e) {
